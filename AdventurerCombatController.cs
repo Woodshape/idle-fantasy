@@ -1,7 +1,9 @@
 #nullable enable
 
 using Godot;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using GDict = Godot.Collections.Dictionary;
 
 public partial class AdventurerCombatController : Node
@@ -12,11 +14,13 @@ public partial class AdventurerCombatController : Node
 	private CombatActionRunner? _adventurerRunner;
 	private CombatActionRunner? _monsterRunner;
 	private int _encounterId;
+	private long _lastProcessedTick;
+	private double _tickIntervalSeconds = 0.25;
 	private bool _monsterDefeatedEmitted;
 	private bool _adventurerDiedEmitted;
 
 	public CombatState State => _adventurer?.CombatState ?? CombatState.OutOfCombat;
-	public double AttackCooldownRemaining => _adventurerRunner?.BasicAttackCooldownRemaining ?? 0.0;
+	public int AttackCooldownTicksRemaining => _adventurerRunner?.BasicAttackCooldownTicksRemaining ?? 0;
 
 	public override void _Ready()
 	{
@@ -24,29 +28,7 @@ public partial class AdventurerCombatController : Node
 		_adventurer = GetParentOrNull<Adventurer>();
 	}
 
-	public override void _PhysicsProcess(double delta)
-	{
-		_adventurer ??= GetParentOrNull<Adventurer>();
-
-		if (_adventurer is null || _target is null)
-		{
-			return;
-		}
-
-		_adventurerRunner?.Update(delta);
-
-		if (HandleEndConditions())
-		{
-			PublishEncounterState();
-			return;
-		}
-
-		_monsterRunner?.Update(delta);
-		HandleEndConditions();
-		PublishEncounterState();
-	}
-
-	public void StartCombat(Monster target)
+	public void StartCombat(Monster target, long currentTick)
 	{
 		_adventurer ??= GetParentOrNull<Adventurer>();
 
@@ -57,25 +39,72 @@ public partial class AdventurerCombatController : Node
 
 		_target = target;
 		_encounterId++;
+		_lastProcessedTick = currentTick;
 		_monsterDefeatedEmitted = false;
 		_adventurerDiedEmitted = false;
 		_adventurerRunner = new CombatActionRunner(_adventurer, CreateAdventurerActions(), _rng, EmitBridgeEvent);
 		_monsterRunner = new CombatActionRunner(target, CreateMonsterActions(), _rng, EmitBridgeEvent);
-		_adventurerRunner.Start(target);
-		_monsterRunner.Start(_adventurer);
+		_adventurerRunner.Start(target, currentTick);
+		_monsterRunner.Start(_adventurer, currentTick);
 
-		GD.Print($"COMBAT_STARTED encounter={_encounterId} adventurer={_adventurer.AdventurerName} monster={target.MonsterName}");
+		GD.Print($"COMBAT_STARTED tick={currentTick} encounter={_encounterId} adventurer={_adventurer.AdventurerName} monster={target.MonsterName}");
 		EmitBridgeEvent("combat_started", new GDict
 		{
 			{ "source", nameof(AdventurerCombatController) },
 			{ "encounter_id", _encounterId },
+			{ "tick", currentTick },
 			{ "adventurer", _adventurer.AdventurerName },
 			{ "monster", target.MonsterName },
-			{ "adventurer_attacks_per_second", _adventurer.AttackSpeed },
-			{ "monster_attacks_per_second", target.AttackSpeed },
-			{ "timing_model", "per_combatant_action_timers" }
+			{ "adventurer_attack_speed_ticks", _adventurer.AttackSpeed },
+			{ "monster_attack_speed_ticks", target.AttackSpeed },
+			{ "tick_interval_seconds", _tickIntervalSeconds },
+			{ "timing_model", "simulation_ticks" }
 		});
 		PublishEncounterState();
+	}
+
+	public void ProcessSimulationTick(long tick, double tickIntervalSeconds)
+	{
+		_tickIntervalSeconds = tickIntervalSeconds;
+		_adventurer ??= GetParentOrNull<Adventurer>();
+
+		if (_adventurer is null || _target is null || _adventurerRunner is null || _monsterRunner is null)
+		{
+			return;
+		}
+
+		_lastProcessedTick = tick;
+		EmitBridgeEvent("combat_tick_started", new GDict
+		{
+			{ "source", nameof(AdventurerCombatController) },
+			{ "encounter_id", _encounterId },
+			{ "tick", tick },
+			{ "tick_interval_seconds", tickIntervalSeconds }
+		});
+
+		_adventurerRunner.AdvanceTickCounters(tick);
+		_monsterRunner.AdvanceTickCounters(tick);
+
+		List<QueuedCombatAction> queuedActions = new();
+		AddIfQueued(queuedActions, _adventurerRunner.QueueActionForTick(tick));
+		AddIfQueued(queuedActions, _monsterRunner.QueueActionForTick(tick));
+
+		foreach (RolledCombatAction rolledAction in RollActionOrder(queuedActions, tick))
+		{
+			rolledAction.QueuedAction.Runner.ResolveQueuedAction(rolledAction.QueuedAction, tick);
+		}
+
+		HandleEndConditions();
+		PublishEncounterState();
+		EmitBridgeEvent("combat_tick_completed", new GDict
+		{
+			{ "source", nameof(AdventurerCombatController) },
+			{ "encounter_id", _encounterId },
+			{ "tick", tick },
+			{ "queued_action_count", queuedActions.Count },
+			{ "adventurer_alive", _adventurer.IsAlive },
+			{ "monster_alive", _target?.IsAlive ?? false }
+		});
 	}
 
 	public void StopCombat()
@@ -102,8 +131,6 @@ public partial class AdventurerCombatController : Node
 
 		if (!_adventurer.IsAlive)
 		{
-			_adventurerRunner?.Update(0.0);
-
 			if (!_adventurerDiedEmitted)
 			{
 				_adventurerDiedEmitted = true;
@@ -116,6 +143,7 @@ public partial class AdventurerCombatController : Node
 				});
 			}
 
+			_adventurerRunner?.Stop();
 			_monsterRunner?.Stop();
 			_adventurerRunner = null;
 			_monsterRunner = null;
@@ -130,8 +158,6 @@ public partial class AdventurerCombatController : Node
 
 		if (!_target.IsAlive)
 		{
-			_monsterRunner?.Update(0.0);
-
 			if (!_monsterDefeatedEmitted)
 			{
 				_monsterDefeatedEmitted = true;
@@ -148,6 +174,7 @@ public partial class AdventurerCombatController : Node
 			}
 
 			_adventurerRunner?.Stop();
+			_monsterRunner?.Stop();
 			_target.PublishState();
 			_adventurerRunner = null;
 			_monsterRunner = null;
@@ -167,15 +194,74 @@ public partial class AdventurerCombatController : Node
 				"Heavy Strike",
 				CombatActionKind.Skill,
 				48.0,
-				1.0,
-				0.0,
-				0.25,
+				4,
+				0,
+				1,
 				true,
 				false,
+				10,
 				1.5,
 				false),
 			CombatAction.BasicAttack()
 		};
+	}
+
+	private IEnumerable<RolledCombatAction> RollActionOrder(IReadOnlyList<QueuedCombatAction> queuedActions, long tick)
+	{
+		List<RolledCombatAction> rolledActions = new();
+
+		foreach (QueuedCombatAction queuedAction in queuedActions)
+		{
+			int randomRoll = _rng.RandiRange(1, 100);
+			CombatStats stats = queuedAction.Actor.Stats;
+			int initiativeScore =
+				randomRoll
+				+ stats.Initiative
+				+ (int)Math.Round(stats.Accuracy * 20.0, MidpointRounding.AwayFromZero)
+				+ (int)Math.Round(stats.Evasion * 10.0, MidpointRounding.AwayFromZero)
+				+ GetAttackSpeedInitiativeBonus(stats.AttackSpeedTicks)
+				- queuedAction.Action.ActionWeight;
+			RolledCombatAction rolledAction = new(queuedAction, randomRoll, initiativeScore);
+			rolledActions.Add(rolledAction);
+			EmitBridgeEvent("combat_action_order_rolled", new GDict
+			{
+				{ "source", nameof(AdventurerCombatController) },
+				{ "encounter_id", _encounterId },
+				{ "tick", tick },
+				{ "combatant", queuedAction.Actor.DisplayName },
+				{ "combatant_kind", queuedAction.Actor.CombatantKind },
+				{ "target", queuedAction.Target?.DisplayName ?? "none" },
+				{ "action_id", queuedAction.Action.ActionId },
+				{ "random_roll", randomRoll },
+				{ "initiative", stats.Initiative },
+				{ "accuracy_bonus", (int)Math.Round(stats.Accuracy * 20.0, MidpointRounding.AwayFromZero) },
+				{ "evasion_bonus", (int)Math.Round(stats.Evasion * 10.0, MidpointRounding.AwayFromZero) },
+				{ "attack_speed_ticks", stats.AttackSpeedTicks },
+				{ "attack_speed_bonus", GetAttackSpeedInitiativeBonus(stats.AttackSpeedTicks) },
+				{ "action_weight", queuedAction.Action.ActionWeight },
+				{ "initiative_score", initiativeScore }
+			});
+		}
+
+		return rolledActions
+			.OrderByDescending(action => action.InitiativeScore)
+			.ThenByDescending(action => action.QueuedAction.Actor.Initiative)
+			.ThenBy(action => action.QueuedAction.Actor.AttackSpeed)
+			.ThenBy(action => action.QueuedAction.Actor.CombatantId, System.StringComparer.Ordinal)
+			.ToArray();
+	}
+
+	private static int GetAttackSpeedInitiativeBonus(int attackSpeedTicks)
+	{
+		return Math.Max(0, 12 - Math.Max(1, attackSpeedTicks));
+	}
+
+	private static void AddIfQueued(List<QueuedCombatAction> queuedActions, QueuedCombatAction? queuedAction)
+	{
+		if (queuedAction is not null)
+		{
+			queuedActions.Add(queuedAction);
+		}
 	}
 
 	private static IReadOnlyList<CombatAction> CreateMonsterActions()
@@ -198,6 +284,8 @@ public partial class AdventurerCombatController : Node
 			{ "source", nameof(AdventurerCombatController) },
 			{ "encounter_id", _encounterId },
 			{ "active", _target is not null && _adventurer?.CombatState != CombatState.OutOfCombat },
+			{ "last_processed_tick", _lastProcessedTick },
+			{ "tick_interval_seconds", _tickIntervalSeconds },
 			{ "adventurer", BuildRunnerState(_adventurerRunner, _adventurer) },
 			{ "monster", BuildRunnerState(_monsterRunner, _monsterRunner?.Owner) }
 		});
@@ -209,7 +297,7 @@ public partial class AdventurerCombatController : Node
 
 		if (runner is not null)
 		{
-			foreach ((string key, double value) in runner.SkillCooldowns)
+			foreach ((string key, int value) in runner.SkillCooldowns)
 			{
 				skillCooldowns[key] = value;
 			}
@@ -223,12 +311,13 @@ public partial class AdventurerCombatController : Node
 			{ "target", runner?.Target?.DisplayName ?? "none" },
 			{ "active_action", runner?.ActiveActionId ?? string.Empty },
 			{ "queued_action", runner?.QueuedActionId ?? string.Empty },
-			{ "basic_attack_cooldown_remaining", runner?.BasicAttackCooldownRemaining ?? 0.0 },
-			{ "cast_remaining", combatant is Adventurer adventurer ? adventurer.CastRemaining : combatant is Monster monster ? monster.CastRemaining : 0.0 },
-			{ "recovery_remaining", combatant is Adventurer adventurer2 ? adventurer2.RecoveryRemaining : combatant is Monster monster2 ? monster2.RecoveryRemaining : 0.0 },
+			{ "basic_attack_cooldown_ticks_remaining", runner?.BasicAttackCooldownTicksRemaining ?? 0 },
+			{ "cast_ticks_remaining", combatant is Adventurer adventurer ? adventurer.CastTicksRemaining : combatant is Monster monster ? monster.CastTicksRemaining : 0 },
+			{ "recovery_ticks_remaining", combatant is Adventurer adventurer2 ? adventurer2.RecoveryTicksRemaining : combatant is Monster monster2 ? monster2.RecoveryTicksRemaining : 0 },
 			{ "skill_cooldowns", skillCooldowns },
 			{ "is_alive", combatant?.IsAlive ?? false },
-			{ "attack_speed", combatant?.AttackSpeed ?? 0.0 },
+			{ "attack_speed", combatant?.AttackSpeed ?? 0 },
+			{ "attack_speed_ticks", combatant?.AttackSpeed ?? 0 },
 			{ "health", combatant?.Health ?? 0 },
 			{ "max_health", combatant?.MaxHealth ?? 0 }
 		};

@@ -7,6 +7,7 @@ public enum CombatState
 	OutOfCombat,
 	Engaging,
 	Ready,
+	Queued,
 	UsingAction,
 	Casting,
 	Recovering,
@@ -28,11 +29,12 @@ public sealed class CombatAction
 		string displayName,
 		CombatActionKind kind,
 		double range,
-		double cooldown,
-		double castTime,
-		double recoveryTime,
+		int cooldownTicks,
+		int castTicks,
+		int recoveryTicks,
 		bool requiresTarget,
 		bool canUseWhileMoving,
+		int actionWeight,
 		double damageMultiplier,
 		bool usesBasicAttackCooldown)
 	{
@@ -40,11 +42,12 @@ public sealed class CombatAction
 		DisplayName = displayName;
 		Kind = kind;
 		Range = range;
-		Cooldown = cooldown;
-		CastTime = castTime;
-		RecoveryTime = recoveryTime;
+		CooldownTicks = cooldownTicks;
+		CastTicks = castTicks;
+		RecoveryTicks = recoveryTicks;
 		RequiresTarget = requiresTarget;
 		CanUseWhileMoving = canUseWhileMoving;
+		ActionWeight = actionWeight;
 		DamageMultiplier = damageMultiplier;
 		UsesBasicAttackCooldown = usesBasicAttackCooldown;
 	}
@@ -53,11 +56,12 @@ public sealed class CombatAction
 	public string DisplayName { get; }
 	public CombatActionKind Kind { get; }
 	public double Range { get; }
-	public double Cooldown { get; }
-	public double CastTime { get; }
-	public double RecoveryTime { get; }
+	public int CooldownTicks { get; }
+	public int CastTicks { get; }
+	public int RecoveryTicks { get; }
 	public bool RequiresTarget { get; }
 	public bool CanUseWhileMoving { get; }
+	public int ActionWeight { get; }
 	public double DamageMultiplier { get; }
 	public bool UsesBasicAttackCooldown { get; }
 
@@ -68,11 +72,12 @@ public sealed class CombatAction
 			"Basic Attack",
 			CombatActionKind.BasicAttack,
 			48.0,
-			0.0,
-			0.0,
-			0.10,
+			0,
+			0,
+			0,
 			true,
 			false,
+			0,
 			1.0,
 			true);
 	}
@@ -83,7 +88,8 @@ public readonly record struct CombatStats(
 	double Accuracy,
 	int Defense,
 	double Evasion,
-	double AttacksPerSecond,
+	int Initiative,
+	int AttackSpeedTicks,
 	int MaxHealth,
 	int CurrentHealth);
 
@@ -93,10 +99,10 @@ public sealed class CombatantCombatSnapshot
 	public string CurrentTargetName { get; init; } = string.Empty;
 	public string QueuedActionId { get; init; } = string.Empty;
 	public string ActiveActionId { get; init; } = string.Empty;
-	public double BasicAttackCooldownRemaining { get; init; }
-	public double CastRemaining { get; init; }
-	public double RecoveryRemaining { get; init; }
-	public IReadOnlyDictionary<string, double> SkillCooldowns { get; init; } = new Dictionary<string, double>();
+	public int BasicAttackCooldownTicksRemaining { get; init; }
+	public int CastTicksRemaining { get; init; }
+	public int RecoveryTicksRemaining { get; init; }
+	public IReadOnlyDictionary<string, int> SkillCooldowns { get; init; } = new Dictionary<string, int>();
 	public bool IsDisabled { get; init; }
 	public bool CanAct { get; init; }
 }

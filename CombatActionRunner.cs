@@ -16,10 +16,11 @@ public sealed class CombatActionRunner
 	private readonly IReadOnlyList<CombatAction> _actions;
 	private readonly RandomNumberGenerator _rng;
 	private readonly Action<string, GDict> _emitEvent;
-	private readonly Dictionary<string, double> _skillCooldowns = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, int> _skillCooldowns = new(StringComparer.Ordinal);
 	private CombatAction? _queuedAction;
 	private CombatAction? _activeAction;
 	private ICombatant? _target;
+	private long _currentTick;
 
 	public CombatActionRunner(
 		ICombatant owner,
@@ -34,29 +35,30 @@ public sealed class CombatActionRunner
 
 		foreach (CombatAction action in _actions.Where(action => action.Kind != CombatActionKind.BasicAttack))
 		{
-			_skillCooldowns[action.ActionId] = 0.0;
+			_skillCooldowns[action.ActionId] = 0;
 		}
 	}
 
 	public ICombatant Owner => _owner;
 	public ICombatant? Target => _target;
 	public CombatState State { get; private set; } = CombatState.OutOfCombat;
-	public double BasicAttackCooldownRemaining { get; private set; }
-	public double CastRemaining { get; private set; }
-	public double RecoveryRemaining { get; private set; }
-	public IReadOnlyDictionary<string, double> SkillCooldowns => _skillCooldowns;
+	public int BasicAttackCooldownTicksRemaining { get; private set; }
+	public int CastTicksRemaining { get; private set; }
+	public int RecoveryTicksRemaining { get; private set; }
+	public IReadOnlyDictionary<string, int> SkillCooldowns => _skillCooldowns;
 	public string ActiveActionId => _activeAction?.ActionId ?? string.Empty;
 	public string QueuedActionId => _queuedAction?.ActionId ?? string.Empty;
 	public bool IsDisabled => State == CombatState.Disabled;
 	public bool CanAct => State == CombatState.Ready && _owner.IsAlive && _target?.IsAlive == true;
 
-	public void Start(ICombatant target)
+	public void Start(ICombatant target, long currentTick)
 	{
+		_currentTick = currentTick;
 		_target = target;
 		_queuedAction = null;
 		_activeAction = null;
-		CastRemaining = 0.0;
-		RecoveryRemaining = 0.0;
+		CastTicksRemaining = 0;
+		RecoveryTicksRemaining = 0;
 		ChangeState(CombatState.Engaging);
 		PublishSnapshot();
 	}
@@ -66,21 +68,23 @@ public sealed class CombatActionRunner
 		_target = null;
 		_queuedAction = null;
 		_activeAction = null;
-		BasicAttackCooldownRemaining = 0.0;
-		CastRemaining = 0.0;
-		RecoveryRemaining = 0.0;
+		BasicAttackCooldownTicksRemaining = 0;
+		CastTicksRemaining = 0;
+		RecoveryTicksRemaining = 0;
 
 		foreach (string key in _skillCooldowns.Keys.ToArray())
 		{
-			_skillCooldowns[key] = 0.0;
+			_skillCooldowns[key] = 0;
 		}
 
 		ChangeState(_owner.IsAlive ? CombatState.OutOfCombat : CombatState.Defeated);
 		PublishSnapshot();
 	}
 
-	public void Update(double delta)
+	public void AdvanceTickCounters(long tick)
 	{
+		_currentTick = tick;
+
 		if (State is CombatState.OutOfCombat or CombatState.Defeated)
 		{
 			return;
@@ -88,6 +92,8 @@ public sealed class CombatActionRunner
 
 		if (!_owner.IsAlive)
 		{
+			_queuedAction = null;
+			_activeAction = null;
 			ChangeState(CombatState.Defeated);
 			PublishSnapshot();
 			return;
@@ -103,85 +109,167 @@ public sealed class CombatActionRunner
 			return;
 		}
 
-		UpdateCooldowns(delta);
-
-		switch (State)
+		if (State == CombatState.Engaging)
 		{
-			case CombatState.Engaging:
-				ChangeState(CombatState.Ready);
-				EmitReady();
-				TrySelectAndStartAction();
-				break;
-			case CombatState.Casting:
-				UpdateCast(delta);
-				break;
-			case CombatState.Recovering:
-				UpdateRecovery(delta);
-				break;
-			case CombatState.Ready:
-				TrySelectAndStartAction();
-				break;
+			ChangeState(CombatState.Ready);
+			EmitReady(tick);
+		}
+
+		UpdateCooldowns(tick);
+		UpdateRecovery(tick);
+		UpdateCast(tick);
+		PublishSnapshot();
+	}
+
+	public QueuedCombatAction? QueueActionForTick(long tick)
+	{
+		_currentTick = tick;
+
+		if (State == CombatState.Queued && _queuedAction is CombatAction queuedAction)
+		{
+			return new QueuedCombatAction(this, _owner, _target, queuedAction);
+		}
+
+		if (State != CombatState.Ready || !CanAct)
+		{
+			return null;
+		}
+
+		CombatAction? action = SelectAction();
+
+		if (action is null)
+		{
+			return null;
+		}
+
+		if (action.CastTicks > 0)
+		{
+			_activeAction = action;
+			CastTicksRemaining = action.CastTicks;
+			ChangeState(CombatState.Casting);
+			_emitEvent("combat_cast_started", BuildActionPayload(action, tick));
+			PublishSnapshot();
+			return null;
+		}
+
+		return QueueSelectedAction(action, tick, "ready");
+	}
+
+	public void ResolveQueuedAction(QueuedCombatAction queuedAction, long tick)
+	{
+		_currentTick = tick;
+		CombatAction action = queuedAction.Action;
+
+		if (_queuedAction != action)
+		{
+			CancelQueuedAction(action, tick, "action_no_longer_queued");
+			return;
+		}
+
+		if (!_owner.IsAlive)
+		{
+			CancelQueuedAction(action, tick, "combatant_defeated");
+			ChangeState(CombatState.Defeated);
+			PublishSnapshot();
+			return;
+		}
+
+		if (_target is null || !_target.IsAlive)
+		{
+			CancelQueuedAction(action, tick, "target_defeated");
+			ChangeState(_owner.IsAlive ? CombatState.Ready : CombatState.Defeated);
+			PublishSnapshot();
+			return;
+		}
+
+		_queuedAction = null;
+		_activeAction = action;
+		_emitEvent("combat_action_started", BuildActionPayload(action, tick));
+
+		ActionResolution resolution = ResolveAction(action, tick);
+		StartCooldowns(action, tick);
+		_emitEvent("combat_action_resolved", new GDict
+		{
+			{ "source", nameof(CombatActionRunner) },
+			{ "tick", tick },
+			{ "combatant", _owner.DisplayName },
+			{ "combatant_kind", _owner.CombatantKind },
+			{ "target", _target?.DisplayName ?? "none" },
+			{ "action_id", action.ActionId },
+			{ "action_kind", action.Kind.ToString() },
+			{ "hit", resolution.Hit },
+			{ "damage", resolution.Damage }
+		});
+
+		_activeAction = null;
+
+		if (!_owner.IsAlive)
+		{
+			ChangeState(CombatState.Defeated);
+		}
+		else if (action.RecoveryTicks > 0 && _target?.IsAlive == true)
+		{
+			RecoveryTicksRemaining = action.RecoveryTicks;
+			ChangeState(CombatState.Recovering);
+			_emitEvent("combat_recovery_started", new GDict
+			{
+				{ "source", nameof(CombatActionRunner) },
+				{ "tick", tick },
+				{ "combatant", _owner.DisplayName },
+				{ "combatant_kind", _owner.CombatantKind },
+				{ "duration_ticks", RecoveryTicksRemaining }
+			});
+		}
+		else
+		{
+			ChangeState(CombatState.Ready);
+			EmitReady(tick);
 		}
 
 		PublishSnapshot();
 	}
 
-	private void UpdateCooldowns(double delta)
+	private void UpdateCooldowns(long tick)
 	{
-		if (BasicAttackCooldownRemaining > 0.0)
+		if (BasicAttackCooldownTicksRemaining > 0)
 		{
-			double previous = BasicAttackCooldownRemaining;
-			BasicAttackCooldownRemaining = Math.Max(0.0, BasicAttackCooldownRemaining - delta);
+			BasicAttackCooldownTicksRemaining--;
 
-			if (previous > 0.0 && BasicAttackCooldownRemaining <= 0.0)
+			if (BasicAttackCooldownTicksRemaining == 0)
 			{
-				EmitCooldownReady("basic_attack", "basic_attack");
+				EmitCooldownReady("basic_attack", "basic_attack", tick);
 			}
 		}
 
 		foreach (string actionId in _skillCooldowns.Keys.ToArray())
 		{
-			double previous = _skillCooldowns[actionId];
+			int previous = _skillCooldowns[actionId];
 
-			if (previous <= 0.0)
+			if (previous <= 0)
 			{
 				continue;
 			}
 
-			double current = Math.Max(0.0, previous - delta);
+			int current = Math.Max(0, previous - 1);
 			_skillCooldowns[actionId] = current;
 
-			if (current <= 0.0)
+			if (current == 0)
 			{
-				EmitCooldownReady(actionId, "skill");
+				EmitCooldownReady(actionId, "skill", tick);
 			}
 		}
 	}
 
-	private void UpdateCast(double delta)
+	private void UpdateRecovery(long tick)
 	{
-		if (_activeAction is null)
-		{
-			ChangeState(CombatState.Ready);
-			return;
-		}
-
-		CastRemaining = Math.Max(0.0, CastRemaining - delta);
-
-		if (CastRemaining > 0.0)
+		if (State != CombatState.Recovering || RecoveryTicksRemaining <= 0)
 		{
 			return;
 		}
 
-		_emitEvent("combat_cast_completed", BuildActionPayload(_activeAction));
-		ResolveActiveAction();
-	}
+		RecoveryTicksRemaining--;
 
-	private void UpdateRecovery(double delta)
-	{
-		RecoveryRemaining = Math.Max(0.0, RecoveryRemaining - delta);
-
-		if (RecoveryRemaining > 0.0)
+		if (RecoveryTicksRemaining > 0)
 		{
 			return;
 		}
@@ -189,31 +277,54 @@ public sealed class CombatActionRunner
 		_emitEvent("combat_recovery_completed", new GDict
 		{
 			{ "source", nameof(CombatActionRunner) },
+			{ "tick", tick },
 			{ "combatant", _owner.DisplayName },
 			{ "combatant_kind", _owner.CombatantKind }
 		});
 		ChangeState(CombatState.Ready);
-		EmitReady();
-		TrySelectAndStartAction();
+		EmitReady(tick);
 	}
 
-	private void TrySelectAndStartAction()
+	private void UpdateCast(long tick)
 	{
-		if (!CanAct)
+		if (State != CombatState.Casting || _activeAction is not CombatAction action)
 		{
 			return;
 		}
 
-		CombatAction? action = SelectAction();
+		CastTicksRemaining = Math.Max(0, CastTicksRemaining - 1);
 
-		if (action is null)
+		if (CastTicksRemaining > 0)
 		{
 			return;
 		}
 
+		_emitEvent("combat_cast_completed", BuildActionPayload(action, tick));
+		_activeAction = null;
+		QueueSelectedAction(action, tick, "cast_completed");
+	}
+
+	private QueuedCombatAction QueueSelectedAction(CombatAction action, long tick, string reason)
+	{
 		_queuedAction = action;
-		_emitEvent("combat_action_selected", BuildActionPayload(action));
-		StartAction(action);
+		ChangeState(CombatState.Queued);
+		GD.Print($"ACTION_QUEUED tick={tick} combatant={_owner.DisplayName} action={action.ActionId} target={_target?.DisplayName ?? "none"} reason={reason} action_cooldown_ticks={GetActionCooldownTicks(action)} basic_attack_cooldown_ticks_remaining={BasicAttackCooldownTicksRemaining} skill_cooldown_ticks_remaining={GetSkillCooldownTicksRemaining(action)} cast_ticks={action.CastTicks} recovery_ticks={action.RecoveryTicks}");
+		_emitEvent("combat_action_queued", BuildActionPayload(action, tick, new GDict
+		{
+			{ "queue_reason", reason }
+		}));
+		PublishSnapshot();
+		return new QueuedCombatAction(this, _owner, _target, action);
+	}
+
+	private int GetSkillCooldownTicksRemaining(CombatAction action)
+	{
+		return _skillCooldowns.TryGetValue(action.ActionId, out int remaining) ? remaining : 0;
+	}
+
+	private int GetActionCooldownTicks(CombatAction action)
+	{
+		return action.UsesBasicAttackCooldown ? GetBasicAttackCooldownTicks() : action.CooldownTicks;
 	}
 
 	private CombatAction? SelectAction()
@@ -238,84 +349,12 @@ public sealed class CombatActionRunner
 
 		return action.Kind switch
 		{
-			CombatActionKind.BasicAttack => BasicAttackCooldownRemaining <= 0.0,
-			_ => !_skillCooldowns.TryGetValue(action.ActionId, out double remaining) || remaining <= 0.0
+			CombatActionKind.BasicAttack => BasicAttackCooldownTicksRemaining <= 0,
+			_ => !_skillCooldowns.TryGetValue(action.ActionId, out int remaining) || remaining <= 0
 		};
 	}
 
-	private void StartAction(CombatAction action)
-	{
-		_queuedAction = null;
-		_activeAction = action;
-		_emitEvent("combat_action_started", BuildActionPayload(action));
-
-		if (action.CastTime > 0.0)
-		{
-			CastRemaining = action.CastTime;
-			ChangeState(CombatState.Casting);
-			_emitEvent("combat_cast_started", BuildActionPayload(action));
-			return;
-		}
-
-		ChangeState(CombatState.UsingAction);
-		ResolveActiveAction();
-	}
-
-	private void ResolveActiveAction()
-	{
-		if (_activeAction is not CombatAction action)
-		{
-			ChangeState(CombatState.Ready);
-			return;
-		}
-
-		ActionResolution resolution = ResolveAction(action);
-		StartCooldowns(action);
-		_emitEvent("combat_action_resolved", new GDict
-		{
-			{ "source", nameof(CombatActionRunner) },
-			{ "combatant", _owner.DisplayName },
-			{ "combatant_kind", _owner.CombatantKind },
-			{ "target", _target?.DisplayName ?? "none" },
-			{ "action_id", action.ActionId },
-			{ "action_kind", action.Kind.ToString() },
-			{ "hit", resolution.Hit },
-			{ "damage", resolution.Damage }
-		});
-
-		_activeAction = null;
-
-		if (!_owner.IsAlive)
-		{
-			ChangeState(CombatState.Defeated);
-			return;
-		}
-
-		if (_target?.IsAlive != true)
-		{
-			ChangeState(CombatState.Ready);
-			return;
-		}
-
-		if (action.RecoveryTime > 0.0)
-		{
-			RecoveryRemaining = action.RecoveryTime;
-			ChangeState(CombatState.Recovering);
-			_emitEvent("combat_recovery_started", new GDict
-			{
-				{ "source", nameof(CombatActionRunner) },
-				{ "combatant", _owner.DisplayName },
-				{ "combatant_kind", _owner.CombatantKind },
-				{ "duration", RecoveryRemaining }
-			});
-			return;
-		}
-
-		ChangeState(CombatState.Ready);
-		EmitReady();
-	}
-
-	private ActionResolution ResolveAction(CombatAction action)
+	private ActionResolution ResolveAction(CombatAction action, long tick)
 	{
 		if (_target is null || !_target.IsAlive)
 		{
@@ -328,10 +367,11 @@ public sealed class CombatActionRunner
 		int rawDamage = (int)Math.Round(_owner.Attack * action.DamageMultiplier, MidpointRounding.AwayFromZero);
 		int damage = hit ? Math.Max(1, rawDamage - _target.Defense) : 0;
 
-		GD.Print($"ATTACK_ROLL attacker={_owner.DisplayName} defender={_target.DisplayName} action={action.ActionId} hit_chance={hitChance:0.00} roll={roll:0.00} hit={hit} damage={damage}");
+		GD.Print($"ATTACK_ROLL tick={tick} attacker={_owner.DisplayName} defender={_target.DisplayName} action={action.ActionId} hit_chance={hitChance:0.00} roll={roll:0.00} hit={hit} damage={damage}");
 		_emitEvent("attack_roll_resolved", new GDict
 		{
 			{ "source", nameof(CombatActionRunner) },
+			{ "tick", tick },
 			{ "attacker", _owner.DisplayName },
 			{ "attacker_kind", _owner.CombatantKind },
 			{ "defender", _target.DisplayName },
@@ -354,6 +394,7 @@ public sealed class CombatActionRunner
 		_emitEvent("damage_applied", new GDict
 		{
 			{ "source", nameof(CombatActionRunner) },
+			{ "tick", tick },
 			{ "attacker", _owner.DisplayName },
 			{ "attacker_kind", _owner.CombatantKind },
 			{ "defender", _target.DisplayName },
@@ -365,20 +406,35 @@ public sealed class CombatActionRunner
 		return new ActionResolution(true, appliedDamage);
 	}
 
-	private void StartCooldowns(CombatAction action)
+	private void StartCooldowns(CombatAction action, long tick)
 	{
 		if (action.UsesBasicAttackCooldown)
 		{
-			double duration = 1.0 / Math.Max(0.01, _owner.AttackSpeed);
-			BasicAttackCooldownRemaining = duration;
-			EmitCooldownStarted(action.ActionId, "basic_attack", duration);
+			int durationTicks = GetBasicAttackCooldownTicks();
+			BasicAttackCooldownTicksRemaining = durationTicks;
+			EmitCooldownStarted(action.ActionId, "basic_attack", durationTicks, tick);
 		}
 
-		if (action.Kind != CombatActionKind.BasicAttack && action.Cooldown > 0.0)
+		if (action.Kind != CombatActionKind.BasicAttack && action.CooldownTicks > 0)
 		{
-			_skillCooldowns[action.ActionId] = action.Cooldown;
-			EmitCooldownStarted(action.ActionId, "skill", action.Cooldown);
+			_skillCooldowns[action.ActionId] = action.CooldownTicks;
+			EmitCooldownStarted(action.ActionId, "skill", action.CooldownTicks, tick);
 		}
+	}
+
+	private int GetBasicAttackCooldownTicks()
+	{
+		return Math.Max(1, _owner.AttackSpeed);
+	}
+
+	private void CancelQueuedAction(CombatAction action, long tick, string reason)
+	{
+		_queuedAction = null;
+		_activeAction = null;
+		_emitEvent("combat_action_cancelled", BuildActionPayload(action, tick, new GDict
+		{
+			{ "cancel_reason", reason }
+		}));
 	}
 
 	private void ChangeState(CombatState nextState)
@@ -391,10 +447,14 @@ public sealed class CombatActionRunner
 		}
 
 		State = nextState;
-		GD.Print($"COMBAT_STATE combatant={_owner.DisplayName} from={previousState} to={nextState}");
+		if (previousState != CombatState.Queued && nextState != CombatState.Queued)
+		{
+			GD.Print($"COMBAT_STATE tick={_currentTick} combatant={_owner.DisplayName} from={previousState} to={nextState}");
+		}
 		_emitEvent("combat_state_changed", new GDict
 		{
 			{ "source", nameof(CombatActionRunner) },
+			{ "tick", _currentTick },
 			{ "combatant", _owner.DisplayName },
 			{ "combatant_kind", _owner.CombatantKind },
 			{ "target", _target?.DisplayName ?? "none" },
@@ -403,37 +463,40 @@ public sealed class CombatActionRunner
 		});
 	}
 
-	private void EmitReady()
+	private void EmitReady(long tick)
 	{
 		_emitEvent("combatant_ready", new GDict
 		{
 			{ "source", nameof(CombatActionRunner) },
+			{ "tick", tick },
 			{ "combatant", _owner.DisplayName },
 			{ "combatant_kind", _owner.CombatantKind },
 			{ "target", _target?.DisplayName ?? "none" },
-			{ "basic_attack_cooldown_remaining", BasicAttackCooldownRemaining },
-			{ "ready_skill_count", _skillCooldowns.Count(pair => pair.Value <= 0.0) }
+			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining },
+			{ "ready_skill_count", _skillCooldowns.Count(pair => pair.Value <= 0) }
 		});
 	}
 
-	private void EmitCooldownStarted(string actionId, string cooldownKind, double duration)
+	private void EmitCooldownStarted(string actionId, string cooldownKind, int durationTicks, long tick)
 	{
 		_emitEvent("combat_action_cooldown_started", new GDict
 		{
 			{ "source", nameof(CombatActionRunner) },
+			{ "tick", tick },
 			{ "combatant", _owner.DisplayName },
 			{ "combatant_kind", _owner.CombatantKind },
 			{ "action_id", actionId },
 			{ "cooldown_kind", cooldownKind },
-			{ "duration", duration }
+			{ "duration_ticks", durationTicks }
 		});
 	}
 
-	private void EmitCooldownReady(string actionId, string cooldownKind)
+	private void EmitCooldownReady(string actionId, string cooldownKind, long tick)
 	{
 		_emitEvent("combat_action_cooldown_ready", new GDict
 		{
 			{ "source", nameof(CombatActionRunner) },
+			{ "tick", tick },
 			{ "combatant", _owner.DisplayName },
 			{ "combatant_kind", _owner.CombatantKind },
 			{ "action_id", actionId },
@@ -441,22 +504,34 @@ public sealed class CombatActionRunner
 		});
 	}
 
-	private GDict BuildActionPayload(CombatAction action)
+	private GDict BuildActionPayload(CombatAction action, long tick, GDict? extras = null)
 	{
-		return new GDict
+		GDict payload = new()
 		{
 			{ "source", nameof(CombatActionRunner) },
+			{ "tick", tick },
 			{ "combatant", _owner.DisplayName },
 			{ "combatant_kind", _owner.CombatantKind },
 			{ "target", _target?.DisplayName ?? "none" },
 			{ "action_id", action.ActionId },
 			{ "action_name", action.DisplayName },
 			{ "action_kind", action.Kind.ToString() },
-			{ "cooldown", action.Cooldown },
-			{ "cast_time", action.CastTime },
-			{ "recovery_time", action.RecoveryTime },
-			{ "basic_attack_cooldown_remaining", BasicAttackCooldownRemaining }
+			{ "cooldown_ticks", GetActionCooldownTicks(action) },
+			{ "cast_ticks", action.CastTicks },
+			{ "recovery_ticks", action.RecoveryTicks },
+			{ "action_weight", action.ActionWeight },
+			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining }
 		};
+
+		if (extras is not null)
+		{
+			foreach (Variant key in extras.Keys)
+			{
+				payload[key] = extras[key];
+			}
+		}
+
+		return payload;
 	}
 
 	private void PublishSnapshot()
@@ -467,10 +542,10 @@ public sealed class CombatActionRunner
 			CurrentTargetName = _target?.DisplayName ?? string.Empty,
 			QueuedActionId = _queuedAction?.ActionId ?? string.Empty,
 			ActiveActionId = _activeAction?.ActionId ?? string.Empty,
-			BasicAttackCooldownRemaining = BasicAttackCooldownRemaining,
-			CastRemaining = CastRemaining,
-			RecoveryRemaining = RecoveryRemaining,
-			SkillCooldowns = new Dictionary<string, double>(_skillCooldowns, StringComparer.Ordinal),
+			BasicAttackCooldownTicksRemaining = BasicAttackCooldownTicksRemaining,
+			CastTicksRemaining = CastTicksRemaining,
+			RecoveryTicksRemaining = RecoveryTicksRemaining,
+			SkillCooldowns = new Dictionary<string, int>(_skillCooldowns, StringComparer.Ordinal),
 			IsDisabled = IsDisabled,
 			CanAct = CanAct
 		});
@@ -479,3 +554,14 @@ public sealed class CombatActionRunner
 
 	private readonly record struct ActionResolution(bool Hit, int Damage);
 }
+
+public sealed record QueuedCombatAction(
+	CombatActionRunner Runner,
+	ICombatant Actor,
+	ICombatant? Target,
+	CombatAction Action);
+
+public sealed record RolledCombatAction(
+	QueuedCombatAction QueuedAction,
+	int RandomRoll,
+	int InitiativeScore);

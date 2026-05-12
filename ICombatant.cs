@@ -9,7 +9,8 @@ public interface ICombatant
 	double Accuracy { get; }
 	int Defense { get; }
 	double Evasion { get; }
-	double AttackSpeed { get; }
+	int Initiative { get; }
+	int AttackSpeed { get; }
 	int Health { get; }
 	int MaxHealth { get; }
 	bool IsAlive { get; }

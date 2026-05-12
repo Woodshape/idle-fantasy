@@ -28,7 +28,10 @@ public partial class Adventurer : Node2D, ICombatant
 	public double Evasion { get; set; } = 0.15;
 
 	[Export]
-	public double AttackSpeed { get; set; } = 1.0;
+	public int Initiative { get; set; } = 4;
+
+	[Export]
+	public int AttackSpeed { get; set; } = 4;
 
 	[Export]
 	public float Speed { get; set; } = 120.0f;
@@ -49,19 +52,19 @@ public partial class Adventurer : Node2D, ICombatant
 	public string CombatantId => "adventurer";
 	public string CombatantKind => "adventurer";
 	public string DisplayName => AdventurerName;
-	public CombatStats Stats => new(Attack, Accuracy, Defense, Evasion, AttackSpeed, MaxHealth, Health);
+	public CombatStats Stats => new(Attack, Accuracy, Defense, Evasion, Initiative, AttackSpeed, MaxHealth, Health);
 	public CombatState CombatState { get; private set; } = CombatState.OutOfCombat;
 	public string CurrentCombatTargetName { get; private set; } = string.Empty;
 	public string QueuedActionId { get; private set; } = string.Empty;
 	public string ActiveActionId { get; private set; } = string.Empty;
-	public double BasicAttackCooldownRemaining { get; private set; }
-	public double CastRemaining { get; private set; }
-	public double RecoveryRemaining { get; private set; }
-	public IReadOnlyDictionary<string, double> SkillCooldowns => _skillCooldowns;
+	public int BasicAttackCooldownTicksRemaining { get; private set; }
+	public int CastTicksRemaining { get; private set; }
+	public int RecoveryTicksRemaining { get; private set; }
+	public IReadOnlyDictionary<string, int> SkillCooldowns => _skillCooldowns;
 	public bool IsDisabled { get; private set; }
 	public bool CanAct { get; private set; }
 
-	private readonly Dictionary<string, double> _skillCooldowns = new();
+	private readonly Dictionary<string, int> _skillCooldowns = new();
 
 	public override void _Ready()
 	{
@@ -147,14 +150,14 @@ public partial class Adventurer : Node2D, ICombatant
 		CurrentCombatTargetName = snapshot.CurrentTargetName;
 		QueuedActionId = snapshot.QueuedActionId;
 		ActiveActionId = snapshot.ActiveActionId;
-		BasicAttackCooldownRemaining = snapshot.BasicAttackCooldownRemaining;
-		CastRemaining = snapshot.CastRemaining;
-		RecoveryRemaining = snapshot.RecoveryRemaining;
+		BasicAttackCooldownTicksRemaining = snapshot.BasicAttackCooldownTicksRemaining;
+		CastTicksRemaining = snapshot.CastTicksRemaining;
+		RecoveryTicksRemaining = snapshot.RecoveryTicksRemaining;
 		IsDisabled = snapshot.IsDisabled;
 		CanAct = snapshot.CanAct;
 		_skillCooldowns.Clear();
 
-		foreach ((string key, double value) in snapshot.SkillCooldowns)
+		foreach ((string key, int value) in snapshot.SkillCooldowns)
 		{
 			_skillCooldowns[key] = value;
 		}
@@ -180,6 +183,7 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "accuracy", Accuracy },
 			{ "defense", Defense },
 			{ "evasion", Evasion },
+			{ "initiative", Initiative },
 			{ "attack_speed", AttackSpeed },
 			{ "speed", Speed },
 			{ "is_alive", IsAlive },
@@ -188,9 +192,9 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "current_combat_target", CurrentCombatTargetName },
 			{ "queued_action", QueuedActionId },
 			{ "active_action", ActiveActionId },
-			{ "basic_attack_cooldown_remaining", BasicAttackCooldownRemaining },
-			{ "cast_remaining", CastRemaining },
-			{ "recovery_remaining", RecoveryRemaining },
+			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining },
+			{ "cast_ticks_remaining", CastTicksRemaining },
+			{ "recovery_ticks_remaining", RecoveryTicksRemaining },
 			{ "skill_cooldowns", BuildSkillCooldownState() },
 			{ "is_disabled", IsDisabled },
 			{ "can_act", CanAct },
@@ -215,7 +219,7 @@ public partial class Adventurer : Node2D, ICombatant
 	{
 		GDict cooldowns = new();
 
-		foreach ((string key, double value) in _skillCooldowns)
+		foreach ((string key, int value) in _skillCooldowns)
 		{
 			cooldowns[key] = value;
 		}

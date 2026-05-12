@@ -202,7 +202,7 @@ public partial class AdventurerController : Node
 
 		if (!_combatStartedForTarget)
 		{
-			_adventurer.CombatController?.StartCombat(target);
+			_adventurer.CombatController?.StartCombat(target, _game.SimulationTickCount);
 			_combatStartedForTarget = true;
 		}
 

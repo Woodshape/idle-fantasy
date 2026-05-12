@@ -34,6 +34,7 @@ public partial class GameController : Node2D
 	public Adventurer? Adventurer => _adventurer;
 	public int CompletedLoops => _completedLoops;
 	public bool CompletedOnce => _completedLoops > 0;
+	public long SimulationTickCount => _simulationTickCount;
 
 	public override void _Ready()
 	{
@@ -80,8 +81,9 @@ public partial class GameController : Node2D
 				{ "source", nameof(GameController) },
 				{ "tick", _simulationTickCount },
 				{ "interval", SimulationTickInterval },
-				{ "responsibility", "low_frequency_maintenance" }
+				{ "responsibility", "world_and_combat" }
 			});
+			_adventurer?.CombatController?.ProcessSimulationTick(_simulationTickCount, SimulationTickInterval);
 			PublishSimulationClockState();
 		}
 	}
@@ -133,7 +135,7 @@ public partial class GameController : Node2D
 		if (_combatLabel is not null)
 		{
 			string targetName = _adventurer.CurrentMonsterTarget?.MonsterName ?? "none";
-			_combatLabel.Text = $"Combat: {_adventurer.CombatStateName} | Target: {targetName} | Action: {(_adventurer.ActiveActionId == string.Empty ? "none" : _adventurer.ActiveActionId)} | Basic CD: {_adventurer.BasicAttackCooldownRemaining:0.00} | Heavy CD: {GetCooldown(_adventurer, "heavy_strike"):0.00}";
+			_combatLabel.Text = $"Combat: {_adventurer.CombatStateName} | Target: {targetName} | Action: {(_adventurer.ActiveActionId == string.Empty ? "none" : _adventurer.ActiveActionId)} | Basic CD: {_adventurer.BasicAttackCooldownTicksRemaining} ticks | Heavy CD: {GetCooldown(_adventurer, "heavy_strike")} ticks";
 		}
 
 		if (_rewardLabel is not null)
@@ -174,13 +176,13 @@ public partial class GameController : Node2D
 			{ "interval", SimulationTickInterval },
 			{ "tick_count", _simulationTickCount },
 			{ "accumulator", _simulationAccumulator },
-			{ "drives_basic_attacks", false }
+			{ "drives_basic_attacks", true }
 		});
 	}
 
-	private static double GetCooldown(Adventurer adventurer, string actionId)
+	private static int GetCooldown(Adventurer adventurer, string actionId)
 	{
-		return adventurer.SkillCooldowns.TryGetValue(actionId, out double remaining) ? remaining : 0.0;
+		return adventurer.SkillCooldowns.TryGetValue(actionId, out int remaining) ? remaining : 0;
 	}
 
 	private static void EmitBridgeEvent(string type, GDict payload)
