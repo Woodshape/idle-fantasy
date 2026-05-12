@@ -8,6 +8,8 @@ using GDict = Godot.Collections.Dictionary;
 
 public partial class GameController : Node2D
 {
+	private const double SimulationTickInterval = 0.25;
+
 	[Export]
 	public NodePath TownPath { get; set; } = new("Town");
 
@@ -25,6 +27,8 @@ public partial class GameController : Node2D
 	private Label? _rewardLabel;
 	private int _completedLoops;
 	private bool _loopStopped;
+	private double _simulationAccumulator;
+	private long _simulationTickCount;
 
 	public Town? Town => _town;
 	public Adventurer? Adventurer => _adventurer;
@@ -61,6 +65,25 @@ public partial class GameController : Node2D
 	{
 		UpdateHud();
 		PublishState();
+	}
+
+	public override void _PhysicsProcess(double delta)
+	{
+		_simulationAccumulator += delta;
+
+		while (_simulationAccumulator >= SimulationTickInterval)
+		{
+			_simulationAccumulator -= SimulationTickInterval;
+			_simulationTickCount++;
+			EmitBridgeEvent("simulation_tick", new GDict
+			{
+				{ "source", nameof(GameController) },
+				{ "tick", _simulationTickCount },
+				{ "interval", SimulationTickInterval },
+				{ "responsibility", "low_frequency_maintenance" }
+			});
+			PublishSimulationClockState();
+		}
 	}
 
 	public Monster? FindHuntTarget(Adventurer adventurer)
@@ -110,7 +133,7 @@ public partial class GameController : Node2D
 		if (_combatLabel is not null)
 		{
 			string targetName = _adventurer.CurrentMonsterTarget?.MonsterName ?? "none";
-			_combatLabel.Text = $"Combat: {_adventurer.CombatStateName} | Target: {targetName}";
+			_combatLabel.Text = $"Combat: {_adventurer.CombatStateName} | Target: {targetName} | Action: {(_adventurer.ActiveActionId == string.Empty ? "none" : _adventurer.ActiveActionId)} | Basic CD: {_adventurer.BasicAttackCooldownRemaining:0.00} | Heavy CD: {GetCooldown(_adventurer, "heavy_strike"):0.00}";
 		}
 
 		if (_rewardLabel is not null)
@@ -135,6 +158,29 @@ public partial class GameController : Node2D
 			{ "living_monsters", _monsters.Count(monster => monster.IsAlive) },
 			{ "monster_count", _monsters.Count }
 		});
+		PublishSimulationClockState();
+	}
+
+	private void PublishSimulationClockState()
+	{
+		if (TestBridge.Instance?.IsActive != true)
+		{
+			return;
+		}
+
+		TestBridge.Instance.EmitState("simulation_clock", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "interval", SimulationTickInterval },
+			{ "tick_count", _simulationTickCount },
+			{ "accumulator", _simulationAccumulator },
+			{ "drives_basic_attacks", false }
+		});
+	}
+
+	private static double GetCooldown(Adventurer adventurer, string actionId)
+	{
+		return adventurer.SkillCooldowns.TryGetValue(actionId, out double remaining) ? remaining : 0.0;
 	}
 
 	private static void EmitBridgeEvent(string type, GDict payload)

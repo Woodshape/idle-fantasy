@@ -1,35 +1,22 @@
 #nullable enable
 
 using Godot;
-using System;
+using System.Collections.Generic;
 using GDict = Godot.Collections.Dictionary;
-
-public enum AdventurerCombatState
-{
-	OutOfCombat,
-	Engaging,
-	Ready,
-	AttackCooldown,
-	SkillCooldown,
-	Casting,
-	Recovering,
-	Disabled,
-	Defeated
-}
 
 public partial class AdventurerCombatController : Node
 {
-	private const double CombatTickInterval = 1.0;
-	private const double BaseHitChance = 0.75;
-	private const double MinHitChance = 0.05;
-	private const double MaxHitChance = 0.95;
-
 	private readonly RandomNumberGenerator _rng = new();
 	private Adventurer? _adventurer;
 	private Monster? _target;
+	private CombatActionRunner? _adventurerRunner;
+	private CombatActionRunner? _monsterRunner;
+	private int _encounterId;
+	private bool _monsterDefeatedEmitted;
+	private bool _adventurerDiedEmitted;
 
-	public AdventurerCombatState State { get; private set; } = AdventurerCombatState.OutOfCombat;
-	public double AttackCooldownRemaining { get; private set; }
+	public CombatState State => _adventurer?.CombatState ?? CombatState.OutOfCombat;
+	public double AttackCooldownRemaining => _adventurerRunner?.BasicAttackCooldownRemaining ?? 0.0;
 
 	public override void _Ready()
 	{
@@ -41,197 +28,225 @@ public partial class AdventurerCombatController : Node
 	{
 		_adventurer ??= GetParentOrNull<Adventurer>();
 
-		if (_adventurer is null || State is AdventurerCombatState.OutOfCombat or AdventurerCombatState.Defeated)
+		if (_adventurer is null || _target is null)
 		{
 			return;
 		}
 
-		if (!_adventurer.IsAlive)
+		_adventurerRunner?.Update(delta);
+
+		if (HandleEndConditions())
 		{
-			ChangeState(AdventurerCombatState.Defeated);
+			PublishEncounterState();
 			return;
 		}
 
-		if (_target is null || !_target.IsAlive)
-		{
-			StopCombat();
-			return;
-		}
-
-		if (State == AdventurerCombatState.Engaging)
-		{
-			AttackCooldownRemaining = CombatTickInterval;
-			ChangeState(AdventurerCombatState.AttackCooldown);
-			return;
-		}
-
-		if (State == AdventurerCombatState.AttackCooldown)
-		{
-			AttackCooldownRemaining = Math.Max(0.0, AttackCooldownRemaining - delta);
-			_adventurer.PublishState();
-
-			if (AttackCooldownRemaining <= 0.0)
-			{
-				ChangeState(AdventurerCombatState.Ready);
-			}
-
-			return;
-		}
-
-		if (State == AdventurerCombatState.Ready)
-		{
-			ResolveCombatTick();
-		}
+		_monsterRunner?.Update(delta);
+		HandleEndConditions();
+		PublishEncounterState();
 	}
 
 	public void StartCombat(Monster target)
 	{
+		_adventurer ??= GetParentOrNull<Adventurer>();
+
 		if (_adventurer is null)
 		{
-			_adventurer = GetParentOrNull<Adventurer>();
+			return;
 		}
 
 		_target = target;
-		target.SetCombatState(AdventurerCombatState.Engaging);
-		GD.Print($"COMBAT_STARTED adventurer={_adventurer?.AdventurerName} monster={target.MonsterName}");
+		_encounterId++;
+		_monsterDefeatedEmitted = false;
+		_adventurerDiedEmitted = false;
+		_adventurerRunner = new CombatActionRunner(_adventurer, CreateAdventurerActions(), _rng, EmitBridgeEvent);
+		_monsterRunner = new CombatActionRunner(target, CreateMonsterActions(), _rng, EmitBridgeEvent);
+		_adventurerRunner.Start(target);
+		_monsterRunner.Start(_adventurer);
+
+		GD.Print($"COMBAT_STARTED encounter={_encounterId} adventurer={_adventurer.AdventurerName} monster={target.MonsterName}");
 		EmitBridgeEvent("combat_started", new GDict
 		{
 			{ "source", nameof(AdventurerCombatController) },
-			{ "adventurer", _adventurer?.AdventurerName ?? "unknown" },
+			{ "encounter_id", _encounterId },
+			{ "adventurer", _adventurer.AdventurerName },
 			{ "monster", target.MonsterName },
-			{ "tick_interval", CombatTickInterval }
+			{ "adventurer_attacks_per_second", _adventurer.AttackSpeed },
+			{ "monster_attacks_per_second", target.AttackSpeed },
+			{ "timing_model", "per_combatant_action_timers" }
 		});
-		ChangeState(AdventurerCombatState.Engaging);
+		PublishEncounterState();
 	}
 
 	public void StopCombat()
 	{
-		_target?.SetCombatState(AdventurerCombatState.OutOfCombat);
+		_adventurerRunner?.Stop();
+
+		if (_target?.IsAlive == true)
+		{
+			_monsterRunner?.Stop();
+		}
+
 		_target = null;
-		AttackCooldownRemaining = 0.0;
-		ChangeState(AdventurerCombatState.OutOfCombat);
+		_adventurerRunner = null;
+		_monsterRunner = null;
+		PublishEncounterState();
 	}
 
-	private void ResolveCombatTick()
+	private bool HandleEndConditions()
 	{
-		if (_adventurer is null || _target is null)
+		if (_adventurer is null)
 		{
-			StopCombat();
-			return;
+			return true;
 		}
-
-		ResolveAttack(
-			_adventurer.AdventurerName,
-			_target.MonsterName,
-			_adventurer.Attack,
-			_adventurer.Accuracy,
-			_target.Defense,
-			_target.Evasion,
-			damage => _target.ApplyDamage(damage));
-
-		if (!_target.IsAlive)
-		{
-			_target.SetCombatState(AdventurerCombatState.Defeated);
-			GD.Print($"MONSTER_DEFEATED monster={_target.MonsterName}");
-			EmitBridgeEvent("monster_defeated", new GDict
-			{
-				{ "source", nameof(AdventurerCombatController) },
-				{ "adventurer", _adventurer.AdventurerName },
-				{ "monster", _target.MonsterName },
-				{ "gold_reward", _target.GoldReward },
-				{ "experience_reward", _target.ExperienceReward }
-			});
-			StopCombat();
-			return;
-		}
-
-		ResolveAttack(
-			_target.MonsterName,
-			_adventurer.AdventurerName,
-			_target.Attack,
-			_target.Accuracy,
-			_adventurer.Defense,
-			_adventurer.Evasion,
-			damage => _adventurer.ApplyDamage(damage));
 
 		if (!_adventurer.IsAlive)
 		{
-			ChangeState(AdventurerCombatState.Defeated);
-			EmitBridgeEvent("adventurer_died", new GDict
+			_adventurerRunner?.Update(0.0);
+
+			if (!_adventurerDiedEmitted)
 			{
-				{ "source", nameof(AdventurerCombatController) },
-				{ "adventurer", _adventurer.AdventurerName },
-				{ "monster", _target.MonsterName }
-			});
-			return;
+				_adventurerDiedEmitted = true;
+				EmitBridgeEvent("adventurer_died", new GDict
+				{
+					{ "source", nameof(AdventurerCombatController) },
+					{ "encounter_id", _encounterId },
+					{ "adventurer", _adventurer.AdventurerName },
+					{ "monster", _target?.MonsterName ?? "none" }
+				});
+			}
+
+			_monsterRunner?.Stop();
+			_adventurerRunner = null;
+			_monsterRunner = null;
+			_target = null;
+			return true;
 		}
 
-		AttackCooldownRemaining = CombatTickInterval;
-		ChangeState(AdventurerCombatState.AttackCooldown);
+		if (_target is null)
+		{
+			return true;
+		}
+
+		if (!_target.IsAlive)
+		{
+			_monsterRunner?.Update(0.0);
+
+			if (!_monsterDefeatedEmitted)
+			{
+				_monsterDefeatedEmitted = true;
+				GD.Print($"MONSTER_DEFEATED monster={_target.MonsterName}");
+				EmitBridgeEvent("monster_defeated", new GDict
+				{
+					{ "source", nameof(AdventurerCombatController) },
+					{ "encounter_id", _encounterId },
+					{ "adventurer", _adventurer.AdventurerName },
+					{ "monster", _target.MonsterName },
+					{ "gold_reward", _target.GoldReward },
+					{ "experience_reward", _target.ExperienceReward }
+				});
+			}
+
+			_adventurerRunner?.Stop();
+			_target.PublishState();
+			_adventurerRunner = null;
+			_monsterRunner = null;
+			_target = null;
+			return true;
+		}
+
+		return false;
 	}
 
-	private void ResolveAttack(
-		string attackerName,
-		string defenderName,
-		int attackerAttack,
-		double attackerAccuracy,
-		int defenderDefense,
-		double defenderEvasion,
-		Func<int, int> applyDamage)
+	private static IReadOnlyList<CombatAction> CreateAdventurerActions()
 	{
-		double hitChance = Math.Clamp(BaseHitChance + attackerAccuracy - defenderEvasion, MinHitChance, MaxHitChance);
-		double roll = _rng.Randf();
-		bool hit = roll <= hitChance;
-		int damage = hit ? Math.Max(1, attackerAttack - defenderDefense) : 0;
-
-		GD.Print($"ATTACK_ROLL attacker={attackerName} defender={defenderName} hit_chance={hitChance:0.00} roll={roll:0.00} hit={hit} damage={damage}");
-		EmitBridgeEvent("attack_roll_resolved", new GDict
+		return new[]
 		{
-			{ "source", nameof(AdventurerCombatController) },
-			{ "attacker", attackerName },
-			{ "defender", defenderName },
-			{ "hit_chance", hitChance },
-			{ "roll", roll },
-			{ "hit", hit },
-			{ "damage", damage }
-		});
+			new CombatAction(
+				"heavy_strike",
+				"Heavy Strike",
+				CombatActionKind.Skill,
+				48.0,
+				1.0,
+				0.0,
+				0.25,
+				true,
+				false,
+				1.5,
+				false),
+			CombatAction.BasicAttack()
+		};
+	}
 
-		if (!hit)
+	private static IReadOnlyList<CombatAction> CreateMonsterActions()
+	{
+		return new[]
+		{
+			CombatAction.BasicAttack()
+		};
+	}
+
+	private void PublishEncounterState()
+	{
+		if (TestBridge.Instance?.IsActive != true)
 		{
 			return;
 		}
 
-		int appliedDamage = applyDamage(damage);
-		EmitBridgeEvent("damage_applied", new GDict
+		TestBridge.Instance.EmitState("combat_encounter", new GDict
 		{
 			{ "source", nameof(AdventurerCombatController) },
-			{ "attacker", attackerName },
-			{ "defender", defenderName },
-			{ "damage", appliedDamage }
+			{ "encounter_id", _encounterId },
+			{ "active", _target is not null && _adventurer?.CombatState != CombatState.OutOfCombat },
+			{ "adventurer", BuildRunnerState(_adventurerRunner, _adventurer) },
+			{ "monster", BuildRunnerState(_monsterRunner, _monsterRunner?.Owner) }
 		});
 	}
 
-	private void ChangeState(AdventurerCombatState nextState)
+	private static GDict BuildRunnerState(CombatActionRunner? runner, ICombatant? combatant)
 	{
-		AdventurerCombatState previousState = State;
+		GDict skillCooldowns = new();
 
-		if (previousState == nextState)
+		if (runner is not null)
 		{
-			return;
+			foreach ((string key, double value) in runner.SkillCooldowns)
+			{
+				skillCooldowns[key] = value;
+			}
 		}
 
-		State = nextState;
-		GD.Print($"COMBAT_STATE from={previousState} to={nextState}");
-		EmitBridgeEvent("combat_state_changed", new GDict
+		return new GDict
 		{
-			{ "source", nameof(AdventurerCombatController) },
-			{ "from", previousState.ToString() },
-			{ "to", nextState.ToString() },
-			{ "adventurer", _adventurer?.AdventurerName ?? "unknown" },
-			{ "monster", _target?.MonsterName ?? "none" }
-		});
-		_adventurer?.PublishState();
-		_target?.PublishState();
+			{ "name", combatant?.DisplayName ?? "none" },
+			{ "kind", combatant?.CombatantKind ?? "none" },
+			{ "state", GetCombatantState(runner, combatant) },
+			{ "target", runner?.Target?.DisplayName ?? "none" },
+			{ "active_action", runner?.ActiveActionId ?? string.Empty },
+			{ "queued_action", runner?.QueuedActionId ?? string.Empty },
+			{ "basic_attack_cooldown_remaining", runner?.BasicAttackCooldownRemaining ?? 0.0 },
+			{ "cast_remaining", combatant is Adventurer adventurer ? adventurer.CastRemaining : combatant is Monster monster ? monster.CastRemaining : 0.0 },
+			{ "recovery_remaining", combatant is Adventurer adventurer2 ? adventurer2.RecoveryRemaining : combatant is Monster monster2 ? monster2.RecoveryRemaining : 0.0 },
+			{ "skill_cooldowns", skillCooldowns },
+			{ "is_alive", combatant?.IsAlive ?? false },
+			{ "attack_speed", combatant?.AttackSpeed ?? 0.0 },
+			{ "health", combatant?.Health ?? 0 },
+			{ "max_health", combatant?.MaxHealth ?? 0 }
+		};
+	}
+
+	private static string GetCombatantState(CombatActionRunner? runner, ICombatant? combatant)
+	{
+		if (runner is not null)
+		{
+			return runner.State.ToString();
+		}
+
+		return combatant switch
+		{
+			Adventurer adventurer => adventurer.CombatState.ToString(),
+			Monster monster => monster.CombatState.ToString(),
+			_ => CombatState.OutOfCombat.ToString()
+		};
 	}
 
 	private static void EmitBridgeEvent(string type, GDict payload)

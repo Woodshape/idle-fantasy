@@ -1,9 +1,10 @@
 #nullable enable
 
 using Godot;
+using System.Collections.Generic;
 using GDict = Godot.Collections.Dictionary;
 
-public partial class Adventurer : Node2D
+public partial class Adventurer : Node2D, ICombatant
 {
 	[Export]
 	public string AdventurerName { get; set; } = "Mira";
@@ -27,6 +28,9 @@ public partial class Adventurer : Node2D
 	public double Evasion { get; set; } = 0.15;
 
 	[Export]
+	public double AttackSpeed { get; set; } = 1.0;
+
+	[Export]
 	public float Speed { get; set; } = 120.0f;
 
 	[Export]
@@ -41,7 +45,23 @@ public partial class Adventurer : Node2D
 	public AdventurerCombatController? CombatController { get; private set; }
 	public bool IsAlive => Health > 0;
 	public string IntentionStateName => Controller?.State.ToString() ?? "Unknown";
-	public string CombatStateName => CombatController?.State.ToString() ?? "Unknown";
+	public string CombatStateName => CombatState.ToString();
+	public string CombatantId => "adventurer";
+	public string CombatantKind => "adventurer";
+	public string DisplayName => AdventurerName;
+	public CombatStats Stats => new(Attack, Accuracy, Defense, Evasion, AttackSpeed, MaxHealth, Health);
+	public CombatState CombatState { get; private set; } = CombatState.OutOfCombat;
+	public string CurrentCombatTargetName { get; private set; } = string.Empty;
+	public string QueuedActionId { get; private set; } = string.Empty;
+	public string ActiveActionId { get; private set; } = string.Empty;
+	public double BasicAttackCooldownRemaining { get; private set; }
+	public double CastRemaining { get; private set; }
+	public double RecoveryRemaining { get; private set; }
+	public IReadOnlyDictionary<string, double> SkillCooldowns => _skillCooldowns;
+	public bool IsDisabled { get; private set; }
+	public bool CanAct { get; private set; }
+
+	private readonly Dictionary<string, double> _skillCooldowns = new();
 
 	public override void _Ready()
 	{
@@ -121,6 +141,25 @@ public partial class Adventurer : Node2D
 		PublishState();
 	}
 
+	public void SetCombatSnapshot(CombatantCombatSnapshot snapshot)
+	{
+		CombatState = !IsAlive ? global::CombatState.Defeated : snapshot.State;
+		CurrentCombatTargetName = snapshot.CurrentTargetName;
+		QueuedActionId = snapshot.QueuedActionId;
+		ActiveActionId = snapshot.ActiveActionId;
+		BasicAttackCooldownRemaining = snapshot.BasicAttackCooldownRemaining;
+		CastRemaining = snapshot.CastRemaining;
+		RecoveryRemaining = snapshot.RecoveryRemaining;
+		IsDisabled = snapshot.IsDisabled;
+		CanAct = snapshot.CanAct;
+		_skillCooldowns.Clear();
+
+		foreach ((string key, double value) in snapshot.SkillCooldowns)
+		{
+			_skillCooldowns[key] = value;
+		}
+	}
+
 	public void PublishState()
 	{
 		if (TestBridge.Instance?.IsActive != true)
@@ -141,11 +180,20 @@ public partial class Adventurer : Node2D
 			{ "accuracy", Accuracy },
 			{ "defense", Defense },
 			{ "evasion", Evasion },
+			{ "attack_speed", AttackSpeed },
 			{ "speed", Speed },
 			{ "is_alive", IsAlive },
 			{ "intention_state", IntentionStateName },
 			{ "combat_state", CombatStateName },
-			{ "attack_cooldown_remaining", CombatController?.AttackCooldownRemaining ?? 0.0 },
+			{ "current_combat_target", CurrentCombatTargetName },
+			{ "queued_action", QueuedActionId },
+			{ "active_action", ActiveActionId },
+			{ "basic_attack_cooldown_remaining", BasicAttackCooldownRemaining },
+			{ "cast_remaining", CastRemaining },
+			{ "recovery_remaining", RecoveryRemaining },
+			{ "skill_cooldowns", BuildSkillCooldownState() },
+			{ "is_disabled", IsDisabled },
+			{ "can_act", CanAct },
 			{ "position", BridgePayload.VectorToArray(GlobalPosition) },
 			{ "has_move_target", MoveTarget is not null }
 		};
@@ -161,6 +209,18 @@ public partial class Adventurer : Node2D
 		}
 
 		TestBridge.Instance.EmitState("adventurer", state);
+	}
+
+	private GDict BuildSkillCooldownState()
+	{
+		GDict cooldowns = new();
+
+		foreach ((string key, double value) in _skillCooldowns)
+		{
+			cooldowns[key] = value;
+		}
+
+		return cooldowns;
 	}
 
 	public override void _Draw()
