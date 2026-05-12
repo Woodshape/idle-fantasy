@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Idle Fantasy Game Design Notes</title>
+	<style>
+		:root {
+			--bg: #efe3c7;
+			--paper: #fff9eb;
+			--paper-strong: #fff2cf;
+			--ink: #23190f;
+			--muted: #695744;
+			--line: #d0b782;
+			--accent: #8e3f1f;
+			--accent-2: #2f6650;
+			--accent-3: #495f91;
+			--shadow: 0 18px 50px rgba(45, 31, 15, 0.14);
+			--radius: 18px;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html {
+			scroll-behavior: smooth;
+		}
+
+		body {
+			margin: 0;
+			background:
+				radial-gradient(circle at 12% 10%, rgba(142, 63, 31, 0.14), transparent 28rem),
+				radial-gradient(circle at 85% 20%, rgba(47, 102, 80, 0.13), transparent 30rem),
+				linear-gradient(135deg, #efe3c7 0%, #ead5a8 100%);
+			color: var(--ink);
+			font-family: "Trebuchet MS", "Gill Sans", Verdana, sans-serif;
+			line-height: 1.55;
+		}
+
+		a {
+			color: inherit;
+		}
+
+		.page {
+			display: grid;
+			grid-template-columns: 290px minmax(0, 1fr);
+			gap: 2rem;
+			max-width: 1500px;
+			margin: 0 auto;
+			padding: 2rem;
+		}
+
+		.sidebar {
+			align-self: start;
+			background: rgba(255, 249, 235, 0.82);
+			border: 1px solid rgba(208, 183, 130, 0.8);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			padding: 1rem;
+			position: sticky;
+			top: 1rem;
+		}
+
+		.sidebar h2 {
+			font-family: Georgia, serif;
+			font-size: 1rem;
+			letter-spacing: 0.08em;
+			margin: 0 0 0.75rem;
+			text-transform: uppercase;
+		}
+
+		.sidebar a {
+			border-radius: 999px;
+			color: var(--muted);
+			display: block;
+			font-size: 0.94rem;
+			padding: 0.42rem 0.65rem;
+			text-decoration: none;
+		}
+
+		.sidebar a:hover {
+			background: var(--paper-strong);
+			color: var(--ink);
+		}
+
+		main {
+			display: grid;
+			gap: 1.25rem;
+			min-width: 0;
+		}
+
+		.hero {
+			background:
+				linear-gradient(135deg, rgba(35, 25, 15, 0.92), rgba(85, 45, 24, 0.86)),
+				linear-gradient(90deg, rgba(142, 63, 31, 0.7), rgba(47, 102, 80, 0.7));
+			border: 1px solid rgba(255, 242, 207, 0.28);
+			border-radius: 28px;
+			box-shadow: var(--shadow);
+			color: #fff9eb;
+			overflow: hidden;
+			padding: clamp(1.5rem, 4vw, 3.25rem);
+			position: relative;
+		}
+
+		.hero:after {
+			background:
+				linear-gradient(90deg, rgba(255, 249, 235, 0.1) 1px, transparent 1px),
+				linear-gradient(rgba(255, 249, 235, 0.08) 1px, transparent 1px);
+			background-size: 36px 36px;
+			content: "";
+			inset: 0;
+			opacity: 0.35;
+			position: absolute;
+		}
+
+		.hero > * {
+			position: relative;
+			z-index: 1;
+		}
+
+		.kicker {
+			color: #f7d698;
+			font-size: 0.84rem;
+			font-weight: 700;
+			letter-spacing: 0.14em;
+			margin: 0 0 0.65rem;
+			text-transform: uppercase;
+		}
+
+		h1,
+		h2,
+		h3 {
+			font-family: Georgia, "Times New Roman", serif;
+			line-height: 1.1;
+		}
+
+		h1 {
+			font-size: clamp(2.5rem, 7vw, 5.6rem);
+			margin: 0 0 1rem;
+			max-width: 13ch;
+		}
+
+		.hero p {
+			font-size: clamp(1.05rem, 2vw, 1.28rem);
+			max-width: 76ch;
+		}
+
+		.hero p:last-child {
+			margin-bottom: 0;
+		}
+
+		.summary-grid,
+		.card-grid,
+		.split-grid,
+		.stat-grid {
+			display: grid;
+			gap: 1rem;
+		}
+
+		.summary-grid {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+
+		.card-grid {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.split-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.stat-grid {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.panel,
+		.summary-card {
+			background: rgba(255, 249, 235, 0.9);
+			border: 1px solid rgba(208, 183, 130, 0.78);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+		}
+
+		.panel {
+			padding: clamp(1.15rem, 2.4vw, 1.8rem);
+		}
+
+		.summary-card {
+			padding: 1rem;
+		}
+
+		.summary-card strong {
+			color: var(--accent);
+			display: block;
+			font-family: Georgia, serif;
+			font-size: 1.1rem;
+			margin-bottom: 0.25rem;
+		}
+
+		.summary-card span {
+			color: var(--muted);
+			font-size: 0.94rem;
+		}
+
+		.section-title {
+			align-items: end;
+			border-bottom: 2px solid rgba(208, 183, 130, 0.62);
+			display: flex;
+			gap: 1rem;
+			justify-content: space-between;
+			margin-bottom: 1rem;
+			padding-bottom: 0.75rem;
+		}
+
+		.section-title h2 {
+			font-size: clamp(1.55rem, 3vw, 2.35rem);
+			margin: 0;
+		}
+
+		.tag {
+			background: rgba(47, 102, 80, 0.11);
+			border: 1px solid rgba(47, 102, 80, 0.25);
+			border-radius: 999px;
+			color: var(--accent-2);
+			font-size: 0.78rem;
+			font-weight: 700;
+			letter-spacing: 0.07em;
+			padding: 0.32rem 0.6rem;
+			text-transform: uppercase;
+			white-space: nowrap;
+		}
+
+		p {
+			margin: 0 0 1rem;
+		}
+
+		p:last-child {
+			margin-bottom: 0;
+		}
+
+		ul,
+		ol {
+			margin: 0;
+			padding-left: 1.15rem;
+		}
+
+		li + li {
+			margin-top: 0.35rem;
+		}
+
+		.flow {
+			counter-reset: step;
+			display: grid;
+			gap: 0.65rem;
+			list-style: none;
+			padding: 0;
+		}
+
+		.flow li {
+			align-items: start;
+			background: var(--paper-strong);
+			border: 1px solid rgba(208, 183, 130, 0.75);
+			border-radius: 14px;
+			display: grid;
+			gap: 0.75rem;
+			grid-template-columns: auto 1fr;
+			margin: 0;
+			padding: 0.75rem;
+		}
+
+		.flow li:before {
+			align-items: center;
+			background: var(--accent);
+			border-radius: 50%;
+			color: #fff9eb;
+			content: counter(step);
+			counter-increment: step;
+			display: inline-flex;
+			font-weight: 800;
+			height: 2rem;
+			justify-content: center;
+			width: 2rem;
+		}
+
+		.mini-card {
+			background: rgba(255, 242, 207, 0.8);
+			border: 1px solid rgba(208, 183, 130, 0.68);
+			border-radius: 14px;
+			padding: 1rem;
+		}
+
+		.mini-card h3 {
+			font-size: 1.18rem;
+			margin: 0 0 0.5rem;
+		}
+
+		.contrast {
+			background: linear-gradient(135deg, rgba(47, 102, 80, 0.12), rgba(73, 95, 145, 0.09));
+			border-color: rgba(47, 102, 80, 0.26);
+		}
+
+		.warning {
+			background: linear-gradient(135deg, rgba(142, 63, 31, 0.12), rgba(255, 242, 207, 0.88));
+			border-color: rgba(142, 63, 31, 0.26);
+		}
+
+		.state-list {
+			display: grid;
+			gap: 0.55rem;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			list-style: none;
+			padding: 0;
+		}
+
+		.state-list li {
+			background: #fffaf0;
+			border: 1px solid rgba(208, 183, 130, 0.62);
+			border-radius: 12px;
+			margin: 0;
+			padding: 0.65rem;
+		}
+
+		.state-list strong {
+			color: var(--accent-3);
+			display: block;
+		}
+
+		.callout {
+			background: #2f6650;
+			border-radius: var(--radius);
+			color: #fff9eb;
+			padding: 1.15rem;
+		}
+
+		.callout h3 {
+			margin: 0 0 0.5rem;
+		}
+
+		.callout p {
+			color: rgba(255, 249, 235, 0.88);
+		}
+
+		.two-column-list {
+			columns: 2 18rem;
+			column-gap: 2rem;
+		}
+
+		.two-column-list li {
+			break-inside: avoid;
+			margin-bottom: 0.35rem;
+		}
+
+		.footer-note {
+			color: var(--muted);
+			font-size: 0.9rem;
+			text-align: center;
+		}
+
+		@media (max-width: 1100px) {
+			.page {
+				grid-template-columns: 1fr;
+			}
+
+			.sidebar {
+				position: static;
+			}
+
+			.sidebar nav {
+				display: grid;
+				gap: 0.25rem;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.summary-grid,
+			.card-grid,
+			.stat-grid {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+		}
+
+		@media (max-width: 760px) {
+			.page {
+				padding: 1rem;
+			}
+
+			.summary-grid,
+			.card-grid,
+			.split-grid,
+			.stat-grid,
+			.state-list,
+			.sidebar nav {
+				grid-template-columns: 1fr;
+			}
+
+			.section-title {
+				align-items: start;
+				flex-direction: column;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="page">
+		<aside class="sidebar" aria-label="Document navigation">
+			<h2>At A Glance</h2>
+			<nav>
+				<a href="#high-concept">High Concept</a>
+				<a href="#core-loop">Core Loop</a>
+				<a href="#player-role">Player Role</a>
+				<a href="#time-model">Time Model</a>
+				<a href="#spells">Player Spells</a>
+				<a href="#settlements">Settlements</a>
+				<a href="#adventurers">Adventurers</a>
+				<a href="#parties">Parties</a>
+				<a href="#decision-model">Decision Model</a>
+				<a href="#monsters">Monsters</a>
+				<a href="#world">World Locations</a>
+				<a href="#combat">Combat</a>
+				<a href="#economy">Loot And Economy</a>
+				<a href="#death">Death</a>
+				<a href="#progression">Progression</a>
+				<a href="#first-slice">First Slice</a>
+				<a href="#decisions">Decisions</a>
+				<a href="#questions">Open Questions</a>
+			</nav>
+		</aside>
+
+		<main>
+			<header class="hero" id="high-concept">
+				<p class="kicker">2D Top-Down Fantasy RPG Simulator</p>
+				<h1>Idle Fantasy Game Design Notes</h1>
+				<p>Idle Fantasy is a quasi-idle RPG simulator where the player manages settlements that attract adventurers. Adventurers autonomously leave town, explore the world, fight monsters, collect loot, return to resupply, level up, and repeat.</p>
+				<p>The core fantasy is watching a living RPG world run on its own, then nudging the economy, roster, infrastructure, and risk profile so the adventurer ecosystem grows from a small village into a city-scale fantasy hub.</p>
+			</header>
+
+			<section class="summary-grid" aria-label="Design summary">
+				<div class="summary-card">
+					<strong>Player Fantasy</strong>
+					<span>Abstract observer, planner, and occasional spellcaster.</span>
+				</div>
+				<div class="summary-card">
+					<strong>Core Tension</strong>
+					<span>Solo runs give higher rewards. Parties reduce risk but split gains.</span>
+				</div>
+				<div class="summary-card">
+					<strong>Progression</strong>
+					<span>Village to town to city, with stronger services and recruits.</span>
+				</div>
+				<div class="summary-card">
+					<strong>First Slice</strong>
+					<span>One town, one adventurer, one monster, one full loop.</span>
+				</div>
+			</section>
+
+			<section class="panel" id="core-loop">
+				<div class="section-title">
+					<h2>Core Loop</h2>
+					<span class="tag">Autonomous RPG Cycle</span>
+				</div>
+				<ol class="flow">
+					<li>Adventurers are hired manually from a settlement, spending player gold.</li>
+					<li>Adventurers pick a goal based on level, health, gear, nearby threats, and available locations.</li>
+					<li>They travel into the world.</li>
+					<li>They fight monsters, explore ruins, or enter dungeons.</li>
+					<li>They collect loot, gold, experience, and injuries.</li>
+					<li>They decide whether to continue, retreat, or die based on risk and supplies.</li>
+					<li>Survivors return to settlement.</li>
+					<li>They buy potions, upgrade equipment, rest, level up, or retire.</li>
+					<li>Settlement services improve, attracting stronger adventurers.</li>
+				</ol>
+			</section>
+
+			<section class="panel" id="player-role">
+				<div class="section-title">
+					<h2>Player Role</h2>
+					<span class="tag">Planner First</span>
+				</div>
+				<p>The player influences the simulation through long-term management decisions. The player is abstract, not a visible character in the world. Direct control should normally be limited, though spells can create short and intentional windows for intervention.</p>
+				<ul class="two-column-list">
+					<li>Hire adventurers manually with gold.</li>
+					<li>Upgrade village, town, and city services.</li>
+					<li>Fund shops, inns, clerics, training halls, guilds, and defenses.</li>
+					<li>Set broad policies such as risk tolerance, hunting zones, bounty priorities, and expedition funding.</li>
+					<li>Cast spells that temporarily affect the world, adventurers, monsters, or economy.</li>
+					<li>Watch individual adventurer stories emerge from autonomous decisions.</li>
+				</ul>
+				<div class="split-grid" style="margin-top: 1rem;">
+					<div class="mini-card warning">
+						<h3>No Pause For Now</h3>
+						<p>The simulation should keep running, which makes timing, risk, and intervention costs matter.</p>
+					</div>
+					<div class="mini-card">
+						<h3>No-Money Fallback</h3>
+						<p>If the player runs out of money, a downtrodden adventurer may be hireable: weak, desperate, cheap or free, and risky to rely on.</p>
+					</div>
+				</div>
+				<p style="margin-top: 1rem;">Later progression may let the abstract player build additional buildings, research upgrades, unlock automation, or auto-hire adventurers. Early gameplay should stay relatively idle and management-light.</p>
+			</section>
+
+			<section class="panel" id="time-model">
+				<div class="section-title">
+					<h2>Time Model</h2>
+					<span class="tag">Hybrid</span>
+				</div>
+				<p>Idle Fantasy uses a hybrid time model: mechanics resolve on ticks, while movement and world time advance continuously so actors feel fluid and dynamic.</p>
+				<div class="split-grid">
+					<div class="mini-card">
+						<h3>Tick-Based Mechanics</h3>
+						<ul>
+							<li>Attacks.</li>
+							<li>Casting.</li>
+							<li>Buffs and debuffs.</li>
+							<li>Cooldowns.</li>
+							<li>Other discrete gameplay resolutions.</li>
+						</ul>
+					</div>
+					<div class="mini-card contrast">
+						<h3>Continuous Feel</h3>
+						<ul>
+							<li>Smooth travel.</li>
+							<li>Fluid animation.</li>
+							<li>Dynamic world movement.</li>
+							<li>Readable action between mechanical ticks.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="spells">
+				<div class="section-title">
+					<h2>Player Spells</h2>
+					<span class="tag">Active Intervention</span>
+				</div>
+				<p>Player spells are active interventions layered on top of the idle simulation. They let the player influence outcomes without replacing the autonomous game loop.</p>
+				<div class="card-grid">
+					<div class="mini-card">
+						<h3>Guidance</h3>
+						<p>Reveal threats, highlight valuable ruins, improve target selection, or redirect an adventurer.</p>
+					</div>
+					<div class="mini-card">
+						<h3>Protection</h3>
+						<p>Shield an adventurer, reduce incoming damage, prevent ambushes, or improve escape chance.</p>
+					</div>
+					<div class="mini-card">
+						<h3>World Influence</h3>
+						<p>Slow monsters, bless a road, reveal hidden loot, or weaken a dungeon room.</p>
+					</div>
+					<div class="mini-card">
+						<h3>Economy Influence</h3>
+						<p>Boost shop stock, reduce upgrade cost, improve loot sale prices, or attract recruits.</p>
+					</div>
+					<div class="mini-card contrast">
+						<h3>Possession</h3>
+						<p>Temporarily take direct control of an adventurer while the simulation continues around them.</p>
+					</div>
+					<div class="mini-card warning">
+						<h3>Costs</h3>
+						<p>Spells should use mana, favor, resources, rare relics, cooldown time, or opportunity cost.</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="possession">
+				<div class="section-title">
+					<h2>Possession Spell</h2>
+					<span class="tag">Temporary Control</span>
+				</div>
+				<div class="split-grid">
+					<div class="mini-card contrast">
+						<h3>During Possession</h3>
+						<ul>
+							<li>The selected adventurer stops autonomous decision-making.</li>
+							<li>The player can click to move.</li>
+							<li>The player can click to target enemies or objects.</li>
+							<li>The player can use that adventurer's available skills.</li>
+							<li>The adventurer still uses their own stats, gear, health, inventory, and risk.</li>
+							<li>The simulation continues around them.</li>
+						</ul>
+					</div>
+					<div class="mini-card">
+						<h3>When It Ends</h3>
+						<ul>
+							<li>Control returns to the adventurer AI.</li>
+							<li>The adventurer evaluates their current situation and resumes an appropriate state.</li>
+							<li>If hurt, overloaded, lost, or in danger, they may retreat rather than continue the player's plan.</li>
+						</ul>
+					</div>
+				</div>
+				<div class="callout" style="margin-top: 1rem;">
+					<h3>Design Intent</h3>
+					<p>Possession gives the player dramatic agency at key moments, stays time-limited so idle simulation remains the core identity, creates a reason to care about individual builds, and can be gated by progression, cooldowns, or magic infrastructure.</p>
+				</div>
+			</section>
+
+			<section class="panel" id="settlements">
+				<div class="section-title">
+					<h2>Settlements</h2>
+					<span class="tag">Progression Anchors</span>
+				</div>
+				<div class="card-grid">
+					<div class="mini-card">
+						<h3>Villages</h3>
+						<p>Attract low-level adventurers and provide basic services.</p>
+					</div>
+					<div class="mini-card">
+						<h3>Towns</h3>
+						<p>Attract stronger adventurers and offer better gear, potions, training, and rumors.</p>
+					</div>
+					<div class="mini-card">
+						<h3>Cities</h3>
+						<p>Attract top-level characters and unlock resurrection, magic guilds, high-tier crafting, and large-scale quests.</p>
+					</div>
+				</div>
+				<h3>Potential Services</h3>
+				<ul class="two-column-list">
+					<li>Tavern: manually recruits adventurers for gold.</li>
+					<li>Inn: restores health over time.</li>
+					<li>Shop: sells potions and basic supplies.</li>
+					<li>Blacksmith: sells and repairs equipment.</li>
+					<li>Trainer: converts experience into levels or skill improvements.</li>
+					<li>Temple: healing, curse removal, resurrection.</li>
+					<li>Guild hall: party formation, contracts, bounties, policy controls.</li>
+					<li>Market: loot sale prices, resource flow, settlement economy.</li>
+				</ul>
+			</section>
+
+			<section class="panel" id="adventurers">
+				<div class="section-title">
+					<h2>Adventurers</h2>
+					<span class="tag">Autonomous Agents</span>
+				</div>
+				<p>Adventurers are autonomous agents with persistent state. Early implementation should start with one generic archetype before class complexity is added.</p>
+				<div class="split-grid">
+					<div class="mini-card">
+						<h3>Core Stats</h3>
+						<ul>
+							<li>Name and class.</li>
+							<li>Level and experience.</li>
+							<li>Health and max health.</li>
+							<li>Attack, defense, speed, and perception.</li>
+							<li>Gold, inventory, equipment, and potion count.</li>
+							<li>Current task and target.</li>
+							<li>Risk tolerance and personality traits.</li>
+						</ul>
+					</div>
+					<div class="mini-card">
+						<h3>Initial Classes</h3>
+						<ul>
+							<li>Fighter: durable melee adventurer, good starter class.</li>
+							<li>Rogue: faster travel, better loot chance, weaker in direct combat.</li>
+							<li>Cleric: healing and eventual resurrection support.</li>
+							<li>Mage: high damage, fragile, expensive scaling.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="parties">
+				<div class="section-title">
+					<h2>Parties</h2>
+					<span class="tag">Risk Sharing</span>
+				</div>
+				<p>Adventurers can create, join, and leave parties. A party is a temporary or persistent group that travels, fights, and shares rewards.</p>
+				<div class="split-grid">
+					<div class="mini-card contrast">
+						<h3>Tradeoff</h3>
+						<ul>
+							<li>Solo adventuring is high risk and high reward.</li>
+							<li>Party adventuring is lower risk but rewards are split between members.</li>
+							<li>Parties can defeat stronger monsters and survive deeper expeditions.</li>
+							<li>Solo adventurers progress faster if they survive.</li>
+						</ul>
+					</div>
+					<div class="mini-card">
+						<h3>Behavior</h3>
+						<ul>
+							<li>Seek a party when a target is too dangerous alone.</li>
+							<li>Leave a party if rewards are too low, personalities clash, health is poor, or goals diverge.</li>
+							<li>Choose targets based on combined strength, supplies, travel distance, and expected reward.</li>
+							<li>Split gold, loot, and experience according to simple rules at first.</li>
+						</ul>
+					</div>
+				</div>
+				<div class="split-grid" style="margin-top: 1rem;">
+					<div class="mini-card">
+						<h3>Initial Reward Model</h3>
+						<ul>
+							<li>Gold is split evenly.</li>
+							<li>Experience is split evenly or weighted by participation.</li>
+							<li>Items are assigned randomly, by class usefulness, or sold and split later.</li>
+						</ul>
+					</div>
+					<div class="mini-card">
+						<h3>Later Systems</h3>
+						<ul>
+							<li>Roles such as tank, healer, scout, damage dealer, and support.</li>
+							<li>Party reputation and named parties.</li>
+							<li>Party tactics, formations, morale, and leadership.</li>
+							<li>Contracts requiring minimum party strength.</li>
+							<li>Rescue parties for dead or stranded adventurers.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="decision-model">
+				<div class="section-title">
+					<h2>Adventurer Decision Model</h2>
+					<span class="tag">Finite State Machine First</span>
+				</div>
+				<p>Adventurers should feel self-directed. Early behavior can use a simple finite state machine, then later evolve into utility scoring based on reward, risk, travel distance, supplies, and personality.</p>
+				<ul class="state-list">
+					<li><strong>IdleInTown</strong>Choose whether to rest, shop, level up, or depart.</li>
+					<li><strong>ChooseTarget</strong>Select a nearby monster or location appropriate to level.</li>
+					<li><strong>FindParty</strong>Seek allies when a target is too risky alone.</li>
+					<li><strong>JoinParty</strong>Coordinate with other adventurers and follow party decisions.</li>
+					<li><strong>TravelToTarget</strong>Move through the world.</li>
+					<li><strong>Fight</strong>Resolve combat against a monster.</li>
+					<li><strong>Loot</strong>Collect rewards.</li>
+					<li><strong>ReturnToTown</strong>Retreat with loot or when health and supplies are low.</li>
+					<li><strong>RecoverInTown</strong>Heal and resupply.</li>
+					<li><strong>Possessed</strong>Temporarily controlled by the player until the spell expires.</li>
+					<li><strong>Dead</strong>Remain dead until resurrection or permanent removal.</li>
+				</ul>
+			</section>
+
+			<section class="panel" id="monsters">
+				<div class="section-title">
+					<h2>Monsters</h2>
+					<span class="tag">Threats And Rewards</span>
+				</div>
+				<p>Monsters are world threats and resource generators. Early monsters should be simple static targets near the starting town, with later systems adding wandering monsters, lairs, patrols, boss monsters, ecology pressure, and attacks on settlements.</p>
+				<ul class="two-column-list">
+					<li>Type.</li>
+					<li>Level.</li>
+					<li>Health.</li>
+					<li>Attack and defense.</li>
+					<li>Aggro radius.</li>
+					<li>Loot table.</li>
+					<li>Experience reward.</li>
+					<li>Spawn location or lair.</li>
+				</ul>
+			</section>
+
+			<section class="panel" id="world">
+				<div class="section-title">
+					<h2>World Locations</h2>
+					<span class="tag">Goals And Pressure</span>
+				</div>
+				<div class="card-grid">
+					<div class="mini-card">
+						<h3>Wilderness</h3>
+						<p>Low-risk monster hunting.</p>
+					</div>
+					<div class="mini-card">
+						<h3>Ruins</h3>
+						<p>Higher loot, higher danger, limited visibility.</p>
+					</div>
+					<div class="mini-card">
+						<h3>Dungeons</h3>
+						<p>Multi-room expeditions with escalating risk.</p>
+					</div>
+					<div class="mini-card">
+						<h3>Roads</h3>
+						<p>Safer travel with possible ambushes.</p>
+					</div>
+					<div class="mini-card">
+						<h3>Resource Nodes</h3>
+						<p>Herbs, ore, relics, and monster dens.</p>
+					</div>
+					<div class="mini-card warning">
+						<h3>Risk Signals</h3>
+						<p>Communicate danger through distance, monster level, biome, rumors, or scouting.</p>
+					</div>
+				</div>
+				<div class="callout" style="margin-top: 1rem;">
+					<h3>World Direction</h3>
+					<p>The world should start procedural because it is simpler to test, iterate, and rebalance while the game loop is still changing. For the first slice, no real world map is required: only a town, adventurers, and monsters.</p>
+				</div>
+			</section>
+
+			<section class="panel" id="combat">
+				<div class="section-title">
+					<h2>Combat</h2>
+					<span class="tag">Probability Rolls</span>
+				</div>
+				<p>Combat should be random, but the randomness should come from explicit probability calculations. Attacks, defenses, spells, resists, dodges, blocks, and similar actions produce a fixed probability under the hood, then roll against it.</p>
+				<div class="mini-card contrast" style="margin-bottom: 1rem;">
+					<h3>Formula Shape</h3>
+					<p><code>hit_chance = f(attacker_accuracy, defender_evasion, level_delta, status_effects)</code></p>
+					<p><code>attack_hits = random(0..1) &lt;= hit_chance</code></p>
+				</div>
+				<ol class="flow">
+					<li>Adventurer and monster enter combat.</li>
+					<li>Combatants exchange attacks at fixed intervals.</li>
+					<li>Each attack computes a success probability and rolls against it.</li>
+					<li>Successful attacks apply damage, mitigation, effects, or spell outcomes.</li>
+					<li>Health reaches zero.</li>
+					<li>Winner receives rewards or enters a post-combat state.</li>
+				</ol>
+				<p style="margin-top: 1rem;">Later combat can add abilities, status effects, formations, party tactics, fleeing, potions, and class-specific logic.</p>
+			</section>
+
+			<section class="panel" id="economy">
+				<div class="section-title">
+					<h2>Loot And Economy</h2>
+					<span class="tag">Adventure To Settlement</span>
+				</div>
+				<div class="split-grid">
+					<div class="mini-card">
+						<h3>Basic Loot Types</h3>
+						<ul>
+							<li>Gold.</li>
+							<li>Equipment.</li>
+							<li>Potions and consumables.</li>
+							<li>Materials.</li>
+							<li>Rare relics.</li>
+						</ul>
+					</div>
+					<div class="mini-card">
+						<h3>Early Loop</h3>
+						<ul>
+							<li>Monsters drop gold and experience.</li>
+							<li>Adventurers carry gold back to town.</li>
+							<li>Adventurers spend gold on healing or potions.</li>
+							<li>Excess wealth can indirectly benefit the settlement later.</li>
+						</ul>
+					</div>
+				</div>
+				<p style="margin-top: 1rem;">The economy should eventually support visible flows: adventurers buy from shops, shops need stock, settlement upgrades improve available goods, and high-level adventurers require high-level services.</p>
+			</section>
+
+			<section class="panel" id="death">
+				<div class="section-title">
+					<h2>Death And Resurrection</h2>
+					<span class="tag">Risk With Weight</span>
+				</div>
+				<div class="split-grid">
+					<div class="mini-card warning">
+						<h3>Initial Behavior</h3>
+						<ul>
+							<li>A dead adventurer stops acting.</li>
+							<li>Death is logged visibly.</li>
+							<li>Their carried loot may be lost or dropped.</li>
+						</ul>
+					</div>
+					<div class="mini-card">
+						<h3>Long-Term Behavior</h3>
+						<ul>
+							<li>Resurrection is expensive.</li>
+							<li>Resurrection requires a high-level cleric, temple, rare item, or city-tier service.</li>
+							<li>Some deaths may be permanent depending on game settings or difficulty.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="progression">
+				<div class="section-title">
+					<h2>Progression</h2>
+					<span class="tag">Layered Growth</span>
+				</div>
+				<div class="card-grid">
+					<div class="mini-card">
+						<h3>Individual</h3>
+						<p>Adventurers gain levels, gear, traits, and reputation.</p>
+					</div>
+					<div class="mini-card">
+						<h3>Settlement</h3>
+						<p>Services improve and attract better adventurers.</p>
+					</div>
+					<div class="mini-card">
+						<h3>World</h3>
+						<p>Stronger monsters, deeper dungeons, new regions, and larger threats appear.</p>
+					</div>
+					<div class="mini-card">
+						<h3>Player</h3>
+						<p>Better policies, automation, analytics, and strategic tools unlock over time.</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="first-slice">
+				<div class="section-title">
+					<h2>First Playable Slice Target</h2>
+					<span class="tag">Small Complete Loop</span>
+				</div>
+				<p>The first slice should prove the smallest complete version of the loop.</p>
+				<ul class="two-column-list">
+					<li>A town exists as a home point.</li>
+					<li>One adventurer starts in the town.</li>
+					<li>One monster spawn exists outside the town.</li>
+					<li>The adventurer autonomously walks to a monster.</li>
+					<li>Combat resolves with probability-based attack rolls.</li>
+					<li>The adventurer gains gold and experience if successful.</li>
+					<li>The adventurer returns to the town.</li>
+					<li>The state is visible through logs, labels, or TestBridge events.</li>
+				</ul>
+				<div class="callout" style="margin-top: 1rem;">
+					<h3>Not In This Slice</h3>
+					<p>This does not need a world map, shops, classes, dungeons, parties, equipment, or full settlement progression yet.</p>
+				</div>
+			</section>
+
+			<section class="panel" id="decisions">
+				<div class="section-title">
+					<h2>Current Design Decisions</h2>
+					<span class="tag">Locked For Now</span>
+				</div>
+				<ul class="two-column-list">
+					<li>Adventurers are hired manually with gold at first.</li>
+					<li>Auto-hiring may be added later.</li>
+					<li>If the player runs out of money, a desperate or downtrodden adventurer fallback may be considered.</li>
+					<li>Time is hybrid: tick-based mechanics with continuous movement and world time.</li>
+					<li>There is no pause planned for now.</li>
+					<li>Combat is random and should use explicit probability formulas followed by rolls.</li>
+					<li>Far-away adventurer simulation is undecided and irrelevant for the first slice.</li>
+					<li>The player is abstract and mostly idle for now.</li>
+					<li>Later player progression may include building additional structures or researching mechanics.</li>
+					<li>The world should start procedural for easier testing.</li>
+					<li>The first slice does not need a world map, only a town, adventurers, and monsters.</li>
+				</ul>
+			</section>
+
+			<section class="panel" id="questions">
+				<div class="section-title">
+					<h2>Open Design Questions</h2>
+					<span class="tag">Decide Later</span>
+				</div>
+				<ul class="two-column-list">
+					<li>Are adventurers permanently simulated off-screen, or only near loaded areas?</li>
+					<li>What exact formula family should attack, defense, casting, dodge, block, and resist rolls use?</li>
+					<li>How generous should the no-money fallback adventurer option be?</li>
+					<li>What is the player's abstract identity: patron, guild spirit, godlike observer, town charter, or something else?</li>
+				</ul>
+			</section>
+
+			<p class="footer-note">HTML reading view generated from docs/game-design.md.</p>
+		</main>
+	</div>
+</body>
+</html>
