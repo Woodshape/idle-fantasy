@@ -1,11 +1,57 @@
-[gd_scene format=3 uid="uid://egstoxsb7pm0"]
+[gd_scene load_steps=7 format=3 uid="uid://egstoxsb7pm0"]
 
-[ext_resource type="Texture2D" uid="uid://nv01a6tbu2gc" path="res://icon.svg" id="1_wtcfe"]
-[ext_resource type="Script" uid="uid://dj6ikq0p28d0s" path="res://PlayerController.cs" id="2_uaqic"]
+[ext_resource type="Script" path="res://GameController.cs" id="1_0q5sm"]
+[ext_resource type="Script" path="res://Town.cs" id="2_town"]
+[ext_resource type="Script" path="res://Adventurer.cs" id="3_adv"]
+[ext_resource type="Script" path="res://AdventurerController.cs" id="4_advctl"]
+[ext_resource type="Script" path="res://AdventurerCombatController.cs" id="5_combat"]
+[ext_resource type="Script" path="res://Monster.cs" id="6_monster"]
 
-[node name="Node2D" type="Node2D" unique_id=1500002770]
-script = ExtResource("2_uaqic")
-position = Vector2(546, 334)
+[node name="Game" type="Node2D"]
+script = ExtResource("1_0q5sm")
 
-[node name="Sprite2D" type="Sprite2D" parent="." unique_id=837235953]
-texture = ExtResource("1_wtcfe")
+[node name="Town" type="Node2D" parent="."]
+position = Vector2(160, 300)
+script = ExtResource("2_town")
+
+[node name="Adventurer" type="Node2D" parent="."]
+position = Vector2(160, 300)
+script = ExtResource("3_adv")
+
+[node name="AdventurerController" type="Node" parent="Adventurer"]
+script = ExtResource("4_advctl")
+
+[node name="AdventurerCombatController" type="Node" parent="Adventurer"]
+script = ExtResource("5_combat")
+
+[node name="Monsters" type="Node2D" parent="."]
+
+[node name="Slime" type="Node2D" parent="Monsters"]
+position = Vector2(580, 300)
+script = ExtResource("6_monster")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="PanelContainer" parent="Hud"]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 430.0
+offset_bottom = 118.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Hud/Panel"]
+offset_left = 7.0
+offset_top = 7.0
+offset_right = 411.0
+offset_bottom = 99.0
+
+[node name="StateLabel" type="Label" parent="Hud/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Adventurer"
+
+[node name="CombatLabel" type="Label" parent="Hud/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Combat"
+
+[node name="RewardLabel" type="Label" parent="Hud/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Rewards"
