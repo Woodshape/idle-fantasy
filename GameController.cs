@@ -19,6 +19,12 @@ public partial class GameController : Node2D
 	[Export]
 	public NodePath MonsterContainerPath { get; set; } = new("Monsters");
 
+	[Export]
+	public PackedScene? AdventurerScene { get; set; }
+
+	[Export]
+	public PackedScene? MonsterScene { get; set; }
+
 	private Town? _town;
 	private Adventurer? _adventurer;
 	private readonly List<Monster> _monsters = new();
@@ -40,18 +46,25 @@ public partial class GameController : Node2D
 	{
 		_town = GetNodeOrNull<Town>(TownPath);
 		_adventurer = GetNodeOrNull<Adventurer>(AdventurerPath);
-		Node? monsterContainer = GetNodeOrNull(MonsterContainerPath);
+		Node monsterContainer = GetOrCreateMonsterContainer();
 		_monsters.Clear();
 
-		if (monsterContainer is not null)
+		if (_adventurer is null)
 		{
-			foreach (Node child in monsterContainer.GetChildren())
+			_adventurer = SpawnDefaultAdventurer();
+		}
+
+		foreach (Node child in monsterContainer.GetChildren())
+		{
+			if (child is Monster monster)
 			{
-				if (child is Monster monster)
-				{
-					_monsters.Add(monster);
-				}
+				_monsters.Add(monster);
 			}
+		}
+
+		if (_monsters.Count == 0)
+		{
+			SpawnDefaultMonsters(monsterContainer);
 		}
 
 		_stateLabel = GetNodeOrNull<Label>("Hud/Panel/VBoxContainer/StateLabel");
@@ -60,6 +73,70 @@ public partial class GameController : Node2D
 
 		UpdateHud();
 		PublishState();
+	}
+
+	private Node GetOrCreateMonsterContainer()
+	{
+		Node? monsterContainer = GetNodeOrNull(MonsterContainerPath);
+
+		if (monsterContainer is not null)
+		{
+			return monsterContainer;
+		}
+
+		Node2D createdContainer = new()
+		{
+			Name = MonsterContainerPath.GetName(MonsterContainerPath.GetNameCount() - 1)
+		};
+		AddChild(createdContainer);
+		return createdContainer;
+	}
+
+	private Adventurer? SpawnDefaultAdventurer()
+	{
+		if (AdventurerScene is null)
+		{
+			GD.PushError("AdventurerScene is not assigned; cannot spawn runtime adventurer.");
+			return null;
+		}
+
+		Adventurer adventurer = AdventurerScene.Instantiate<Adventurer>();
+		adventurer.Name = "Adventurer";
+		adventurer.Setup(
+			stats: adventurer.CreateStartingStats(),
+			position: _town?.ReturnPosition ?? adventurer.Position);
+		AddChild(adventurer);
+		return adventurer;
+	}
+
+	private void SpawnDefaultMonsters(Node monsterContainer)
+	{
+		if (MonsterScene is null)
+		{
+			GD.PushError("MonsterScene is not assigned; cannot spawn runtime monsters.");
+			return;
+		}
+
+		SpawnMonster(monsterContainer, "Slime", "Slime", new Vector2(580.0f, 300.0f));
+		SpawnMonster(monsterContainer, "Slime2", "Slime 2", new Vector2(670.0f, 240.0f));
+		SpawnMonster(monsterContainer, "Slime3", "Slime 3", new Vector2(670.0f, 360.0f));
+	}
+
+	private void SpawnMonster(Node monsterContainer, string nodeName, string monsterName, Vector2 position)
+	{
+		if (MonsterScene is null)
+		{
+			return;
+		}
+
+		Monster monster = MonsterScene.Instantiate<Monster>();
+		monster.Name = nodeName;
+		monster.Setup(
+			monsterName: monsterName,
+			stats: monster.CreateStartingStats(),
+			position: position);
+		monsterContainer.AddChild(monster);
+		_monsters.Add(monster);
 	}
 
 	public override void _Process(double delta)

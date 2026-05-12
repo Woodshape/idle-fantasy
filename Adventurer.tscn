@@ -1,0 +1,14 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" uid="uid://coayya7pcwfic" path="res://Adventurer.cs" id="1_hrbkr"]
+[ext_resource type="Script" uid="uid://c66ov47jswk43" path="res://AdventurerController.cs" id="2_wwsmb"]
+[ext_resource type="Script" uid="uid://diwyeoq4xci1f" path="res://AdventurerCombatController.cs" id="3_4b2lm"]
+
+[node name="Adventurer" type="Node2D"]
+script = ExtResource("1_hrbkr")
+
+[node name="AdventurerController" type="Node" parent="."]
+script = ExtResource("2_wwsmb")
+
+[node name="AdventurerCombatController" type="Node" parent="."]
+script = ExtResource("3_4b2lm")

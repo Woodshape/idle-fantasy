@@ -1,6 +1,7 @@
 #nullable enable
 
 using Godot;
+using System;
 using System.Collections.Generic;
 using GDict = Godot.Collections.Dictionary;
 
@@ -66,13 +67,83 @@ public partial class Adventurer : Node2D, ICombatant
 	public bool CanAct { get; private set; }
 
 	private readonly Dictionary<string, int> _skillCooldowns = new();
+	private bool _hasSetup;
 
 	public override void _Ready()
 	{
-		Health = MaxHealth;
+		if (!_hasSetup)
+		{
+			Health = MaxHealth;
+		}
+
 		Controller = GetNodeOrNull<AdventurerController>("AdventurerController");
 		CombatController = GetNodeOrNull<AdventurerCombatController>("AdventurerCombatController");
 		PublishState();
+	}
+
+	public CombatStats CreateStartingStats()
+	{
+		return new CombatStats(Attack, Accuracy, Defense, Evasion, Initiative, AttackSpeed, MaxHealth, MaxHealth);
+	}
+
+	public void Setup(
+		string? adventurerName = null,
+		int? level = null,
+		CombatStats? stats = null,
+		Vector2? position = null,
+		float? speed = null,
+		float? stopDistance = null,
+		int experience = 0,
+		int gold = 0)
+	{
+		AdventurerName = adventurerName ?? AdventurerName;
+		Level = level ?? Level;
+
+		if (stats is CombatStats setupStats)
+		{
+			Attack = setupStats.Attack;
+			Accuracy = setupStats.Accuracy;
+			Defense = setupStats.Defense;
+			Evasion = setupStats.Evasion;
+			Initiative = setupStats.Initiative;
+			AttackSpeed = setupStats.AttackSpeedTicks;
+			MaxHealth = setupStats.MaxHealth;
+			Health = Mathf.Clamp(setupStats.CurrentHealth, 0, MaxHealth);
+		}
+		else
+		{
+			throw new InvalidOperationException($"{nameof(Adventurer)}.{nameof(Setup)} requires character stats.");
+		}
+
+		if (position is Vector2 setupPosition)
+		{
+			Position = setupPosition;
+		}
+
+		Speed = speed ?? Speed;
+		StopDistance = stopDistance ?? StopDistance;
+		Experience = experience;
+		Gold = gold;
+		MoveTarget = null;
+		CurrentMonsterTarget = null;
+		CombatState = Health > 0 ? global::CombatState.OutOfCombat : global::CombatState.Defeated;
+		CurrentCombatTargetName = string.Empty;
+		QueuedActionId = string.Empty;
+		ActiveActionId = string.Empty;
+		BasicAttackCooldownTicksRemaining = 0;
+		GlobalCooldownTicksRemaining = 0;
+		CastTicksRemaining = 0;
+		RecoveryTicksRemaining = 0;
+		IsDisabled = false;
+		CanAct = false;
+		_skillCooldowns.Clear();
+		_hasSetup = true;
+		QueueRedraw();
+
+		if (IsInsideTree())
+		{
+			PublishState();
+		}
 	}
 
 	public void SetMoveTarget(Vector2 target)

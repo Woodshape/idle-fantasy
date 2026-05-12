@@ -2,43 +2,19 @@
 
 [ext_resource type="Script" uid="uid://crvc53pr1gid8" path="res://GameController.cs" id="1_dwbse"]
 [ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://Town.cs" id="2_pkg7o"]
-[ext_resource type="Script" uid="uid://coayya7pcwfic" path="res://Adventurer.cs" id="3_gbfbk"]
-[ext_resource type="Script" uid="uid://c66ov47jswk43" path="res://AdventurerController.cs" id="4_ioo17"]
-[ext_resource type="Script" uid="uid://diwyeoq4xci1f" path="res://AdventurerCombatController.cs" id="5_wse8f"]
-[ext_resource type="Script" uid="uid://btqlfuvh0d8cq" path="res://Monster.cs" id="6_ic0uy"]
+[ext_resource type="PackedScene" path="res://Adventurer.tscn" id="3_kcv4l"]
+[ext_resource type="PackedScene" path="res://Monster.tscn" id="4_47ur8"]
 
 [node name="Game" type="Node2D" unique_id=1741732238]
 script = ExtResource("1_dwbse")
+AdventurerScene = ExtResource("3_kcv4l")
+MonsterScene = ExtResource("4_47ur8")
 
 [node name="Town" type="Node2D" parent="." unique_id=1017707839]
 position = Vector2(160, 300)
 script = ExtResource("2_pkg7o")
 
-[node name="Adventurer" type="Node2D" parent="." unique_id=2034013761]
-position = Vector2(160, 300)
-script = ExtResource("3_gbfbk")
-
-[node name="AdventurerController" type="Node" parent="Adventurer" unique_id=1067124966]
-script = ExtResource("4_ioo17")
-
-[node name="AdventurerCombatController" type="Node" parent="Adventurer" unique_id=1979986923]
-script = ExtResource("5_wse8f")
-
 [node name="Monsters" type="Node2D" parent="." unique_id=1825137319]
-
-[node name="Slime" type="Node2D" parent="Monsters" unique_id=2021799167]
-position = Vector2(580, 300)
-script = ExtResource("6_ic0uy")
-
-[node name="Slime2" type="Node2D" parent="Monsters"]
-position = Vector2(670, 240)
-script = ExtResource("6_ic0uy")
-MonsterName = "Slime 2"
-
-[node name="Slime3" type="Node2D" parent="Monsters"]
-position = Vector2(670, 360)
-script = ExtResource("6_ic0uy")
-MonsterName = "Slime 3"
 
 [node name="Hud" type="CanvasLayer" parent="." unique_id=700767130]
 

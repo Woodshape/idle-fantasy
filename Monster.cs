@@ -1,6 +1,7 @@
 #nullable enable
 
 using Godot;
+using System;
 using System.Collections.Generic;
 using GDict = Godot.Collections.Dictionary;
 
@@ -58,11 +59,75 @@ public partial class Monster : Node2D, ICombatant
 	public bool CanAct { get; private set; }
 
 	private readonly Dictionary<string, int> _skillCooldowns = new();
+	private bool _hasSetup;
 
 	public override void _Ready()
 	{
-		Health = MaxHealth;
+		if (!_hasSetup)
+		{
+			Health = MaxHealth;
+		}
+
 		PublishState();
+	}
+
+	public CombatStats CreateStartingStats()
+	{
+		return new CombatStats(Attack, Accuracy, Defense, Evasion, Initiative, AttackSpeed, MaxHealth, MaxHealth);
+	}
+
+	public void Setup(
+		string? monsterName = null,
+		int? level = null,
+		CombatStats? stats = null,
+		Vector2? position = null,
+		int? goldReward = null,
+		int? experienceReward = null)
+	{
+		MonsterName = monsterName ?? MonsterName;
+		Level = level ?? Level;
+
+		if (stats is CombatStats setupStats)
+		{
+			Attack = setupStats.Attack;
+			Accuracy = setupStats.Accuracy;
+			Defense = setupStats.Defense;
+			Evasion = setupStats.Evasion;
+			Initiative = setupStats.Initiative;
+			AttackSpeed = setupStats.AttackSpeedTicks;
+			MaxHealth = setupStats.MaxHealth;
+			Health = Mathf.Clamp(setupStats.CurrentHealth, 0, MaxHealth);
+		}
+		else
+		{
+			throw new InvalidOperationException($"{nameof(Monster)}.{nameof(Setup)} requires character stats.");
+		}
+
+		if (position is Vector2 setupPosition)
+		{
+			Position = setupPosition;
+		}
+
+		GoldReward = goldReward ?? GoldReward;
+		ExperienceReward = experienceReward ?? ExperienceReward;
+		CombatState = Health > 0 ? global::CombatState.OutOfCombat : global::CombatState.Defeated;
+		CurrentCombatTargetName = string.Empty;
+		QueuedActionId = string.Empty;
+		ActiveActionId = string.Empty;
+		BasicAttackCooldownTicksRemaining = 0;
+		GlobalCooldownTicksRemaining = 0;
+		CastTicksRemaining = 0;
+		RecoveryTicksRemaining = 0;
+		IsDisabled = false;
+		CanAct = false;
+		_skillCooldowns.Clear();
+		_hasSetup = true;
+		QueueRedraw();
+
+		if (IsInsideTree())
+		{
+			PublishState();
+		}
 	}
 
 	public int ApplyDamage(int amount)
