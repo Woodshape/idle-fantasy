@@ -36,7 +36,7 @@ public sealed class CombatAction
 		bool canUseWhileMoving,
 		int actionWeight,
 		double damageMultiplier,
-		bool usesBasicAttackCooldown)
+		bool usesGlobalAttackCooldown)
 	{
 		ActionId = actionId;
 		DisplayName = displayName;
@@ -49,7 +49,7 @@ public sealed class CombatAction
 		CanUseWhileMoving = canUseWhileMoving;
 		ActionWeight = actionWeight;
 		DamageMultiplier = damageMultiplier;
-		UsesBasicAttackCooldown = usesBasicAttackCooldown;
+		UsesGlobalAttackCooldown = usesGlobalAttackCooldown;
 	}
 
 	public string ActionId { get; }
@@ -63,7 +63,7 @@ public sealed class CombatAction
 	public bool CanUseWhileMoving { get; }
 	public int ActionWeight { get; }
 	public double DamageMultiplier { get; }
-	public bool UsesBasicAttackCooldown { get; }
+	public bool UsesGlobalAttackCooldown { get; }
 
 	public static CombatAction BasicAttack()
 	{
@@ -100,6 +100,7 @@ public sealed class CombatantCombatSnapshot
 	public string QueuedActionId { get; init; } = string.Empty;
 	public string ActiveActionId { get; init; } = string.Empty;
 	public int BasicAttackCooldownTicksRemaining { get; init; }
+	public int GlobalCooldownTicksRemaining { get; init; }
 	public int CastTicksRemaining { get; init; }
 	public int RecoveryTicksRemaining { get; init; }
 	public IReadOnlyDictionary<string, int> SkillCooldowns { get; init; } = new Dictionary<string, int>();

@@ -58,6 +58,7 @@ public partial class Adventurer : Node2D, ICombatant
 	public string QueuedActionId { get; private set; } = string.Empty;
 	public string ActiveActionId { get; private set; } = string.Empty;
 	public int BasicAttackCooldownTicksRemaining { get; private set; }
+	public int GlobalCooldownTicksRemaining { get; private set; }
 	public int CastTicksRemaining { get; private set; }
 	public int RecoveryTicksRemaining { get; private set; }
 	public IReadOnlyDictionary<string, int> SkillCooldowns => _skillCooldowns;
@@ -151,6 +152,7 @@ public partial class Adventurer : Node2D, ICombatant
 		QueuedActionId = snapshot.QueuedActionId;
 		ActiveActionId = snapshot.ActiveActionId;
 		BasicAttackCooldownTicksRemaining = snapshot.BasicAttackCooldownTicksRemaining;
+		GlobalCooldownTicksRemaining = snapshot.GlobalCooldownTicksRemaining;
 		CastTicksRemaining = snapshot.CastTicksRemaining;
 		RecoveryTicksRemaining = snapshot.RecoveryTicksRemaining;
 		IsDisabled = snapshot.IsDisabled;
@@ -193,6 +195,7 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "queued_action", QueuedActionId },
 			{ "active_action", ActiveActionId },
 			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining },
+			{ "global_cooldown_ticks_remaining", GlobalCooldownTicksRemaining },
 			{ "cast_ticks_remaining", CastTicksRemaining },
 			{ "recovery_ticks_remaining", RecoveryTicksRemaining },
 			{ "skill_cooldowns", BuildSkillCooldownState() },

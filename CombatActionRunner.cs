@@ -11,6 +11,7 @@ public sealed class CombatActionRunner
 	private const double BaseHitChance = 0.75;
 	private const double MinHitChance = 0.05;
 	private const double MaxHitChance = 0.95;
+	private const int GlobalCooldownTicks = 4;
 
 	private readonly ICombatant _owner;
 	private readonly IReadOnlyList<CombatAction> _actions;
@@ -43,13 +44,14 @@ public sealed class CombatActionRunner
 	public ICombatant? Target => _target;
 	public CombatState State { get; private set; } = CombatState.OutOfCombat;
 	public int BasicAttackCooldownTicksRemaining { get; private set; }
+	public int GlobalCooldownTicksRemaining { get; private set; }
 	public int CastTicksRemaining { get; private set; }
 	public int RecoveryTicksRemaining { get; private set; }
 	public IReadOnlyDictionary<string, int> SkillCooldowns => _skillCooldowns;
 	public string ActiveActionId => _activeAction?.ActionId ?? string.Empty;
 	public string QueuedActionId => _queuedAction?.ActionId ?? string.Empty;
 	public bool IsDisabled => State == CombatState.Disabled;
-	public bool CanAct => State == CombatState.Ready && _owner.IsAlive && _target?.IsAlive == true;
+	public bool CanAct => State == CombatState.Ready && GlobalCooldownTicksRemaining <= 0 && _owner.IsAlive && _target?.IsAlive == true;
 
 	public void Start(ICombatant target, long currentTick)
 	{
@@ -69,6 +71,7 @@ public sealed class CombatActionRunner
 		_queuedAction = null;
 		_activeAction = null;
 		BasicAttackCooldownTicksRemaining = 0;
+		GlobalCooldownTicksRemaining = 0;
 		CastTicksRemaining = 0;
 		RecoveryTicksRemaining = 0;
 
@@ -241,6 +244,16 @@ public sealed class CombatActionRunner
 			}
 		}
 
+		if (GlobalCooldownTicksRemaining > 0)
+		{
+			GlobalCooldownTicksRemaining--;
+
+			if (GlobalCooldownTicksRemaining == 0)
+			{
+				EmitCooldownReady("global_cooldown", "global", tick);
+			}
+		}
+
 		foreach (string actionId in _skillCooldowns.Keys.ToArray())
 		{
 			int previous = _skillCooldowns[actionId];
@@ -308,10 +321,11 @@ public sealed class CombatActionRunner
 	{
 		_queuedAction = action;
 		ChangeState(CombatState.Queued);
-		GD.Print($"ACTION_QUEUED tick={tick} combatant={_owner.DisplayName} action={action.ActionId} target={_target?.DisplayName ?? "none"} reason={reason} action_cooldown_ticks={GetActionCooldownTicks(action)} basic_attack_cooldown_ticks_remaining={BasicAttackCooldownTicksRemaining} skill_cooldown_ticks_remaining={GetSkillCooldownTicksRemaining(action)} cast_ticks={action.CastTicks} recovery_ticks={action.RecoveryTicks}");
+		GD.Print($"ACTION_QUEUED tick={tick} {_owner.DisplayName} action={action.ActionId} target={_target?.DisplayName ?? "none"} cooldown={GetActionCooldownTicks(action)}");
 		_emitEvent("combat_action_queued", BuildActionPayload(action, tick, new GDict
 		{
-			{ "queue_reason", reason }
+			{ "queue_reason", reason },
+			{ "skill_cooldown_ticks_remaining", GetSkillCooldownTicksRemaining(action) }
 		}));
 		PublishSnapshot();
 		return new QueuedCombatAction(this, _owner, _target, action);
@@ -324,7 +338,7 @@ public sealed class CombatActionRunner
 
 	private int GetActionCooldownTicks(CombatAction action)
 	{
-		return action.UsesBasicAttackCooldown ? GetBasicAttackCooldownTicks() : action.CooldownTicks;
+		return action.UsesGlobalAttackCooldown ? GetBasicAttackCooldownTicks() : action.CooldownTicks;
 	}
 
 	private CombatAction? SelectAction()
@@ -342,6 +356,11 @@ public sealed class CombatActionRunner
 
 	private bool IsActionReady(CombatAction action)
 	{
+		if (GlobalCooldownTicksRemaining > 0)
+		{
+			return false;
+		}
+
 		if (action.RequiresTarget && _target?.IsAlive != true)
 		{
 			return false;
@@ -408,7 +427,7 @@ public sealed class CombatActionRunner
 
 	private void StartCooldowns(CombatAction action, long tick)
 	{
-		if (action.UsesBasicAttackCooldown)
+		if (action.UsesGlobalAttackCooldown)
 		{
 			int durationTicks = GetBasicAttackCooldownTicks();
 			BasicAttackCooldownTicksRemaining = durationTicks;
@@ -419,6 +438,12 @@ public sealed class CombatActionRunner
 		{
 			_skillCooldowns[action.ActionId] = action.CooldownTicks;
 			EmitCooldownStarted(action.ActionId, "skill", action.CooldownTicks, tick);
+		}
+
+		if (action.Kind is CombatActionKind.Skill or CombatActionKind.Spell)
+		{
+			GlobalCooldownTicksRemaining = GlobalCooldownTicks;
+			EmitCooldownStarted("global_cooldown", "global", GlobalCooldownTicks, tick);
 		}
 	}
 
@@ -473,6 +498,7 @@ public sealed class CombatActionRunner
 			{ "combatant_kind", _owner.CombatantKind },
 			{ "target", _target?.DisplayName ?? "none" },
 			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining },
+			{ "global_cooldown_ticks_remaining", GlobalCooldownTicksRemaining },
 			{ "ready_skill_count", _skillCooldowns.Count(pair => pair.Value <= 0) }
 		});
 	}
@@ -520,7 +546,8 @@ public sealed class CombatActionRunner
 			{ "cast_ticks", action.CastTicks },
 			{ "recovery_ticks", action.RecoveryTicks },
 			{ "action_weight", action.ActionWeight },
-			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining }
+			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining },
+			{ "global_cooldown_ticks_remaining", GlobalCooldownTicksRemaining }
 		};
 
 		if (extras is not null)
@@ -543,6 +570,7 @@ public sealed class CombatActionRunner
 			QueuedActionId = _queuedAction?.ActionId ?? string.Empty,
 			ActiveActionId = _activeAction?.ActionId ?? string.Empty,
 			BasicAttackCooldownTicksRemaining = BasicAttackCooldownTicksRemaining,
+			GlobalCooldownTicksRemaining = GlobalCooldownTicksRemaining,
 			CastTicksRemaining = CastTicksRemaining,
 			RecoveryTicksRemaining = RecoveryTicksRemaining,
 			SkillCooldowns = new Dictionary<string, int>(_skillCooldowns, StringComparer.Ordinal),

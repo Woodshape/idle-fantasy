@@ -194,7 +194,7 @@ public partial class AdventurerCombatController : Node
 				"Heavy Strike",
 				CombatActionKind.Skill,
 				48.0,
-				4,
+				12,
 				0,
 				1,
 				true,
@@ -214,13 +214,11 @@ public partial class AdventurerCombatController : Node
 		{
 			int randomRoll = _rng.RandiRange(1, 100);
 			CombatStats stats = queuedAction.Actor.Stats;
-			int initiativeScore =
-				randomRoll
-				+ stats.Initiative
-				+ (int)Math.Round(stats.Accuracy * 20.0, MidpointRounding.AwayFromZero)
-				+ (int)Math.Round(stats.Evasion * 10.0, MidpointRounding.AwayFromZero)
-				+ GetAttackSpeedInitiativeBonus(stats.AttackSpeedTicks)
-				- queuedAction.Action.ActionWeight;
+				int initiativeScore =
+					randomRoll
+					+ stats.Initiative
+					+ GetAttackSpeedInitiativeBonus(stats.AttackSpeedTicks)
+					- queuedAction.Action.ActionWeight;
 			RolledCombatAction rolledAction = new(queuedAction, randomRoll, initiativeScore);
 			rolledActions.Add(rolledAction);
 			EmitBridgeEvent("combat_action_order_rolled", new GDict
@@ -234,8 +232,6 @@ public partial class AdventurerCombatController : Node
 				{ "action_id", queuedAction.Action.ActionId },
 				{ "random_roll", randomRoll },
 				{ "initiative", stats.Initiative },
-				{ "accuracy_bonus", (int)Math.Round(stats.Accuracy * 20.0, MidpointRounding.AwayFromZero) },
-				{ "evasion_bonus", (int)Math.Round(stats.Evasion * 10.0, MidpointRounding.AwayFromZero) },
 				{ "attack_speed_ticks", stats.AttackSpeedTicks },
 				{ "attack_speed_bonus", GetAttackSpeedInitiativeBonus(stats.AttackSpeedTicks) },
 				{ "action_weight", queuedAction.Action.ActionWeight },
@@ -312,6 +308,7 @@ public partial class AdventurerCombatController : Node
 			{ "active_action", runner?.ActiveActionId ?? string.Empty },
 			{ "queued_action", runner?.QueuedActionId ?? string.Empty },
 			{ "basic_attack_cooldown_ticks_remaining", runner?.BasicAttackCooldownTicksRemaining ?? 0 },
+			{ "global_cooldown_ticks_remaining", combatant is Adventurer adventurer3 ? adventurer3.GlobalCooldownTicksRemaining : combatant is Monster monster3 ? monster3.GlobalCooldownTicksRemaining : 0 },
 			{ "cast_ticks_remaining", combatant is Adventurer adventurer ? adventurer.CastTicksRemaining : combatant is Monster monster ? monster.CastTicksRemaining : 0 },
 			{ "recovery_ticks_remaining", combatant is Adventurer adventurer2 ? adventurer2.RecoveryTicksRemaining : combatant is Monster monster2 ? monster2.RecoveryTicksRemaining : 0 },
 			{ "skill_cooldowns", skillCooldowns },
