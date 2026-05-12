@@ -61,7 +61,6 @@ Each combatant should own these runtime fields:
 - `CurrentTarget`
 - `QueuedAction`
 - `ActiveAction`
-- `GlobalCooldownRemaining`
 - `BasicAttackCooldownRemaining`
 - `CastRemaining`
 - `RecoveryRemaining`
@@ -83,7 +82,7 @@ Initial combat states:
 - `Disabled`: unable to act because of a condition.
 - `Defeated`: health is zero.
 
-Cooldowns should not be combat states. `BasicAttackCooldownRemaining`, `SkillCooldowns`, and `GlobalCooldownRemaining` are action availability timers. A combatant can remain `Ready` while one skill has 60 seconds left on cooldown, choose another available skill, make a basic attack if ready, or simply wait for the next relevant timer to mature.
+Cooldowns should not be combat states. `BasicAttackCooldownRemaining` and `SkillCooldowns` are action availability timers. A combatant can remain `Ready` while one skill has 60 seconds left on cooldown, choose another available skill, make a basic attack if ready, or simply wait for the next relevant timer to mature.
 
 The important change is that these states belong to each combatant, not only to the adventurer.
 
@@ -95,7 +94,6 @@ Actions should be driven by independent timers:
 - Skill cooldown: per skill, starts when the skill is used; it gates only that skill.
 - Cast time: per action, counts down after an action begins.
 - Recovery time: optional post-action delay before another action can start.
-- Global cooldown: optional shared lockout for most active abilities.
 
 Cooldown timers are checked by the decision controller when selecting an action. They should not force `CombatState` to become `AttackCooldown` or `SkillCooldown`.
 
@@ -140,7 +138,7 @@ If no action is currently available because all relevant cooldowns are still run
 
 ## Skill And Spell Flow
 
-Represent skills and spells with the same `CombatAction` shape.
+Represent adventurer skills and spells with the same `CombatAction` shape. Monsters should not use the same action list format in this slice; keep monster behavior simpler and let the shared runner support their basic attack timing without requiring adventurer-style skill lists.
 
 Suggested fields:
 
@@ -325,10 +323,10 @@ State should expose each combatant’s independent timers so tests can verify th
 - Preserve the current simple visible arena.
 - Do not add parties, equipment, inventory, or shops in this slice.
 
-## Open Questions
+## Resolved Decisions
 
-- Should attack speed be stored as attacks per second or seconds per attack?
-- Should global cooldown exist immediately or wait until multiple skills exist?
-- Should monsters use the same action list format as adventurers from the start?
-- Should buffs and debuffs tick in fixed pulses or store exact expiry timestamps with tick-based cleanup?
-- Should regeneration be continuous or pulse-based on simulation ticks?
+- Store attack speed as attacks per second.
+- Do not add a global cooldown in this slice.
+- Do not make monsters use the same action list format as adventurers yet.
+- Buffs and debuffs tick on the game simulation tick as fixed pulses for now.
+- Regeneration also ticks on the game simulation tick.

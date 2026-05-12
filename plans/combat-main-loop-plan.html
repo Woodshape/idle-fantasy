@@ -485,7 +485,7 @@
 				<a href="#steps">Implementation Steps</a>
 				<a href="#acceptance">Acceptance Criteria</a>
 				<a href="#risks">Risks</a>
-				<a href="#questions">Open Questions</a>
+				<a href="#decided">Resolved Decisions</a>
 			</nav>
 		</aside>
 
@@ -545,7 +545,6 @@
 								<li>Skill cooldowns.</li>
 								<li>Cast time.</li>
 								<li>Recovery windows.</li>
-								<li>Optional global cooldown.</li>
 							</ul>
 						</div>
 					</div>
@@ -608,7 +607,6 @@
 							<li><code>CurrentTarget</code></li>
 							<li><code>QueuedAction</code></li>
 							<li><code>ActiveAction</code></li>
-							<li><code>GlobalCooldownRemaining</code></li>
 							<li><code>BasicAttackCooldownRemaining</code></li>
 							<li><code>CastRemaining</code></li>
 							<li><code>RecoveryRemaining</code></li>
@@ -643,7 +641,7 @@
 				</ul>
 				<div class="card blue" style="margin-top: 1rem;">
 					<h3>Cooldowns Are Not States</h3>
-					<p><code>BasicAttackCooldownRemaining</code>, <code>SkillCooldowns</code>, and <code>GlobalCooldownRemaining</code> are action availability timers. A combatant can stay <code>Ready</code> while one skill has 60 seconds left on cooldown, choose another available skill, make a basic attack if ready, or wait for the next relevant timer to mature.</p>
+					<p><code>BasicAttackCooldownRemaining</code> and <code>SkillCooldowns</code> are action availability timers. A combatant can stay <code>Ready</code> while one skill has 60 seconds left on cooldown, choose another available skill, make a basic attack if ready, or wait for the next relevant timer to mature.</p>
 				</div>
 			</section>
 
@@ -660,7 +658,6 @@
 							<li>Skill cooldown starts when its skill is used and gates only that skill.</li>
 							<li>Cast time counts down after an action begins.</li>
 							<li>Recovery time optionally locks out the next action after resolution.</li>
-							<li>Global cooldown can provide a shared lockout for active abilities.</li>
 						</ul>
 						<p style="margin-top: 1rem;">Cooldown timers are checked by the decision controller when selecting an action. They should not force <code>CombatState</code> to become <code>AttackCooldown</code> or <code>SkillCooldown</code>.</p>
 					</div>
@@ -708,6 +705,7 @@ monster_attacks_per_second = 0.65</code></pre>
 				</div>
 
 				<h3 style="margin-top: 1.25rem;">CombatAction Shape</h3>
+				<p>Use this action shape for adventurer skills and spells. Monsters should not use the same action list format in this slice; keep monster behavior simpler and let the shared runner support their basic attack timing without requiring adventurer-style skill lists.</p>
 				<div class="grid-2">
 					<div class="card violet">
 						<h3>Fields</h3>
@@ -882,31 +880,31 @@ monster_attacks_per_second = 0.65</code></pre>
 				</div>
 			</section>
 
-			<section class="panel" id="questions">
+			<section class="panel" id="decided">
 				<div class="section-title">
-					<h2>Open Questions</h2>
-					<span class="tag">Resolve During Slice</span>
+					<h2>Resolved Decisions</h2>
+					<span class="tag">Locked For This Slice</span>
 				</div>
 				<div class="timeline">
 					<div class="timeline-row">
 						<strong>Attack Speed</strong>
-						<span>Store as attacks per second or seconds per attack?</span>
+						<span>Store attack speed as attacks per second.</span>
 					</div>
 					<div class="timeline-row">
 						<strong>Global Cooldown</strong>
-						<span>Add it immediately or wait until multiple skills exist?</span>
+						<span>Do not add a global cooldown in this slice.</span>
 					</div>
 					<div class="timeline-row">
 						<strong>Action Lists</strong>
-						<span>Should monsters use the same action list format as adventurers from the start?</span>
+						<span>Do not make monsters use the same action list format as adventurers yet.</span>
 					</div>
 					<div class="timeline-row">
 						<strong>Effects</strong>
-						<span>Should buffs and debuffs tick in fixed pulses or store exact expiry timestamps with tick-based cleanup?</span>
+						<span>Buffs and debuffs tick on the game simulation tick as fixed pulses for now.</span>
 					</div>
 					<div class="timeline-row">
 						<strong>Regeneration</strong>
-						<span>Should regeneration be continuous or pulse-based on simulation ticks?</span>
+						<span>Regeneration also ticks on the game simulation tick.</span>
 					</div>
 				</div>
 			</section>
