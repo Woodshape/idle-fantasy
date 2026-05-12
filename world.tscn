@@ -30,6 +30,16 @@ script = ExtResource("5_wse8f")
 position = Vector2(580, 300)
 script = ExtResource("6_ic0uy")
 
+[node name="Slime2" type="Node2D" parent="Monsters"]
+position = Vector2(670, 240)
+script = ExtResource("6_ic0uy")
+MonsterName = "Slime 2"
+
+[node name="Slime3" type="Node2D" parent="Monsters"]
+position = Vector2(670, 360)
+script = ExtResource("6_ic0uy")
+MonsterName = "Slime 3"
+
 [node name="Hud" type="CanvasLayer" parent="." unique_id=700767130]
 
 [node name="Panel" type="PanelContainer" parent="Hud" unique_id=1611576936]

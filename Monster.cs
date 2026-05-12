@@ -13,13 +13,13 @@ public partial class Monster : Node2D, ICombatant
 	public int Level { get; set; } = 1;
 
 	[Export]
-	public int MaxHealth { get; set; } = 18;
+	public int MaxHealth { get; set; } = 23;
 
 	[Export]
-	public int Attack { get; set; } = 3;
+	public int Attack { get; set; } = 6;
 
 	[Export]
-	public double Accuracy { get; set; } = 0.0;
+	public double Accuracy { get; set; } = 0.35;
 
 	[Export]
 	public int Defense { get; set; } = 1;
@@ -172,5 +172,20 @@ public partial class Monster : Node2D, ICombatant
 		Color bodyColor = IsAlive ? new Color(0.71f, 0.20f, 0.23f) : new Color(0.25f, 0.25f, 0.25f);
 		DrawCircle(Vector2.Zero, 18.0f, bodyColor);
 		DrawArc(Vector2.Zero, 24.0f, 0.0f, Mathf.Tau, 32, new Color(0.12f, 0.08f, 0.09f), 2.0f);
+		DrawHealthBar(new Vector2(-24.0f, -34.0f), new Vector2(48.0f, 6.0f));
+	}
+
+	private void DrawHealthBar(Vector2 position, Vector2 size)
+	{
+		float healthRatio = MaxHealth <= 0 ? 0.0f : Mathf.Clamp((float)Health / MaxHealth, 0.0f, 1.0f);
+		Color fillColor = healthRatio > 0.5f
+			? new Color(0.22f, 0.78f, 0.34f)
+			: healthRatio > 0.25f
+				? new Color(0.95f, 0.72f, 0.20f)
+				: new Color(0.90f, 0.24f, 0.24f);
+
+		DrawRect(new Rect2(position, size), new Color(0.08f, 0.08f, 0.09f));
+		DrawRect(new Rect2(position, new Vector2(size.X * healthRatio, size.Y)), fillColor);
+		DrawRect(new Rect2(position, size), new Color(0.02f, 0.02f, 0.025f), false, 1.0f);
 	}
 }

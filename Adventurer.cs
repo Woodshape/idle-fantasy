@@ -13,7 +13,7 @@ public partial class Adventurer : Node2D, ICombatant
 	public int Level { get; set; } = 1;
 
 	[Export]
-	public int MaxHealth { get; set; } = 28;
+	public int MaxHealth { get; set; } = 30;
 
 	[Export]
 	public int Attack { get; set; } = 7;
@@ -235,5 +235,20 @@ public partial class Adventurer : Node2D, ICombatant
 		Color bodyColor = IsAlive ? new Color(0.20f, 0.36f, 0.78f) : new Color(0.18f, 0.18f, 0.20f);
 		DrawCircle(Vector2.Zero, 15.0f, bodyColor);
 		DrawLine(new Vector2(-10.0f, 13.0f), new Vector2(10.0f, 13.0f), new Color(0.95f, 0.86f, 0.42f), 3.0f);
+		DrawHealthBar(new Vector2(-22.0f, -30.0f), new Vector2(44.0f, 6.0f));
+	}
+
+	private void DrawHealthBar(Vector2 position, Vector2 size)
+	{
+		float healthRatio = MaxHealth <= 0 ? 0.0f : Mathf.Clamp((float)Health / MaxHealth, 0.0f, 1.0f);
+		Color fillColor = healthRatio > 0.5f
+			? new Color(0.22f, 0.78f, 0.34f)
+			: healthRatio > 0.25f
+				? new Color(0.95f, 0.72f, 0.20f)
+				: new Color(0.90f, 0.24f, 0.24f);
+
+		DrawRect(new Rect2(position, size), new Color(0.08f, 0.08f, 0.09f));
+		DrawRect(new Rect2(position, new Vector2(size.X * healthRatio, size.Y)), fillColor);
+		DrawRect(new Rect2(position, size), new Color(0.02f, 0.02f, 0.025f), false, 1.0f);
 	}
 }

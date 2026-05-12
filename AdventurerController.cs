@@ -20,6 +20,9 @@ public partial class AdventurerController : Node
 	[Export]
 	public float CombatApproachDistance { get; set; } = 42.0f;
 
+	[Export(PropertyHint.Range, "0.0,1.0,0.05")]
+	public float RestHealthRatio { get; set; } = 0.60f;
+
 	private Adventurer? _adventurer;
 	private GameController? _game;
 	private Town? _town;
@@ -110,8 +113,8 @@ public partial class AdventurerController : Node
 
 		if (target is null)
 		{
-			_stateTimer = 0.5;
-			ChangeState(AdventurerIntentionState.IdleInTown);
+			_adventurer.ClearCombatTarget();
+			ChangeState(AdventurerIntentionState.ReturnToTown);
 			return;
 		}
 
@@ -240,7 +243,18 @@ public partial class AdventurerController : Node
 			{ "total_experience", _adventurer.Experience }
 		});
 		_adventurer.ClearCombatTarget();
-		ChangeState(AdventurerIntentionState.ReturnToTown);
+		ChangeState(ShouldReturnToTownForRest() ? AdventurerIntentionState.ReturnToTown : AdventurerIntentionState.ChooseTarget);
+	}
+
+	private bool ShouldReturnToTownForRest()
+	{
+		if (_adventurer is null)
+		{
+			return true;
+		}
+
+		int restHealth = Mathf.CeilToInt(_adventurer.MaxHealth * RestHealthRatio);
+		return _adventurer.Health <= restHealth;
 	}
 
 	private void UpdateReturn(double delta)
