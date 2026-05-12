@@ -17,6 +17,9 @@ public enum AdventurerIntentionState
 
 public partial class AdventurerController : Node
 {
+	[Export]
+	public float CombatApproachDistance { get; set; } = 42.0f;
+
 	private Adventurer? _adventurer;
 	private GameController? _game;
 	private Town? _town;
@@ -113,13 +116,16 @@ public partial class AdventurerController : Node
 		}
 
 		_adventurer.SetCombatTarget(target);
-		_adventurer.SetMoveTarget(target.GlobalPosition);
+		Vector2 approachPosition = GetCombatApproachPosition(target);
+		_adventurer.SetMoveTarget(approachPosition);
 		EmitBridgeEvent("adventurer_target_selected", new GDict
 		{
 			{ "source", nameof(AdventurerController) },
 			{ "adventurer", _adventurer.AdventurerName },
 			{ "monster", target.MonsterName },
-			{ "target_position", BridgePayload.VectorToArray(target.GlobalPosition) }
+			{ "target_position", BridgePayload.VectorToArray(approachPosition) },
+			{ "monster_position", BridgePayload.VectorToArray(target.GlobalPosition) },
+			{ "combat_approach_distance", CombatApproachDistance }
 		});
 		ChangeState(AdventurerIntentionState.TravelToTarget);
 	}
@@ -139,7 +145,7 @@ public partial class AdventurerController : Node
 			return;
 		}
 
-		_adventurer.SetMoveTarget(target.GlobalPosition);
+		_adventurer.SetMoveTarget(GetCombatApproachPosition(target));
 
 		if (_adventurer.MoveTowardTarget(delta))
 		{
@@ -148,10 +154,29 @@ public partial class AdventurerController : Node
 				{ "source", nameof(AdventurerController) },
 				{ "adventurer", _adventurer.AdventurerName },
 				{ "monster", target.MonsterName },
-				{ "position", BridgePayload.VectorToArray(_adventurer.GlobalPosition) }
+				{ "position", BridgePayload.VectorToArray(_adventurer.GlobalPosition) },
+				{ "monster_position", BridgePayload.VectorToArray(target.GlobalPosition) },
+				{ "distance_to_monster", _adventurer.GlobalPosition.DistanceTo(target.GlobalPosition) }
 			});
 			ChangeState(AdventurerIntentionState.FightMonster);
 		}
+	}
+
+	private Vector2 GetCombatApproachPosition(Monster target)
+	{
+		if (_adventurer is null)
+		{
+			return target.GlobalPosition;
+		}
+
+		Vector2 approachDirection = target.GlobalPosition - _adventurer.GlobalPosition;
+
+		if (approachDirection.LengthSquared() <= 0.001f)
+		{
+			approachDirection = Vector2.Right;
+		}
+
+		return target.GlobalPosition - approachDirection.Normalized() * CombatApproachDistance;
 	}
 
 	private void UpdateFight()

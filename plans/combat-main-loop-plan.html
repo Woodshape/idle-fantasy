@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Combat Main Loop Plan Overview</title>
+	<style>
+		:root {
+			--bg: #111819;
+			--paper: #f7f0df;
+			--paper-2: #ede0c4;
+			--ink: #241912;
+			--muted: #675849;
+			--line: #ccb680;
+			--green: #2f6951;
+			--gold: #b77a27;
+			--red: #993d2d;
+			--blue: #365f7d;
+			--violet: #67517f;
+			--shadow: 0 22px 64px rgba(8, 14, 13, 0.28);
+			--radius: 18px;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html {
+			scroll-behavior: smooth;
+		}
+
+		body {
+			margin: 0;
+			background:
+				linear-gradient(115deg, rgba(47, 105, 81, 0.32), transparent 34rem),
+				linear-gradient(250deg, rgba(54, 95, 125, 0.32), transparent 30rem),
+				linear-gradient(140deg, #111819 0%, #203329 49%, #30251b 100%);
+			color: var(--ink);
+			font-family: "Trebuchet MS", "Gill Sans", Verdana, sans-serif;
+			line-height: 1.55;
+		}
+
+		a {
+			color: inherit;
+		}
+
+		code {
+			background: rgba(54, 95, 125, 0.1);
+			border: 1px solid rgba(54, 95, 125, 0.18);
+			border-radius: 7px;
+			padding: 0.08rem 0.28rem;
+		}
+
+		pre {
+			background: #192722;
+			border-radius: 14px;
+			color: #fff8e8;
+			overflow-x: auto;
+			padding: 1rem;
+		}
+
+		pre code {
+			background: transparent;
+			border: 0;
+			padding: 0;
+		}
+
+		p {
+			margin: 0 0 1rem;
+		}
+
+		p:last-child {
+			margin-bottom: 0;
+		}
+
+		ul,
+		ol {
+			margin: 0;
+			padding-left: 1.15rem;
+		}
+
+		li + li {
+			margin-top: 0.36rem;
+		}
+
+		.layout {
+			display: grid;
+			gap: 1.5rem;
+			grid-template-columns: 290px minmax(0, 1fr);
+			margin: 0 auto;
+			max-width: 1480px;
+			padding: 1.5rem;
+		}
+
+		.sidebar {
+			align-self: start;
+			background: rgba(247, 240, 223, 0.94);
+			border: 1px solid rgba(204, 182, 128, 0.86);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			padding: 1rem;
+			position: sticky;
+			top: 1rem;
+		}
+
+		.sidebar h2 {
+			font-family: Georgia, serif;
+			font-size: 0.95rem;
+			letter-spacing: 0.12em;
+			margin: 0 0 0.8rem;
+			text-transform: uppercase;
+		}
+
+		.sidebar a {
+			border-radius: 999px;
+			color: var(--muted);
+			display: block;
+			padding: 0.42rem 0.65rem;
+			text-decoration: none;
+		}
+
+		.sidebar a:hover {
+			background: var(--paper-2);
+			color: var(--ink);
+		}
+
+		main {
+			display: grid;
+			gap: 1rem;
+			min-width: 0;
+		}
+
+		.hero,
+		.panel,
+		.card {
+			border: 1px solid rgba(204, 182, 128, 0.78);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+		}
+
+		.hero {
+			background:
+				linear-gradient(135deg, rgba(247, 240, 223, 0.97), rgba(237, 224, 196, 0.94)),
+				linear-gradient(90deg, rgba(47, 105, 81, 0.2), rgba(54, 95, 125, 0.18));
+			overflow: hidden;
+			padding: clamp(1.5rem, 4vw, 3rem);
+			position: relative;
+		}
+
+		.hero:after {
+			background:
+				linear-gradient(90deg, rgba(47, 105, 81, 0.08) 1px, transparent 1px),
+				linear-gradient(rgba(47, 105, 81, 0.08) 1px, transparent 1px);
+			background-size: 34px 34px;
+			content: "";
+			inset: 0;
+			position: absolute;
+		}
+
+		.hero > * {
+			position: relative;
+			z-index: 1;
+		}
+
+		.kicker {
+			color: var(--green);
+			font-weight: 800;
+			letter-spacing: 0.14em;
+			margin: 0 0 0.75rem;
+			text-transform: uppercase;
+		}
+
+		h1,
+		h2,
+		h3 {
+			font-family: Georgia, "Times New Roman", serif;
+			line-height: 1.12;
+		}
+
+		h1 {
+			font-size: clamp(2.3rem, 6vw, 5rem);
+			margin: 0 0 1rem;
+			max-width: 13ch;
+		}
+
+		.hero p {
+			font-size: clamp(1.05rem, 2vw, 1.24rem);
+			max-width: 82ch;
+		}
+
+		.panel {
+			background: rgba(247, 240, 223, 0.94);
+			padding: clamp(1.1rem, 2.4vw, 1.75rem);
+		}
+
+		.section-title {
+			align-items: end;
+			border-bottom: 2px solid rgba(204, 182, 128, 0.65);
+			display: flex;
+			gap: 1rem;
+			justify-content: space-between;
+			margin-bottom: 1rem;
+			padding-bottom: 0.75rem;
+		}
+
+		.section-title h2 {
+			font-size: clamp(1.45rem, 3vw, 2.25rem);
+			margin: 0;
+		}
+
+		.tag {
+			background: rgba(47, 105, 81, 0.12);
+			border: 1px solid rgba(47, 105, 81, 0.25);
+			border-radius: 999px;
+			color: var(--green);
+			font-size: 0.76rem;
+			font-weight: 800;
+			letter-spacing: 0.08em;
+			padding: 0.32rem 0.62rem;
+			text-transform: uppercase;
+			white-space: nowrap;
+		}
+
+		.grid,
+		.grid-2,
+		.grid-3,
+		.summary {
+			display: grid;
+			gap: 1rem;
+		}
+
+		.grid-2 {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.grid-3 {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.summary {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+
+		.card {
+			background: rgba(247, 240, 223, 0.92);
+			padding: 1rem;
+		}
+
+		.card h3 {
+			font-size: 1.14rem;
+			margin: 0 0 0.5rem;
+		}
+
+		.card strong {
+			color: var(--green);
+			display: block;
+			font-family: Georgia, serif;
+			font-size: 1.08rem;
+			margin-bottom: 0.25rem;
+		}
+
+		.card span,
+		.muted {
+			color: var(--muted);
+		}
+
+		.green {
+			background: linear-gradient(135deg, rgba(47, 105, 81, 0.13), rgba(247, 240, 223, 0.9));
+			border-color: rgba(47, 105, 81, 0.28);
+		}
+
+		.gold {
+			background: linear-gradient(135deg, rgba(183, 122, 39, 0.16), rgba(247, 240, 223, 0.9));
+			border-color: rgba(183, 122, 39, 0.3);
+		}
+
+		.red {
+			background: linear-gradient(135deg, rgba(153, 61, 45, 0.13), rgba(247, 240, 223, 0.9));
+			border-color: rgba(153, 61, 45, 0.28);
+		}
+
+		.blue {
+			background: linear-gradient(135deg, rgba(54, 95, 125, 0.14), rgba(247, 240, 223, 0.9));
+			border-color: rgba(54, 95, 125, 0.28);
+		}
+
+		.violet {
+			background: linear-gradient(135deg, rgba(103, 81, 127, 0.13), rgba(247, 240, 223, 0.9));
+			border-color: rgba(103, 81, 127, 0.28);
+		}
+
+		.clock-grid {
+			display: grid;
+			gap: 1rem;
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		}
+
+		.clock {
+			border: 1px solid rgba(204, 182, 128, 0.78);
+			border-radius: 16px;
+			display: grid;
+			gap: 0.75rem;
+			grid-template-rows: auto 1fr;
+			overflow: hidden;
+		}
+
+		.clock h3 {
+			background: rgba(25, 39, 34, 0.92);
+			color: #fff8e8;
+			margin: 0;
+			padding: 0.85rem 1rem;
+		}
+
+		.clock div {
+			padding: 1rem;
+		}
+
+		.state-list {
+			display: grid;
+			gap: 0.65rem;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			list-style: none;
+			padding: 0;
+		}
+
+		.state-list li {
+			background: #fffdf5;
+			border: 1px solid rgba(204, 182, 128, 0.72);
+			border-radius: 13px;
+			margin: 0;
+			padding: 0.7rem;
+		}
+
+		.state-list strong {
+			color: var(--blue);
+			display: block;
+		}
+
+		.flow {
+			counter-reset: step;
+			display: grid;
+			gap: 0.7rem;
+			list-style: none;
+			padding: 0;
+		}
+
+		.flow li {
+			background: var(--paper-2);
+			border: 1px solid rgba(204, 182, 128, 0.8);
+			border-radius: 14px;
+			display: grid;
+			gap: 0.75rem;
+			grid-template-columns: auto 1fr;
+			margin: 0;
+			padding: 0.75rem;
+		}
+
+		.flow li:before {
+			align-items: center;
+			background: var(--green);
+			border-radius: 50%;
+			color: #fff8e8;
+			content: counter(step);
+			counter-increment: step;
+			display: inline-flex;
+			font-weight: 800;
+			height: 2rem;
+			justify-content: center;
+			width: 2rem;
+		}
+
+		.two-column {
+			columns: 2 18rem;
+			column-gap: 2rem;
+		}
+
+		.two-column li {
+			break-inside: avoid;
+			margin-bottom: 0.35rem;
+		}
+
+		.timeline {
+			display: grid;
+			gap: 0.75rem;
+		}
+
+		.timeline-row {
+			align-items: center;
+			background: #fffdf5;
+			border: 1px solid rgba(204, 182, 128, 0.72);
+			border-radius: 14px;
+			display: grid;
+			gap: 0.85rem;
+			grid-template-columns: 9rem minmax(0, 1fr);
+			padding: 0.8rem;
+		}
+
+		.timeline-row strong {
+			color: var(--blue);
+			font-family: Georgia, serif;
+		}
+
+		.badge-row {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+		}
+
+		.badge {
+			background: rgba(54, 95, 125, 0.1);
+			border: 1px solid rgba(54, 95, 125, 0.2);
+			border-radius: 999px;
+			color: var(--blue);
+			font-size: 0.86rem;
+			font-weight: 700;
+			padding: 0.3rem 0.55rem;
+		}
+
+		.footer-note {
+			color: rgba(247, 240, 223, 0.82);
+			font-size: 0.9rem;
+			text-align: center;
+		}
+
+		@media (max-width: 1100px) {
+			.layout {
+				grid-template-columns: 1fr;
+			}
+
+			.sidebar {
+				position: static;
+			}
+
+			.sidebar nav {
+				display: grid;
+				gap: 0.25rem;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.summary,
+			.grid-3 {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+		}
+
+		@media (max-width: 760px) {
+			.layout {
+				padding: 1rem;
+			}
+
+			.summary,
+			.grid-2,
+			.grid-3,
+			.clock-grid,
+			.state-list,
+			.sidebar nav {
+				grid-template-columns: 1fr;
+			}
+
+			.section-title {
+				align-items: start;
+				flex-direction: column;
+			}
+
+			.timeline-row {
+				align-items: start;
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="layout">
+		<aside class="sidebar" aria-label="Plan navigation">
+			<h2>Combat Plan</h2>
+			<nav>
+				<a href="#goal">Goal</a>
+				<a href="#clocks">Two Clocks</a>
+				<a href="#runtime">Runtime Model</a>
+				<a href="#state">Combatant State</a>
+				<a href="#timing">Action Timing</a>
+				<a href="#flows">Action Flows</a>
+				<a href="#decisions">Decision Rules</a>
+				<a href="#bridge">TestBridge</a>
+				<a href="#steps">Implementation Steps</a>
+				<a href="#acceptance">Acceptance Criteria</a>
+				<a href="#risks">Risks</a>
+				<a href="#questions">Open Questions</a>
+			</nav>
+		</aside>
+
+		<main>
+			<header class="hero" id="goal">
+				<p class="kicker">Independent Combat Timers</p>
+				<h1>Combat Main Loop</h1>
+				<p>Refactor combat from one paired attack tick into an entity-driven combat loop where every combatant owns its own action timing.</p>
+				<p>Adventurers, monsters, skills, casts, recoveries, and cooldowns should advance independently from the lower-frequency game simulation tick.</p>
+			</header>
+
+			<section class="summary" aria-label="Plan summary">
+				<div class="card">
+					<strong>Core Change</strong>
+					<span>Remove paired adventurer attack plus immediate monster counterattack.</span>
+				</div>
+				<div class="card">
+					<strong>Timing</strong>
+					<span>Drive actions from per-combatant timers updated by frame or physics delta.</span>
+				</div>
+				<div class="card">
+					<strong>Simulation</strong>
+					<span>Use a separate low-frequency tick for AI hints, effects, regen, and aggregate state.</span>
+				</div>
+				<div class="card">
+					<strong>Proof</strong>
+					<span>Expose event timestamps and timers through TestBridge for headless verification.</span>
+				</div>
+			</section>
+
+			<section class="panel" id="clocks">
+				<div class="section-title">
+					<h2>Two Clocks</h2>
+					<span class="tag">Design Decision</span>
+				</div>
+				<div class="clock-grid">
+					<div class="clock">
+						<h3>Simulation Tick</h3>
+						<div>
+							<p>Low-frequency world and decision maintenance. Initial interval:</p>
+							<pre><code>simulation_tick_interval = 0.25 seconds</code></pre>
+							<ul>
+								<li>AI target reconsideration when out of combat.</li>
+								<li>Buff and debuff duration cleanup.</li>
+								<li>Regeneration, damage-over-time, and healing-over-time pulses.</li>
+								<li>Encounter timeout checks.</li>
+								<li>Bridge state aggregation.</li>
+							</ul>
+						</div>
+					</div>
+					<div class="clock">
+						<h3>Combat Action Timers</h3>
+						<div>
+							<p>Per-entity timers for moment-to-moment combat. These should run continuously while a combatant is active.</p>
+							<ul>
+								<li>Basic attack cooldowns.</li>
+								<li>Skill cooldowns.</li>
+								<li>Cast time.</li>
+								<li>Recovery windows.</li>
+								<li>Optional global cooldown.</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				<div class="card red" style="margin-top: 1rem;">
+					<h3>Simulation Tick Must Not</h3>
+					<ul class="two-column">
+						<li>Trigger basic attack swings directly.</li>
+						<li>Pair adventurer and monster attacks.</li>
+						<li>Block cast completion until the next tick.</li>
+						<li>Delay skill cooldown readiness after its timer reaches zero.</li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="panel" id="runtime">
+				<div class="section-title">
+					<h2>Target Runtime Model</h2>
+					<span class="tag">Shared Combat</span>
+				</div>
+				<p>Start with C# classes and components attached to existing adventurer and monster nodes. Avoid a large ECS or data framework in this slice.</p>
+				<div class="grid-3">
+					<div class="card">
+						<h3><code>Combatant</code></h3>
+						<p>Shared interface or base component for anything that can fight.</p>
+					</div>
+					<div class="card">
+						<h3><code>CombatStats</code></h3>
+						<p>Attack, accuracy, defense, evasion, attack speed, cast speed, cooldown modifiers, max health, and current health.</p>
+					</div>
+					<div class="card">
+						<h3><code>CombatAction</code></h3>
+						<p>Data describing one usable action such as a basic attack, cooldown skill, or spell.</p>
+					</div>
+					<div class="card">
+						<h3><code>CombatActionRunner</code></h3>
+						<p>Executes the active action state for a single combatant.</p>
+					</div>
+					<div class="card">
+						<h3><code>CombatEncounter</code></h3>
+						<p>Owns active combatants, target relationships, and end conditions.</p>
+					</div>
+					<div class="card">
+						<h3><code>CombatDecisionController</code></h3>
+						<p>Chooses the next action when a combatant becomes ready.</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="state">
+				<div class="section-title">
+					<h2>Combatant State</h2>
+					<span class="tag">Per Entity</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Runtime Fields</h3>
+						<ul class="two-column">
+							<li><code>CombatState</code></li>
+							<li><code>CurrentTarget</code></li>
+							<li><code>QueuedAction</code></li>
+							<li><code>ActiveAction</code></li>
+							<li><code>GlobalCooldownRemaining</code></li>
+							<li><code>BasicAttackCooldownRemaining</code></li>
+							<li><code>CastRemaining</code></li>
+							<li><code>RecoveryRemaining</code></li>
+							<li><code>SkillCooldowns</code></li>
+							<li><code>Buffs</code></li>
+							<li><code>Debuffs</code></li>
+							<li><code>IsAlive</code></li>
+							<li><code>IsDisabled</code></li>
+							<li><code>CanAct</code></li>
+						</ul>
+					</div>
+					<div class="card gold">
+						<h3>Starting Point To Replace</h3>
+						<ul>
+							<li><code>AdventurerCombatController.ResolveCombatTick</code> resolves both attacks.</li>
+							<li><code>CombatTickInterval = 1.0</code>.</li>
+							<li>The adventurer attacks first and the monster immediately attacks back if alive.</li>
+							<li>Skill, casting, recovering, and disabled states currently exist only as enum values.</li>
+						</ul>
+					</div>
+				</div>
+				<h3 style="margin-top: 1.25rem;">Initial States</h3>
+				<ul class="state-list">
+					<li><strong>OutOfCombat</strong>No active encounter.</li>
+					<li><strong>Engaging</strong>Entering combat and validating target or range.</li>
+					<li><strong>Ready</strong>Can evaluate and choose an available action, or wait if no action is currently available.</li>
+					<li><strong>UsingAction</strong>Resolving an instant action.</li>
+					<li><strong>Casting</strong>Cast time is counting down.</li>
+					<li><strong>Recovering</strong>Short post-action lockout.</li>
+					<li><strong>Disabled</strong>Unable to act because of a condition.</li>
+					<li><strong>Defeated</strong>Health is zero.</li>
+				</ul>
+				<div class="card blue" style="margin-top: 1rem;">
+					<h3>Cooldowns Are Not States</h3>
+					<p><code>BasicAttackCooldownRemaining</code>, <code>SkillCooldowns</code>, and <code>GlobalCooldownRemaining</code> are action availability timers. A combatant can stay <code>Ready</code> while one skill has 60 seconds left on cooldown, choose another available skill, make a basic attack if ready, or wait for the next relevant timer to mature.</p>
+				</div>
+			</section>
+
+			<section class="panel" id="timing">
+				<div class="section-title">
+					<h2>Action Timing Model</h2>
+					<span class="tag">Independent Cadence</span>
+				</div>
+				<div class="grid-2">
+					<div class="card">
+						<h3>Timer Types</h3>
+						<ul>
+							<li>Basic attack cooldown derives from the attacker's attack speed and gates only the next basic attack.</li>
+							<li>Skill cooldown starts when its skill is used and gates only that skill.</li>
+							<li>Cast time counts down after an action begins.</li>
+							<li>Recovery time optionally locks out the next action after resolution.</li>
+							<li>Global cooldown can provide a shared lockout for active abilities.</li>
+						</ul>
+						<p style="margin-top: 1rem;">Cooldown timers are checked by the decision controller when selecting an action. They should not force <code>CombatState</code> to become <code>AttackCooldown</code> or <code>SkillCooldown</code>.</p>
+					</div>
+					<div class="card blue">
+						<h3>Initial Formula</h3>
+						<pre><code>basic_attack_interval = 1.0 / attacks_per_second</code></pre>
+						<pre><code>adventurer_attacks_per_second = 1.0
+monster_attacks_per_second = 0.65</code></pre>
+						<p>The adventurer and monster no longer exchange paired turns. Each attacks when its own timer is ready.</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="flows">
+				<div class="section-title">
+					<h2>Action Flows</h2>
+					<span class="tag">First Slice Behavior</span>
+				</div>
+				<div class="grid-2">
+					<div class="card">
+						<h3>Enter Combat</h3>
+						<ol>
+							<li>Set <code>CurrentTarget</code>.</li>
+							<li>Enter <code>Engaging</code>.</li>
+							<li>Validate target is alive and in range.</li>
+							<li>Enter <code>Ready</code>.</li>
+							<li>Decision controller chooses an action.</li>
+							<li>If basic attack is chosen and ready, resolve attack.</li>
+							<li>Start basic attack cooldown from attack speed.</li>
+							<li>Enter <code>Recovering</code> if needed, otherwise return to <code>Ready</code>.</li>
+						</ol>
+					</div>
+					<div class="card">
+						<h3>Physics Update</h3>
+						<ol>
+							<li>Reduce combat action timers by <code>delta</code>.</li>
+							<li>Reduce cast and recovery timers by <code>delta</code>.</li>
+							<li>Reduce skill cooldown timers by <code>delta</code>.</li>
+							<li>If a cast completes, resolve the action.</li>
+							<li>If the combatant is <code>Ready</code>, ask for the next available action.</li>
+							<li>If the target died, clear action state and let encounter or intention logic resolve the outcome.</li>
+						</ol>
+						<p style="margin-top: 1rem;">If all relevant cooldowns are still running, the combatant stays <code>Ready</code> and waits. The next decision pass can run when a cooldown-ready event fires, on the next physics frame, or through a lightweight scheduler.</p>
+					</div>
+				</div>
+
+				<h3 style="margin-top: 1.25rem;">CombatAction Shape</h3>
+				<div class="grid-2">
+					<div class="card violet">
+						<h3>Fields</h3>
+						<ul class="two-column">
+							<li><code>ActionId</code></li>
+							<li><code>DisplayName</code></li>
+							<li><code>ActionKind</code></li>
+							<li><code>Range</code></li>
+							<li><code>Cooldown</code></li>
+							<li><code>CastTime</code></li>
+							<li><code>RecoveryTime</code></li>
+							<li><code>RequiresTarget</code></li>
+							<li><code>CanUseWhileMoving</code></li>
+							<li><code>HitFormula</code></li>
+							<li><code>DamageFormula</code></li>
+							<li><code>Effects</code></li>
+						</ul>
+					</div>
+					<div class="card green">
+						<h3>Initial Examples</h3>
+						<ul>
+							<li><code>basic_attack</code>: instant, uses attack speed cooldown.</li>
+							<li><code>heavy_strike</code>: instant, 4 second cooldown, higher damage.</li>
+							<li><code>spark</code>: 1.2 second cast time, 3 second cooldown, magic damage.</li>
+						</ul>
+						<p>One basic attack plus one simple cooldown skill is enough to prove the model.</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="decisions">
+				<div class="section-title">
+					<h2>Combat Decision Rules</h2>
+					<span class="tag">Deterministic First</span>
+				</div>
+				<div class="grid-2">
+					<div class="card">
+						<h3>Adventurer Priority</h3>
+						<ol>
+							<li>If dead, stop.</li>
+							<li>If disabled, wait.</li>
+							<li>If no valid target, exit combat.</li>
+							<li>If a high-priority skill is ready and conditions match, use it.</li>
+							<li>If basic attack is ready, basic attack.</li>
+							<li>Otherwise wait until the next action timer matures.</li>
+						</ol>
+					</div>
+					<div class="card">
+						<h3>Monster Priority</h3>
+						<ol>
+							<li>If dead, stop.</li>
+							<li>If disabled, wait.</li>
+							<li>If no valid target, exit combat.</li>
+							<li>If basic attack is ready, basic attack.</li>
+							<li>Otherwise wait.</li>
+						</ol>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="bridge">
+				<div class="section-title">
+					<h2>TestBridge Coverage</h2>
+					<span class="tag">Observable Timing</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Existing Events To Preserve</h3>
+						<div class="badge-row">
+							<span class="badge">combat_started</span>
+							<span class="badge">combat_state_changed</span>
+							<span class="badge">attack_roll_resolved</span>
+							<span class="badge">damage_applied</span>
+							<span class="badge">monster_defeated</span>
+							<span class="badge">adventurer_died</span>
+						</div>
+					</div>
+					<div class="card blue">
+						<h3>Named States</h3>
+						<div class="badge-row">
+							<span class="badge">adventurer</span>
+							<span class="badge">monster</span>
+							<span class="badge">combat_encounter</span>
+							<span class="badge">simulation_clock</span>
+						</div>
+					</div>
+				</div>
+				<div class="card" style="margin-top: 1rem;">
+					<h3>New Timing Events</h3>
+					<ul class="two-column">
+						<li><code>combatant_ready</code></li>
+						<li><code>combat_action_selected</code></li>
+						<li><code>combat_action_started</code></li>
+						<li><code>combat_action_resolved</code></li>
+						<li><code>combat_action_cooldown_started</code></li>
+						<li><code>combat_action_cooldown_ready</code></li>
+						<li><code>combat_cast_started</code></li>
+						<li><code>combat_cast_completed</code></li>
+						<li><code>combat_recovery_started</code></li>
+						<li><code>combat_recovery_completed</code></li>
+						<li><code>simulation_tick</code></li>
+						<li><code>effect_applied</code></li>
+						<li><code>effect_expired</code></li>
+						<li><code>regeneration_applied</code></li>
+					</ul>
+				</div>
+				<p style="margin-top: 1rem;">Bridge state should expose each combatant's independent timers so tests can verify combat is no longer turn-paired.</p>
+			</section>
+
+			<section class="panel" id="steps">
+				<div class="section-title">
+					<h2>Implementation Steps</h2>
+					<span class="tag">Build Order</span>
+				</div>
+				<ol class="flow">
+					<li>Add shared combat action types: <code>CombatAction.cs</code>, <code>CombatActionKind</code>, and basic attack construction.</li>
+					<li>Add a shared combatant contract through <code>ICombatant</code> or <code>CombatantComponent</code>, then adapt <code>Adventurer</code> and <code>Monster</code>.</li>
+					<li>Add a per-combatant action runner that tracks cooldowns, cast time, recovery time, skill cooldowns, and disabled state from physics delta.</li>
+					<li>Give monsters their own combat controller or attach the same reusable <code>CombatActionRunner</code>.</li>
+					<li>Replace paired <code>ResolveCombatTick</code> with independent action resolution.</li>
+					<li>Add a simulation clock that emits <code>simulation_tick</code> and only handles low-frequency work.</li>
+					<li>Add one simple adventurer skill such as <code>heavy_strike</code> on its own cooldown.</li>
+					<li>Add an optional cast action and verify cast start, countdown, completion, and effect application.</li>
+					<li>Update HUD and TestBridge state to show current action, combat state, cooldowns, cast remaining, recovery remaining, and encounter state.</li>
+					<li>Build the project and run a headless TestBridge session to confirm independent timing through event timestamps.</li>
+				</ol>
+			</section>
+
+			<section class="panel" id="acceptance">
+				<div class="section-title">
+					<h2>Acceptance Criteria</h2>
+					<span class="tag">Definition Of Done</span>
+				</div>
+				<ul class="two-column">
+					<li>Adventurer and monster attacks are not paired turns.</li>
+					<li>Adventurer and monster each own independent action timers.</li>
+					<li>Basic attack speed affects attack cadence.</li>
+					<li>At least one cooldown skill exists and matures independently from basic attack timing.</li>
+					<li>Optional cast action, if implemented, starts and completes from a cast timer rather than a simulation tick.</li>
+					<li>Simulation tick exists and is visibly separate from combat action timers.</li>
+					<li>Simulation tick does not directly trigger basic attacks.</li>
+					<li>Combat still resolves death, rewards, return to town, recovery, and repeat loop.</li>
+					<li>TestBridge events expose action start, action resolve, cooldown start, cooldown ready, and simulation tick.</li>
+					<li>Bridge state exposes per-combatant timers.</li>
+					<li>Headless verification proves at least one full loop completes.</li>
+				</ul>
+			</section>
+
+			<section class="panel" id="risks">
+				<div class="section-title">
+					<h2>Risks And Constraints</h2>
+					<span class="tag">Keep It Focused</span>
+				</div>
+				<div class="grid-2">
+					<div class="card red">
+						<h3>Avoid</h3>
+						<ul>
+							<li>Do not turn the action system into a full RPG rules engine yet.</li>
+							<li>Do not duplicate adventurer-only logic into monster-only logic.</li>
+							<li>Do not add parties, equipment, inventory, or shops in this slice.</li>
+						</ul>
+					</div>
+					<div class="card green">
+						<h3>Protect</h3>
+						<ul>
+							<li>Prefer shared action runner behavior.</li>
+							<li>Keep formulas explicit and logged.</li>
+							<li>Keep bridge events precise enough to debug timing bugs.</li>
+							<li>Preserve the current simple visible arena.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="questions">
+				<div class="section-title">
+					<h2>Open Questions</h2>
+					<span class="tag">Resolve During Slice</span>
+				</div>
+				<div class="timeline">
+					<div class="timeline-row">
+						<strong>Attack Speed</strong>
+						<span>Store as attacks per second or seconds per attack?</span>
+					</div>
+					<div class="timeline-row">
+						<strong>Global Cooldown</strong>
+						<span>Add it immediately or wait until multiple skills exist?</span>
+					</div>
+					<div class="timeline-row">
+						<strong>Action Lists</strong>
+						<span>Should monsters use the same action list format as adventurers from the start?</span>
+					</div>
+					<div class="timeline-row">
+						<strong>Effects</strong>
+						<span>Should buffs and debuffs tick in fixed pulses or store exact expiry timestamps with tick-based cleanup?</span>
+					</div>
+					<div class="timeline-row">
+						<strong>Regeneration</strong>
+						<span>Should regeneration be continuous or pulse-based on simulation ticks?</span>
+					</div>
+				</div>
+			</section>
+
+			<p class="footer-note">HTML review page generated from plans/combat-main-loop-plan.md.</p>
+		</main>
+	</div>
+</body>
+</html>
