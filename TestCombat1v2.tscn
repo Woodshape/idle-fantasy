@@ -1,11 +1,11 @@
-[gd_scene format=3 uid="uid://rwrsr72g2e11"]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" uid="uid://crvc53pr1gid8" path="res://GameController.cs" id="1_game"]
 [ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://Town.cs" id="2_town"]
 [ext_resource type="PackedScene" path="res://Adventurer.tscn" id="3_adventurer"]
-[ext_resource type="PackedScene" uid="uid://hqsfpal0jyrh" path="res://Monster.tscn" id="4_monster"]
+[ext_resource type="PackedScene" path="res://Monster.tscn" id="4_monster"]
 
-[node name="TestCombat1v2" type="Node2D" unique_id=29192225]
+[node name="TestCombat1v2" type="Node2D"]
 script = ExtResource("1_game")
 AdventurerPath = NodePath("Warrior")
 AdventurerScene = ExtResource("3_adventurer")
@@ -13,48 +13,61 @@ MonsterScene = ExtResource("4_monster")
 AutoSpawnDefaultAdventurers = false
 AutoSpawnDefaultMonsters = false
 
-[node name="Town" type="Node2D" parent="." unique_id=1233323636]
+[node name="Town" type="Node2D" parent="."]
 position = Vector2(160, 300)
 script = ExtResource("2_town")
 
-[node name="Warrior" parent="." unique_id=640176725 instance=ExtResource("3_adventurer")]
+[node name="Warrior" parent="." instance=ExtResource("3_adventurer")]
 position = Vector2(300, 300)
 AdventurerName = "Warrior"
+Archetype = 0
 MaxHealth = 36
 Attack = 8
 Accuracy = 0.22
 Defense = 2
 Evasion = 0.12
 Initiative = 3
+AttackSpeed = 4
 
-[node name="Monsters" type="Node2D" parent="." unique_id=781795265]
+[node name="Sprite2D" parent="Warrior"]
+modulate = Color(0.25, 0.55, 1, 1)
 
-[node name="Slime" parent="Monsters" unique_id=1604521309 instance=ExtResource("4_monster")]
+[node name="AdventurerController" parent="Warrior"]
+MaxEncounterMonsters = 2
+MaxEncounterAdventurers = 1
+
+[node name="Monsters" type="Node2D" parent="."]
+
+[node name="Slime" parent="Monsters" instance=ExtResource("4_monster")]
 position = Vector2(560, 260)
+MonsterName = "Slime"
 
-[node name="Slime2" parent="Monsters" unique_id=964077644 instance=ExtResource("4_monster")]
-position = Vector2(559, 291)
+[node name="Slime2" parent="Monsters" instance=ExtResource("4_monster")]
+position = Vector2(560, 340)
 MonsterName = "Slime 2"
 
-[node name="Hud" type="CanvasLayer" parent="." unique_id=1631070718]
+[node name="Sprite2D" parent="Monsters/Slime2"]
+modulate = Color(1, 0.45, 0.12, 1)
 
-[node name="Panel" type="PanelContainer" parent="Hud" unique_id=1213138961]
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="PanelContainer" parent="Hud"]
 offset_left = 12.0
 offset_top = 12.0
 offset_right = 430.0
 offset_bottom = 118.0
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Hud/Panel" unique_id=828665203]
+[node name="VBoxContainer" type="VBoxContainer" parent="Hud/Panel"]
 layout_mode = 2
 
-[node name="StateLabel" type="Label" parent="Hud/Panel/VBoxContainer" unique_id=86652678]
+[node name="StateLabel" type="Label" parent="Hud/Panel/VBoxContainer"]
 layout_mode = 2
 text = "1 Adventurer vs 2 Monsters"
 
-[node name="CombatLabel" type="Label" parent="Hud/Panel/VBoxContainer" unique_id=1638207870]
+[node name="CombatLabel" type="Label" parent="Hud/Panel/VBoxContainer"]
 layout_mode = 2
 text = "Combat"
 
-[node name="RewardLabel" type="Label" parent="Hud/Panel/VBoxContainer" unique_id=1940752246]
+[node name="RewardLabel" type="Label" parent="Hud/Panel/VBoxContainer"]
 layout_mode = 2
 text = "Rewards"

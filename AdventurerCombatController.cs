@@ -79,7 +79,8 @@ public partial class AdventurerCombatController : Node
 				CreateAdventurerActions(adventurer),
 				_rng,
 				EmitBridgeEvent,
-				() => SelectMonsterTarget(adventurer));
+				() => SelectMonsterTarget(adventurer),
+				ApplySocialAggro);
 			_runners.Add(runner);
 			runner.Start(currentTick);
 		}
@@ -114,6 +115,69 @@ public partial class AdventurerCombatController : Node
 			{ "timing_model", "simulation_ticks" }
 		});
 		PublishEncounterState();
+	}
+
+	private void ApplySocialAggro(Adventurer attacker, Monster primaryTarget, CombatAction action, long currentTick)
+	{
+		if (!attacker.IsAlive || !primaryTarget.IsAlive)
+		{
+			return;
+		}
+
+		foreach (Monster monster in _encounterMonsters.Where(monster => monster.IsAlive))
+		{
+			string aggroTrigger = ReferenceEquals(monster, primaryTarget)
+				? "ability_resolved"
+				: "social_aggro";
+			monster.SetAggroTarget(attacker, action.ActionId, aggroTrigger, currentTick);
+		}
+
+		(GetTree().CurrentScene as GameController)?.ApplySocialAggro(primaryTarget, attacker, action.ActionId, currentTick);
+	}
+
+	public bool TryAddAggroMonster(Monster monster, Adventurer aggroTarget, string aggroTrigger, long currentTick, string actionId = "")
+	{
+		if (!_encounterActive
+			|| !monster.IsAlive
+			|| !aggroTarget.IsAlive
+			|| !_encounterAdventurers.Any(adventurer => ReferenceEquals(adventurer, aggroTarget)))
+		{
+			return false;
+		}
+
+		if (_encounterMonsters.Any(encounterMonster => ReferenceEquals(encounterMonster, monster)))
+		{
+			monster.SetAggroTarget(aggroTarget, actionId, aggroTrigger, currentTick);
+			return true;
+		}
+
+		_encounterMonsters.Add(monster);
+		monster.SetAggroTarget(aggroTarget, actionId, aggroTrigger, currentTick);
+
+		CombatActionRunner runner = new(
+			monster,
+			CreateMonsterActions(),
+			_rng,
+			EmitBridgeEvent,
+			() => SelectAdventurerTarget(monster));
+		_runners.Add(runner);
+		runner.Start(currentTick);
+
+		EmitBridgeEvent("monster_joined_encounter", new GDict
+		{
+			{ "source", nameof(AdventurerCombatController) },
+			{ "encounter_id", _encounterId },
+			{ "tick", currentTick },
+			{ "monster", monster.MonsterName },
+			{ "target", aggroTarget.AdventurerName },
+			{ "action_id", actionId },
+			{ "aggro_trigger", aggroTrigger },
+			{ "adventurer_count", _encounterAdventurers.Count },
+			{ "monster_count", _encounterMonsters.Count },
+			{ "living_monster_count", _encounterMonsters.Count(candidate => candidate.IsAlive) }
+		});
+		PublishEncounterState();
+		return true;
 	}
 
 	public void ProcessSimulationTick(long tick, double tickIntervalSeconds)

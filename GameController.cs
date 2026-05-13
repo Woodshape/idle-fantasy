@@ -27,6 +27,12 @@ public partial class GameController : Node2D
 	[Export]
 	public PackedScene? MonsterScene { get; set; }
 
+	[Export]
+	public bool AutoSpawnDefaultAdventurers { get; set; } = true;
+
+	[Export]
+	public bool AutoSpawnDefaultMonsters { get; set; } = true;
+
 	private Town? _town;
 	private Adventurer? _adventurer;
 	private readonly List<Adventurer> _adventurers = new();
@@ -66,7 +72,10 @@ public partial class GameController : Node2D
 			}
 		}
 
-		EnsureDefaultAdventurers();
+		if (AutoSpawnDefaultAdventurers)
+		{
+			EnsureDefaultAdventurers();
+		}
 
 		if (_adventurer is not null && !_adventurers.Contains(_adventurer))
 		{
@@ -84,7 +93,7 @@ public partial class GameController : Node2D
 			}
 		}
 
-		if (_monsters.Count == 0)
+		if (_monsters.Count == 0 && AutoSpawnDefaultMonsters)
 		{
 			SpawnDefaultMonsters(monsterContainer);
 		}
@@ -250,6 +259,11 @@ public partial class GameController : Node2D
 				{ "interval", SimulationTickInterval },
 				{ "responsibility", "world_and_combat" }
 			});
+			foreach (Monster monster in _monsters)
+			{
+				monster.ProcessSimulationTick(this, _simulationTickCount);
+			}
+
 			foreach (Adventurer adventurer in _adventurers)
 			{
 				adventurer.CombatController?.ProcessSimulationTick(_simulationTickCount, SimulationTickInterval);
@@ -290,6 +304,43 @@ public partial class GameController : Node2D
 			.ThenBy(adventurer => adventurer.GlobalPosition.DistanceSquaredTo(leader.GlobalPosition))
 			.Take(Math.Max(1, maximumAdventurers))
 			.ToArray();
+	}
+
+	public bool TryAddAggroMonsterToEncounter(Monster monster, Adventurer aggroTarget, string aggroTrigger, long currentTick, string actionId = "")
+	{
+		if (!monster.IsAlive || !aggroTarget.IsAlive)
+		{
+			return false;
+		}
+
+		AdventurerCombatController? encounterController = _adventurers
+			.Select(adventurer => adventurer.CombatController)
+			.FirstOrDefault(controller =>
+				controller?.HasActiveEncounter == true
+				&& controller.EncounterAdventurers.Any(encounterAdventurer => ReferenceEquals(encounterAdventurer, aggroTarget)));
+
+		return encounterController?.TryAddAggroMonster(monster, aggroTarget, aggroTrigger, currentTick, actionId) == true;
+	}
+
+	public void ApplySocialAggro(Monster sourceMonster, Adventurer aggroTarget, string actionId, long currentTick)
+	{
+		if (!sourceMonster.IsAlive || !aggroTarget.IsAlive)
+		{
+			return;
+		}
+
+		foreach (Monster monster in _monsters)
+		{
+			if (ReferenceEquals(monster, sourceMonster)
+				|| !monster.IsAlive
+				|| monster.GlobalPosition.DistanceTo(sourceMonster.GlobalPosition) > monster.AggroRange)
+			{
+				continue;
+			}
+
+			monster.SetAggroTarget(aggroTarget, actionId, "social_aggro", currentTick);
+			TryAddAggroMonsterToEncounter(monster, aggroTarget, "social_aggro", currentTick, actionId);
+		}
 	}
 
 	public void NotifyLoopCompleted()
@@ -384,7 +435,7 @@ public partial class GameController : Node2D
 		if (_combatLabel is not null)
 		{
 			string targetName = adventurer.CurrentMonsterTarget?.MonsterName ?? adventurer.CurrentCombatTargetName;
-			_combatLabel.Text = $"Combat: {adventurer.CombatStateName} | Target: {FormatNone(targetName)} | Action: {GetDisplayedAction(adventurer)} | Basic CD: {adventurer.BasicAttackCooldownTicksRemaining} ticks | Global CD: {adventurer.GlobalCooldownTicksRemaining} ticks | Heavy CD: {GetCooldown(adventurer, "heavy_strike")} ticks | Spark CD: {GetCooldown(adventurer, "spark")} ticks";
+			_combatLabel.Text = $"Combat: {adventurer.CombatStateName} | Target: {FormatNone(targetName)} | Action: {GetDisplayedAction(adventurer)} | Cooldown: {GetLastAbilityCooldown(adventurer.SkillCooldowns)} ticks | GlobalCooldown: {adventurer.GlobalCooldownTicksRemaining} ticks";
 		}
 
 		if (_rewardLabel is not null)
@@ -405,7 +456,7 @@ public partial class GameController : Node2D
 			string targetName = monster.CurrentCombatTargetName != string.Empty
 				? monster.CurrentCombatTargetName
 				: monster.AggroTarget?.AdventurerName ?? string.Empty;
-			_combatLabel.Text = $"Combat: {monster.CombatState} | Target: {FormatNone(targetName)} | Action: {GetDisplayedAction(monster)} | Basic CD: {monster.BasicAttackCooldownTicksRemaining} ticks | Global CD: {monster.GlobalCooldownTicksRemaining} ticks";
+			_combatLabel.Text = $"Combat: {monster.CombatState} | Target: {FormatNone(targetName)} | Action: {GetDisplayedAction(monster)} | Cooldown: {GetLastAbilityCooldown(monster.SkillCooldowns)} ticks | GlobalCooldown: {monster.GlobalCooldownTicksRemaining} ticks";
 		}
 
 		if (_rewardLabel is not null)
@@ -529,9 +580,9 @@ public partial class GameController : Node2D
 		});
 	}
 
-	private static int GetCooldown(Adventurer adventurer, string actionId)
+	private static int GetLastAbilityCooldown(IReadOnlyDictionary<string, int> skillCooldowns)
 	{
-		return adventurer.SkillCooldowns.TryGetValue(actionId, out int remaining) ? remaining : 0;
+		return skillCooldowns.Values.LastOrDefault();
 	}
 
 	private static void EmitBridgeEvent(string type, GDict payload)

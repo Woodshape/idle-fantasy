@@ -92,8 +92,13 @@ public partial class Monster : Node2D, ICombatant
 
 	public override void _PhysicsProcess(double delta)
 	{
-		UpdateProximityAggro();
 		UpdateAggroMovement(delta);
+	}
+
+	public void ProcessSimulationTick(GameController game, long currentTick)
+	{
+		UpdateProximityAggro(game, currentTick);
+		TryJoinAggroEncounter(game, currentTick);
 	}
 
 	public CombatStats CreateStartingStats()
@@ -304,19 +309,18 @@ public partial class Monster : Node2D, ICombatant
 		_healthBar.Value = Mathf.Clamp(Health, 0, MaxHealth);
 	}
 
-	private void UpdateProximityAggro()
+	private void UpdateProximityAggro(GameController game, long currentTick)
 	{
 		if (!IsAlive || HasAggroTarget)
 		{
 			return;
 		}
 
-		GameController? game = GetTree().CurrentScene as GameController;
-		Adventurer? adventurer = game?.Adventurers
+		Adventurer? adventurer = game.Adventurers
 			.Where(candidate => candidate.IsAlive)
 			.OrderBy(candidate => candidate.GlobalPosition.DistanceSquaredTo(GlobalPosition))
 			.FirstOrDefault()
-			?? game?.Adventurer;
+			?? game.Adventurer;
 
 		if (adventurer?.IsAlive != true)
 		{
@@ -330,7 +334,15 @@ public partial class Monster : Node2D, ICombatant
 			return;
 		}
 
-		SetAggroTarget(adventurer, string.Empty, "proximity", (GetTree().CurrentScene as GameController)?.SimulationTickCount ?? 0);
+		SetAggroTarget(adventurer, string.Empty, "proximity", currentTick);
+	}
+
+	private void TryJoinAggroEncounter(GameController game, long currentTick)
+	{
+		if (AggroTarget is Adventurer target && target.IsAlive)
+		{
+			game.TryAddAggroMonsterToEncounter(this, target, "proximity", currentTick);
+		}
 	}
 
 	private void UpdateAggroMovement(double delta)

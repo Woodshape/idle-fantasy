@@ -18,6 +18,7 @@ public sealed class CombatActionRunner
 	private readonly RandomNumberGenerator _rng;
 	private readonly Action<string, GDict> _emitEvent;
 	private readonly Func<ICombatant?>? _selectTarget;
+	private readonly Action<Adventurer, Monster, CombatAction, long>? _notifyMonsterAggro;
 	private readonly Dictionary<string, int> _skillCooldowns = new(StringComparer.Ordinal);
 	private CombatAction? _queuedAction;
 	private CombatAction? _activeAction;
@@ -31,13 +32,15 @@ public sealed class CombatActionRunner
 		IReadOnlyList<CombatAction> actions,
 		RandomNumberGenerator rng,
 		Action<string, GDict> emitEvent,
-		Func<ICombatant?>? selectTarget = null)
+		Func<ICombatant?>? selectTarget = null,
+		Action<Adventurer, Monster, CombatAction, long>? notifyMonsterAggro = null)
 	{
 		_owner = owner;
 		_actions = actions;
 		_rng = rng;
 		_emitEvent = emitEvent;
 		_selectTarget = selectTarget;
+		_notifyMonsterAggro = notifyMonsterAggro;
 
 		foreach (CombatAction action in _actions.Where(action => action.Kind != CombatActionKind.BasicAttack))
 		{
@@ -542,7 +545,14 @@ public sealed class CombatActionRunner
 	{
 		if (_target is Monster monster && _owner is Adventurer adventurer)
 		{
-			monster.SetAggroTarget(adventurer, action.ActionId, "ability_resolved", tick);
+			if (_notifyMonsterAggro is not null)
+			{
+				_notifyMonsterAggro(adventurer, monster, action, tick);
+			}
+			else
+			{
+				monster.SetAggroTarget(adventurer, action.ActionId, "ability_resolved", tick);
+			}
 		}
 	}
 
