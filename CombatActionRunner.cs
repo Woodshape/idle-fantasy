@@ -130,6 +130,14 @@ public sealed class CombatActionRunner
 
 		if (State == CombatState.Queued && _queuedAction is CombatAction queuedAction)
 		{
+			if (!IsActionInRange(queuedAction, out double queuedDistance))
+			{
+				CancelQueuedAction(queuedAction, tick, "target_out_of_range", queuedDistance);
+				ChangeState(CombatState.Ready);
+				PublishSnapshot();
+				return null;
+			}
+
 			return new QueuedCombatAction(this, _owner, _target, queuedAction);
 		}
 
@@ -185,6 +193,14 @@ public sealed class CombatActionRunner
 			return;
 		}
 
+		if (!IsActionInRange(action, out double distanceToTarget))
+		{
+			CancelQueuedAction(action, tick, "target_out_of_range", distanceToTarget);
+			ChangeState(CombatState.Ready);
+			PublishSnapshot();
+			return;
+		}
+
 		_queuedAction = null;
 		_activeAction = action;
 		_emitEvent("combat_action_started", BuildActionPayload(action, tick));
@@ -203,6 +219,11 @@ public sealed class CombatActionRunner
 			{ "hit", resolution.Hit },
 			{ "damage", resolution.Damage }
 		});
+
+		if (resolution.Hit)
+		{
+			NotifyMonsterAggro(action, tick);
+		}
 
 		_activeAction = null;
 
@@ -317,8 +338,17 @@ public sealed class CombatActionRunner
 		QueueSelectedAction(action, tick, "cast_completed");
 	}
 
-	private QueuedCombatAction QueueSelectedAction(CombatAction action, long tick, string reason)
+	private QueuedCombatAction? QueueSelectedAction(CombatAction action, long tick, string reason)
 	{
+		if (!IsActionInRange(action, out double distanceToTarget))
+		{
+			CancelQueuedAction(action, tick, "target_out_of_range", distanceToTarget);
+			ChangeState(CombatState.Ready);
+			EmitReady(tick);
+			PublishSnapshot();
+			return null;
+		}
+
 		_queuedAction = action;
 		ChangeState(CombatState.Queued);
 		GD.Print($"ACTION_QUEUED tick={tick} {_owner.DisplayName} action={action.ActionId} target={_target?.DisplayName ?? "none"} cooldown={GetActionCooldownTicks(action)}");
@@ -366,11 +396,34 @@ public sealed class CombatActionRunner
 			return false;
 		}
 
+		if (!IsActionInRange(action, out _))
+		{
+			return false;
+		}
+
 		return action.Kind switch
 		{
 			CombatActionKind.BasicAttack => BasicAttackCooldownTicksRemaining <= 0,
 			_ => !_skillCooldowns.TryGetValue(action.ActionId, out int remaining) || remaining <= 0
 		};
+	}
+
+	private bool IsActionInRange(CombatAction action, out double distance)
+	{
+		distance = 0.0;
+
+		if (!action.RequiresTarget || _target is null)
+		{
+			return true;
+		}
+
+		if (_owner is not Node2D ownerNode || _target is not Node2D targetNode)
+		{
+			return true;
+		}
+
+		distance = ownerNode.GlobalPosition.DistanceTo(targetNode.GlobalPosition);
+		return distance <= action.Range;
 	}
 
 	private ActionResolution ResolveAction(CombatAction action, long tick)
@@ -425,6 +478,14 @@ public sealed class CombatActionRunner
 		return new ActionResolution(true, appliedDamage);
 	}
 
+	private void NotifyMonsterAggro(CombatAction action, long tick)
+	{
+		if (_target is Monster monster && _owner is Adventurer adventurer)
+		{
+			monster.SetAggroTarget(adventurer, action.ActionId, "ability_resolved", tick);
+		}
+	}
+
 	private void StartCooldowns(CombatAction action, long tick)
 	{
 		if (action.UsesGlobalAttackCooldown)
@@ -452,14 +513,21 @@ public sealed class CombatActionRunner
 		return Math.Max(1, _owner.AttackSpeed);
 	}
 
-	private void CancelQueuedAction(CombatAction action, long tick, string reason)
+	private void CancelQueuedAction(CombatAction action, long tick, string reason, double? distanceToTarget = null)
 	{
 		_queuedAction = null;
 		_activeAction = null;
-		_emitEvent("combat_action_cancelled", BuildActionPayload(action, tick, new GDict
+		GDict extras = new()
 		{
 			{ "cancel_reason", reason }
-		}));
+		};
+
+		if (distanceToTarget is double distance)
+		{
+			extras["distance_to_target"] = distance;
+		}
+
+		_emitEvent("combat_action_cancelled", BuildActionPayload(action, tick, extras));
 	}
 
 	private void ChangeState(CombatState nextState)
@@ -543,6 +611,8 @@ public sealed class CombatActionRunner
 			{ "action_name", action.DisplayName },
 			{ "action_kind", action.Kind.ToString() },
 			{ "cooldown_ticks", GetActionCooldownTicks(action) },
+			{ "range", action.Range },
+			{ "distance_to_target", GetDistanceToTarget() },
 			{ "cast_ticks", action.CastTicks },
 			{ "recovery_ticks", action.RecoveryTicks },
 			{ "action_weight", action.ActionWeight },
@@ -559,6 +629,16 @@ public sealed class CombatActionRunner
 		}
 
 		return payload;
+	}
+
+	private double GetDistanceToTarget()
+	{
+		if (_target is null || _owner is not Node2D ownerNode || _target is not Node2D targetNode)
+		{
+			return 0.0;
+		}
+
+		return ownerNode.GlobalPosition.DistanceTo(targetNode.GlobalPosition);
 	}
 
 	private void PublishSnapshot()

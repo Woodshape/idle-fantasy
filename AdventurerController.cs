@@ -1,6 +1,8 @@
 #nullable enable
 
 using Godot;
+using System;
+using System.Linq;
 using GDict = Godot.Collections.Dictionary;
 
 public enum AdventurerIntentionState
@@ -18,7 +20,7 @@ public enum AdventurerIntentionState
 public partial class AdventurerController : Node
 {
 	[Export]
-	public float CombatApproachDistance { get; set; } = 42.0f;
+	public float MeleeApproachDistance { get; set; } = 42.0f;
 
 	[Export(PropertyHint.Range, "0.0,1.0,0.05")]
 	public float RestHealthRatio { get; set; } = 0.60f;
@@ -28,6 +30,7 @@ public partial class AdventurerController : Node
 	private Town? _town;
 	private double _stateTimer;
 	private bool _combatStartedForTarget;
+	private bool _movementPausedForCurrentCast;
 
 	public AdventurerIntentionState State { get; private set; } = AdventurerIntentionState.IdleInTown;
 
@@ -71,7 +74,7 @@ public partial class AdventurerController : Node
 				UpdateTravel(delta);
 				break;
 			case AdventurerIntentionState.FightMonster:
-				UpdateFight();
+				UpdateFight(delta);
 				break;
 			case AdventurerIntentionState.CollectLoot:
 				CollectLoot();
@@ -119,7 +122,8 @@ public partial class AdventurerController : Node
 		}
 
 		_adventurer.SetCombatTarget(target);
-		Vector2 approachPosition = GetCombatApproachPosition(target);
+		float approachDistance = GetOpeningApproachDistance();
+		Vector2 approachPosition = GetCombatApproachPosition(target, approachDistance);
 		_adventurer.SetMoveTarget(approachPosition);
 		EmitBridgeEvent("adventurer_target_selected", new GDict
 		{
@@ -128,7 +132,8 @@ public partial class AdventurerController : Node
 			{ "monster", target.MonsterName },
 			{ "target_position", BridgePayload.VectorToArray(approachPosition) },
 			{ "monster_position", BridgePayload.VectorToArray(target.GlobalPosition) },
-			{ "combat_approach_distance", CombatApproachDistance }
+			{ "combat_approach_distance", approachDistance },
+			{ "combat_approach_source", "longest_adventurer_action_range" }
 		});
 		ChangeState(AdventurerIntentionState.TravelToTarget);
 	}
@@ -148,7 +153,7 @@ public partial class AdventurerController : Node
 			return;
 		}
 
-		_adventurer.SetMoveTarget(GetCombatApproachPosition(target));
+		_adventurer.SetMoveTarget(GetCombatApproachPosition(target, GetOpeningApproachDistance()));
 
 		if (_adventurer.MoveTowardTarget(delta))
 		{
@@ -165,7 +170,7 @@ public partial class AdventurerController : Node
 		}
 	}
 
-	private Vector2 GetCombatApproachPosition(Monster target)
+	private Vector2 GetCombatApproachPosition(Monster target, float approachDistance)
 	{
 		if (_adventurer is null)
 		{
@@ -179,10 +184,21 @@ public partial class AdventurerController : Node
 			approachDirection = Vector2.Right;
 		}
 
-		return target.GlobalPosition - approachDirection.Normalized() * CombatApproachDistance;
+		return target.GlobalPosition - approachDirection.Normalized() * approachDistance;
 	}
 
-	private void UpdateFight()
+	private float GetOpeningApproachDistance()
+	{
+		double longestActionRange = AdventurerCombatController.CreateAdventurerActions()
+			.Where(action => action.RequiresTarget)
+			.Select(action => action.Range)
+			.DefaultIfEmpty(MeleeApproachDistance)
+			.Max();
+
+		return (float)Math.Max(MeleeApproachDistance, longestActionRange);
+	}
+
+	private void UpdateFight(double delta)
 	{
 		if (_adventurer is null || _game is null)
 		{
@@ -209,10 +225,47 @@ public partial class AdventurerController : Node
 			_combatStartedForTarget = true;
 		}
 
+			if (target.IsAlive)
+			{
+				if (_adventurer.CombatState == CombatState.Casting)
+				{
+					PauseMovementForCast(target);
+				}
+				else if (_adventurer.CombatState is not CombatState.OutOfCombat and not CombatState.Engaging)
+				{
+					_movementPausedForCurrentCast = false;
+					_adventurer.SetMoveTarget(GetCombatApproachPosition(target, MeleeApproachDistance));
+				_adventurer.MoveTowardTarget(delta);
+			}
+		}
+
 		if (!target.IsAlive)
 		{
 			ChangeState(AdventurerIntentionState.CollectLoot);
 		}
+	}
+
+	private void PauseMovementForCast(Monster target)
+	{
+		if (_adventurer is null || _movementPausedForCurrentCast)
+		{
+			return;
+		}
+
+		bool movementWasPending = _adventurer.ClearMoveTarget();
+		_movementPausedForCurrentCast = true;
+		EmitBridgeEvent("adventurer_cast_movement_paused", new GDict
+		{
+			{ "source", nameof(AdventurerController) },
+			{ "adventurer", _adventurer.AdventurerName },
+			{ "monster", target.MonsterName },
+			{ "action_id", _adventurer.ActiveActionId },
+			{ "cast_ticks_remaining", _adventurer.CastTicksRemaining },
+			{ "movement_was_pending", movementWasPending },
+			{ "position", BridgePayload.VectorToArray(_adventurer.GlobalPosition) },
+			{ "monster_position", BridgePayload.VectorToArray(target.GlobalPosition) },
+			{ "distance_to_monster", _adventurer.GlobalPosition.DistanceTo(target.GlobalPosition) }
+		});
 	}
 
 	private void CollectLoot()
@@ -299,6 +352,7 @@ public partial class AdventurerController : Node
 		if (nextState != AdventurerIntentionState.FightMonster)
 		{
 			_combatStartedForTarget = false;
+			_movementPausedForCurrentCast = false;
 		}
 
 		GD.Print($"ADVENTURER_STATE adventurer={_adventurer.AdventurerName} from={previousState} to={nextState}");

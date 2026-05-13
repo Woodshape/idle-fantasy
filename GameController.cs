@@ -212,7 +212,7 @@ public partial class GameController : Node2D
 		if (_combatLabel is not null)
 		{
 			string targetName = _adventurer.CurrentMonsterTarget?.MonsterName ?? "none";
-			_combatLabel.Text = $"Combat: {_adventurer.CombatStateName} | Target: {targetName} | Action: {(_adventurer.ActiveActionId == string.Empty ? "none" : _adventurer.ActiveActionId)} | Basic CD: {_adventurer.BasicAttackCooldownTicksRemaining} ticks | Global CD: {_adventurer.GlobalCooldownTicksRemaining} ticks | Heavy CD: {GetCooldown(_adventurer, "heavy_strike")} ticks";
+			_combatLabel.Text = $"Combat: {_adventurer.CombatStateName} | Target: {targetName} | Action: {(_adventurer.ActiveActionId == string.Empty ? "none" : _adventurer.ActiveActionId)} | Basic CD: {_adventurer.BasicAttackCooldownTicksRemaining} ticks | Global CD: {_adventurer.GlobalCooldownTicksRemaining} ticks | Heavy CD: {GetCooldown(_adventurer, "heavy_strike")} ticks | Spark CD: {GetCooldown(_adventurer, "spark")} ticks";
 		}
 
 		if (_rewardLabel is not null)

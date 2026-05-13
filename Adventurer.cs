@@ -155,6 +155,18 @@ public partial class Adventurer : Node2D, ICombatant
 		PublishState();
 	}
 
+	public bool ClearMoveTarget()
+	{
+		if (MoveTarget is null)
+		{
+			return false;
+		}
+
+		MoveTarget = null;
+		PublishState();
+		return true;
+	}
+
 	public void SetCombatTarget(Monster monster)
 	{
 		CurrentMonsterTarget = monster;

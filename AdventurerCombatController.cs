@@ -185,7 +185,7 @@ public partial class AdventurerCombatController : Node
 		return false;
 	}
 
-	private static IReadOnlyList<CombatAction> CreateAdventurerActions()
+	public static IReadOnlyList<CombatAction> CreateAdventurerActions()
 	{
 		return new[]
 		{
@@ -201,6 +201,19 @@ public partial class AdventurerCombatController : Node
 				false,
 				10,
 				1.5,
+				false),
+			new CombatAction(
+				"spark",
+				"Spark",
+				CombatActionKind.Spell,
+				160.0,
+				8,
+				12,
+				0,
+				true,
+				false,
+				4,
+				1.2,
 				false),
 			CombatAction.BasicAttack()
 		};

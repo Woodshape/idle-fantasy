@@ -1,503 +1,908 @@
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="generator" content="pandoc" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>Combat Main Loop Plan</title>
-  <style>
-    html {
-      color: #1a1a1a;
-      background-color: #fdfdfd;
-    }
-    body {
-      margin: 0 auto;
-      max-width: 36em;
-      padding-left: 50px;
-      padding-right: 50px;
-      padding-top: 50px;
-      padding-bottom: 50px;
-      hyphens: auto;
-      overflow-wrap: break-word;
-      text-rendering: optimizeLegibility;
-      font-kerning: normal;
-    }
-    @media (max-width: 600px) {
-      body {
-        font-size: 0.9em;
-        padding: 12px;
-      }
-      h1 {
-        font-size: 1.8em;
-      }
-    }
-    @media print {
-      html {
-        background-color: white;
-      }
-      body {
-        background-color: transparent;
-        color: black;
-        font-size: 12pt;
-      }
-      p, h2, h3 {
-        orphans: 3;
-        widows: 3;
-      }
-      h2, h3, h4 {
-        page-break-after: avoid;
-      }
-    }
-    p {
-      margin: 1em 0;
-    }
-    a {
-      color: #1a1a1a;
-    }
-    a:visited {
-      color: #1a1a1a;
-    }
-    img {
-      max-width: 100%;
-    }
-    svg {
-      height: auto;
-      max-width: 100%;
-    }
-    h1, h2, h3, h4, h5, h6 {
-      margin-top: 1.4em;
-    }
-    h5, h6 {
-      font-size: 1em;
-      font-style: italic;
-    }
-    h6 {
-      font-weight: normal;
-    }
-    ol, ul {
-      padding-left: 1.7em;
-      margin-top: 1em;
-    }
-    li > ol, li > ul {
-      margin-top: 0;
-    }
-    blockquote {
-      margin: 1em 0 1em 1.7em;
-      padding-left: 1em;
-      border-left: 2px solid #e6e6e6;
-      color: #606060;
-    }
-    code {
-      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
-      font-size: 85%;
-      margin: 0;
-      hyphens: manual;
-    }
-    pre {
-      margin: 1em 0;
-      overflow: auto;
-    }
-    pre code {
-      padding: 0;
-      overflow: visible;
-      overflow-wrap: normal;
-    }
-    .sourceCode {
-     background-color: transparent;
-     overflow: visible;
-    }
-    hr {
-      background-color: #1a1a1a;
-      border: none;
-      height: 1px;
-      margin: 1em 0;
-    }
-    table {
-      margin: 1em 0;
-      border-collapse: collapse;
-      width: 100%;
-      overflow-x: auto;
-      display: block;
-      font-variant-numeric: lining-nums tabular-nums;
-    }
-    table caption {
-      margin-bottom: 0.75em;
-    }
-    tbody {
-      margin-top: 0.5em;
-      border-top: 1px solid #1a1a1a;
-      border-bottom: 1px solid #1a1a1a;
-    }
-    th {
-      border-top: 1px solid #1a1a1a;
-      padding: 0.25em 0.5em 0.25em 0.5em;
-    }
-    td {
-      padding: 0.125em 0.5em 0.25em 0.5em;
-    }
-    header {
-      margin-bottom: 4em;
-      text-align: center;
-    }
-    #TOC li {
-      list-style: none;
-    }
-    #TOC ul {
-      padding-left: 1.3em;
-    }
-    #TOC > ul {
-      padding-left: 0;
-    }
-    #TOC a:not(:hover) {
-      text-decoration: none;
-    }
-    code{white-space: pre-wrap;}
-    span.smallcaps{font-variant: small-caps;}
-    div.columns{display: flex; gap: min(4vw, 1.5em);}
-    div.column{flex: auto; overflow-x: auto;}
-    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
-    /* The extra [class] is a hack that increases specificity enough to
-       override a similar rule in reveal.js */
-    ul.task-list[class]{list-style: none;}
-    ul.task-list li input[type="checkbox"] {
-      font-size: inherit;
-      width: 0.8em;
-      margin: 0 0.8em 0.2em -1.6em;
-      vertical-align: middle;
-    }
-    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
-  </style>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Combat Main Loop Plan</title>
+	<style>
+		:root {
+			--bg: #101914;
+			--panel: #fff8e8;
+			--panel-2: #f1e4c3;
+			--ink: #22180f;
+			--muted: #6b5a46;
+			--line: #d5bd87;
+			--green: #2f6b4f;
+			--gold: #c4872c;
+			--red: #9d3e28;
+			--blue: #405f91;
+			--shadow: 0 22px 60px rgba(16, 25, 20, 0.22);
+			--radius: 20px;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html {
+			scroll-behavior: smooth;
+		}
+
+		body {
+			background:
+				radial-gradient(circle at 14% 7%, rgba(196, 135, 44, 0.32), transparent 24rem),
+				radial-gradient(circle at 92% 18%, rgba(47, 107, 79, 0.34), transparent 28rem),
+				linear-gradient(135deg, #101914 0%, #213a2c 54%, #47321e 100%);
+			color: var(--ink);
+			font-family: "Trebuchet MS", "Gill Sans", Verdana, sans-serif;
+			line-height: 1.55;
+			margin: 0;
+		}
+
+		a {
+			color: inherit;
+		}
+
+		code {
+			background: rgba(64, 95, 145, 0.1);
+			border: 1px solid rgba(64, 95, 145, 0.18);
+			border-radius: 8px;
+			color: #273a71;
+			padding: 0.08rem 0.28rem;
+		}
+
+		pre {
+			background: #1f2b24;
+			border-radius: 14px;
+			color: #fff8e8;
+			overflow-x: auto;
+			padding: 1rem;
+		}
+
+		pre code {
+			background: transparent;
+			border: 0;
+			color: inherit;
+			padding: 0;
+		}
+
+		.layout {
+			display: grid;
+			gap: 1.5rem;
+			grid-template-columns: 280px minmax(0, 1fr);
+			margin: 0 auto;
+			max-width: 1480px;
+			padding: 1.5rem;
+		}
+
+		.sidebar {
+			align-self: start;
+			background: rgba(255, 248, 232, 0.92);
+			border: 1px solid rgba(213, 189, 135, 0.85);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			padding: 1rem;
+			position: sticky;
+			top: 1rem;
+		}
+
+		.sidebar h2 {
+			font-family: Georgia, serif;
+			font-size: 0.95rem;
+			letter-spacing: 0.12em;
+			margin: 0 0 0.8rem;
+			text-transform: uppercase;
+		}
+
+		.sidebar a {
+			border-radius: 999px;
+			color: var(--muted);
+			display: block;
+			padding: 0.42rem 0.65rem;
+			text-decoration: none;
+		}
+
+		.sidebar a:hover {
+			background: var(--panel-2);
+			color: var(--ink);
+		}
+
+		main {
+			display: grid;
+			gap: 1rem;
+			min-width: 0;
+		}
+
+		.hero,
+		.panel,
+		.card,
+		.metric {
+			border: 1px solid rgba(213, 189, 135, 0.78);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+		}
+
+		.hero {
+			background:
+				linear-gradient(135deg, rgba(255, 248, 232, 0.95), rgba(241, 228, 195, 0.93)),
+				linear-gradient(90deg, rgba(47, 107, 79, 0.2), rgba(196, 135, 44, 0.2));
+			overflow: hidden;
+			padding: clamp(1.5rem, 4vw, 3rem);
+			position: relative;
+		}
+
+		.hero:after {
+			background:
+				linear-gradient(90deg, rgba(47, 107, 79, 0.08) 1px, transparent 1px),
+				linear-gradient(rgba(47, 107, 79, 0.08) 1px, transparent 1px);
+			background-size: 34px 34px;
+			content: "";
+			inset: 0;
+			position: absolute;
+		}
+
+		.hero > * {
+			position: relative;
+			z-index: 1;
+		}
+
+		.kicker {
+			color: var(--green);
+			font-weight: 800;
+			letter-spacing: 0.14em;
+			margin: 0 0 0.75rem;
+			text-transform: uppercase;
+		}
+
+		h1,
+		h2,
+		h3 {
+			font-family: Georgia, "Times New Roman", serif;
+			line-height: 1.12;
+		}
+
+		h1 {
+			font-size: clamp(2.35rem, 6vw, 5.1rem);
+			margin: 0 0 1rem;
+			max-width: 13ch;
+		}
+
+		h2 {
+			font-size: clamp(1.45rem, 3vw, 2.25rem);
+			margin: 0;
+		}
+
+		h3 {
+			font-size: 1.14rem;
+			margin: 0 0 0.5rem;
+		}
+
+		p {
+			margin: 0 0 1rem;
+		}
+
+		p:last-child,
+		li:last-child {
+			margin-bottom: 0;
+		}
+
+		.hero p {
+			font-size: clamp(1.05rem, 2vw, 1.24rem);
+			max-width: 78ch;
+		}
+
+		.panel {
+			background: rgba(255, 248, 232, 0.94);
+			padding: clamp(1.1rem, 2.4vw, 1.75rem);
+		}
+
+		.section-title {
+			align-items: end;
+			border-bottom: 2px solid rgba(213, 189, 135, 0.65);
+			display: flex;
+			gap: 1rem;
+			justify-content: space-between;
+			margin-bottom: 1rem;
+			padding-bottom: 0.75rem;
+		}
+
+		.tag {
+			background: rgba(47, 107, 79, 0.12);
+			border: 1px solid rgba(47, 107, 79, 0.25);
+			border-radius: 999px;
+			color: var(--green);
+			font-size: 0.76rem;
+			font-weight: 800;
+			letter-spacing: 0.08em;
+			padding: 0.32rem 0.62rem;
+			text-transform: uppercase;
+			white-space: nowrap;
+		}
+
+		.grid,
+		.grid-2,
+		.grid-3,
+		.grid-4,
+		.summary {
+			display: grid;
+			gap: 1rem;
+		}
+
+		.grid-2 {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.grid-3 {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.grid-4,
+		.summary {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+
+		.card,
+		.metric {
+			background: rgba(255, 248, 232, 0.92);
+			padding: 1rem;
+		}
+
+		.metric strong {
+			color: var(--green);
+			display: block;
+			font-family: Georgia, serif;
+			font-size: 1.35rem;
+			line-height: 1.1;
+			margin-bottom: 0.35rem;
+		}
+
+		.metric span,
+		.card span,
+		.muted {
+			color: var(--muted);
+		}
+
+		.green {
+			background: linear-gradient(135deg, rgba(47, 107, 79, 0.13), rgba(255, 248, 232, 0.9));
+			border-color: rgba(47, 107, 79, 0.28);
+		}
+
+		.gold {
+			background: linear-gradient(135deg, rgba(196, 135, 44, 0.16), rgba(255, 248, 232, 0.9));
+			border-color: rgba(196, 135, 44, 0.3);
+		}
+
+		.red {
+			background: linear-gradient(135deg, rgba(157, 62, 40, 0.13), rgba(255, 248, 232, 0.9));
+			border-color: rgba(157, 62, 40, 0.28);
+		}
+
+		.blue {
+			background: linear-gradient(135deg, rgba(64, 95, 145, 0.13), rgba(255, 248, 232, 0.9));
+			border-color: rgba(64, 95, 145, 0.28);
+		}
+
+		ul,
+		ol {
+			margin: 0;
+			padding-left: 1.15rem;
+		}
+
+		li + li {
+			margin-top: 0.36rem;
+		}
+
+		.flow {
+			counter-reset: step;
+			display: grid;
+			gap: 0.7rem;
+			list-style: none;
+			padding: 0;
+		}
+
+		.flow li {
+			background: var(--panel-2);
+			border: 1px solid rgba(213, 189, 135, 0.8);
+			border-radius: 14px;
+			margin: 0;
+			min-height: 3.5rem;
+			padding: 0.9rem 1rem 0.9rem 3.5rem;
+			position: relative;
+		}
+
+		.flow li:before {
+			align-items: center;
+			background: var(--green);
+			border-radius: 50%;
+			color: #fff8e8;
+			content: counter(step);
+			counter-increment: step;
+			display: inline-flex;
+			font-weight: 800;
+			height: 2rem;
+			justify-content: center;
+			left: 0.85rem;
+			position: absolute;
+			top: 0.75rem;
+			width: 2rem;
+		}
+
+		.status-list,
+		.state-list,
+		.event-list {
+			display: grid;
+			gap: 0.65rem;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			list-style: none;
+			padding: 0;
+		}
+
+		.status-list li,
+		.state-list li,
+		.event-list li {
+			background: #fffdf5;
+			border: 1px solid rgba(213, 189, 135, 0.72);
+			border-radius: 13px;
+			margin: 0;
+			padding: 0.7rem;
+		}
+
+		.status-list strong,
+		.state-list strong {
+			color: var(--blue);
+			display: block;
+		}
+
+		.two-column {
+			columns: 2 18rem;
+			column-gap: 2rem;
+		}
+
+		.two-column li {
+			break-inside: avoid;
+			margin-bottom: 0.35rem;
+		}
+
+		.pipeline {
+			display: grid;
+			gap: 0.75rem;
+			grid-template-columns: repeat(5, minmax(0, 1fr));
+		}
+
+		.pipeline-step {
+			background: #fffdf5;
+			border: 1px solid rgba(213, 189, 135, 0.72);
+			border-radius: 14px;
+			padding: 0.85rem;
+			position: relative;
+		}
+
+		.pipeline-step strong {
+			color: var(--green);
+			display: block;
+			font-family: Georgia, serif;
+			margin-bottom: 0.25rem;
+		}
+
+		table {
+			border-collapse: collapse;
+			width: 100%;
+		}
+
+		th,
+		td {
+			border-bottom: 1px solid rgba(213, 189, 135, 0.72);
+			padding: 0.62rem 0.5rem;
+			text-align: left;
+			vertical-align: top;
+		}
+
+		th {
+			color: var(--green);
+			font-family: Georgia, serif;
+			font-size: 0.96rem;
+		}
+
+		.callout {
+			background: #2f6650;
+			border-radius: var(--radius);
+			color: #fff8e8;
+			padding: 1.15rem;
+		}
+
+		.callout h3 {
+			margin: 0 0 0.5rem;
+		}
+
+		.callout p {
+			color: rgba(255, 248, 232, 0.88);
+		}
+
+		.footer-note {
+			color: rgba(255, 248, 232, 0.82);
+			font-size: 0.9rem;
+			text-align: center;
+		}
+
+		@media (max-width: 1100px) {
+			.layout {
+				grid-template-columns: 1fr;
+			}
+
+			.sidebar {
+				position: static;
+			}
+
+			.sidebar nav {
+				display: grid;
+				gap: 0.25rem;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.summary,
+			.grid-4,
+			.grid-3,
+			.pipeline {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+		}
+
+		@media (max-width: 760px) {
+			.layout {
+				padding: 1rem;
+			}
+
+			.summary,
+			.grid-2,
+			.grid-3,
+			.grid-4,
+			.pipeline,
+			.status-list,
+			.state-list,
+			.event-list,
+			.sidebar nav {
+				grid-template-columns: 1fr;
+			}
+
+			.section-title {
+				align-items: start;
+				flex-direction: column;
+			}
+		}
+	</style>
 </head>
 <body>
-<header id="title-block-header">
-<h1 class="title">Combat Main Loop Plan</h1>
-</header>
-<h1 id="combat-main-loop-plan">Combat Main Loop Plan</h1>
-<h2 id="goal">Goal</h2>
-<p>Refactor combat to a tick-based simulation loop where the world,
-adventurers, monsters, action cooldowns, skill cooldowns, spell casts,
-and combat resolution advance on discrete ticks.</p>
-<p>This replaces the previous independent real-time action timer
-direction. The idle game should feel like a visible simulation, and
-discrete ticks make combat easier to reason about, easier to test, and
-cheaper to run at scale.</p>
-<h2 id="revised-design-decision">Revised Design Decision</h2>
-<p>Use one authoritative simulation tick for combat and world
-simulation.</p>
-<p>Actions should not resolve continuously from per-frame timers.
-Instead:</p>
-<ul>
-<li>The simulation tick is the authoritative unit of time.</li>
-<li>Each adventurer and monster updates once per tick.</li>
-<li>Basic attacks, skills, spells, recovery, buffs, debuffs,
-regeneration, and damage-over-time use integer tick counters.</li>
-<li>A combatant can act only during a tick resolution step.</li>
-<li>If multiple combatants are ready on the same tick, a deterministic
-resolution mechanic plus a random roll decides action order.</li>
-</ul>
-<p>Do not clamp real-time actions to a nearby tick. Ignore the
-continuous action-timer model and express action timing directly in
-ticks.</p>
-<h2 id="runtime-model">Runtime Model</h2>
-<p>Initial shared combat model:</p>
-<ul>
-<li><code>Combatant</code>: shared interface or base component for
-anything that can fight.</li>
-<li><code>CombatStats</code>: attack, accuracy, defense, evasion,
-initiative, attack speed, max health, current health.</li>
-<li><code>CombatAction</code>: data describing one usable action.</li>
-<li><code>CombatActionCooldown</code>: integer tick cooldown state.</li>
-<li><code>CombatEncounter</code>: owns active combatants, target
-relationships, pending actions, and end conditions.</li>
-<li><code>CombatDecisionController</code>: chooses an action for a
-combatant when its tick counters allow it.</li>
-<li><code>CombatTickResolver</code>: gathers ready actions for the tick,
-orders them, and resolves them.</li>
-</ul>
-<p>Keep the implementation simple. This can start as C# classes and
-components attached to the existing <code>Adventurer</code> and
-<code>Monster</code> nodes rather than a large ECS or data
-framework.</p>
-<h2 id="combatant-state">Combatant State</h2>
-<p>Each combatant should own these runtime fields:</p>
-<ul>
-<li><code>CombatState</code></li>
-<li><code>CurrentTarget</code></li>
-<li><code>QueuedAction</code></li>
-<li><code>ActiveAction</code></li>
-<li><code>BasicAttackCooldownTicksRemaining</code></li>
-<li><code>CastTicksRemaining</code></li>
-<li><code>RecoveryTicksRemaining</code></li>
-<li><code>SkillCooldownTicksRemaining</code></li>
-<li><code>Buffs</code></li>
-<li><code>Debuffs</code></li>
-<li><code>IsAlive</code></li>
-<li><code>IsDisabled</code></li>
-<li><code>CanAct</code></li>
-</ul>
-<p>Initial combat states:</p>
-<ul>
-<li><code>OutOfCombat</code>: no active encounter.</li>
-<li><code>Engaging</code>: entering combat and validating
-target/range.</li>
-<li><code>Ready</code>: can evaluate and choose an available action on
-the current tick, or wait if no action is currently available.</li>
-<li><code>Queued</code>: selected an action for this tick and is waiting
-for tick-order resolution.</li>
-<li><code>Casting</code>: cast ticks are counting down.</li>
-<li><code>Recovering</code>: post-action lockout ticks are counting
-down.</li>
-<li><code>Disabled</code>: unable to act because of a condition.</li>
-<li><code>Defeated</code>: health is zero.</li>
-</ul>
-<p>Cooldowns should not be combat states. Cooldowns are tick counters
-that gate action availability.</p>
-<h2 id="tick-timing-model">Tick Timing Model</h2>
-<p>Initial tick interval:</p>
-<pre class="text"><code>simulation_tick_interval = 0.25 seconds</code></pre>
-<p>All combat timing is represented as integer ticks.</p>
-<p>Example conversions:</p>
-<pre class="text"><code>cooldown_ticks = ceil(cooldown_seconds / simulation_tick_interval)
-cast_ticks = ceil(cast_seconds / simulation_tick_interval)
-recovery_ticks = ceil(recovery_seconds / simulation_tick_interval)</code></pre>
-<p>Initial examples:</p>
-<pre class="text"><code>adventurer_basic_attack_cooldown = 4 ticks
-monster_basic_attack_cooldown = 6 ticks
-heavy_strike_cooldown = 4 ticks
-heavy_strike_recovery = 1 tick
-spark_cast_time = 5 ticks</code></pre>
-<p>Attack speed can still exist as a stat, but it should be converted
-into tick cooldowns:</p>
-<pre class="text"><code>basic_attack_cooldown_ticks = max(1, ceil((1.0 / attacks_per_second) / simulation_tick_interval))</code></pre>
-<h2 id="tick-flow">Tick Flow</h2>
-<p>On every simulation tick:</p>
-<ol type="1">
-<li>Resolve context for each active encounter.</li>
-<li>Remove defeated combatants from action consideration.</li>
-<li>Reduce cooldown, cast, recovery, buff, debuff, regeneration, and
-damage-over-time tick counters.</li>
-<li>Complete casts whose <code>CastTicksRemaining</code> reached zero
-and queue the completed action for this tick.</li>
-<li>Ask each <code>Ready</code> combatant to choose an available
-action.</li>
-<li>Queue selected actions.</li>
-<li>Roll and sort queued actions for this tick.</li>
-<li>Resolve queued actions in order.</li>
-<li>Apply damage, healing, effects, rewards, death, and encounter end
-conditions.</li>
-<li>Publish bridge events and state.</li>
-</ol>
-<p>No combatant should attack between ticks.</p>
-<h2 id="action-queue-and-order-resolution">Action Queue And Order
-Resolution</h2>
-<p>If one combatant is ready on a tick, resolve its queued action.</p>
-<p>If multiple combatants are ready on the same tick, calculate an
-initiative score for each queued action:</p>
-<pre class="text"><code>initiative_score =
+	<div class="layout">
+		<aside class="sidebar" aria-label="Plan navigation">
+			<h2>Combat Plan</h2>
+			<nav>
+				<a href="#overview">Overview</a>
+				<a href="#status">Implementation Status</a>
+				<a href="#architecture">Architecture</a>
+				<a href="#tick-flow">Tick Flow</a>
+				<a href="#actions">Actions</a>
+				<a href="#states">State And Counters</a>
+				<a href="#resolution">Resolution</a>
+				<a href="#bridge">TestBridge</a>
+				<a href="#remaining">Remaining Work</a>
+				<a href="#criteria">Acceptance</a>
+			</nav>
+		</aside>
+
+		<main>
+			<header class="hero" id="overview">
+				<p class="kicker">Current Combat Implementation</p>
+				<h1>Combat Main Loop Plan</h1>
+				<p>Combat now runs from one authoritative simulation tick. Movement and the wider idle loop can keep their normal updates, but combat decisions, cooldowns, action order, hit rolls, damage, death, and combat state snapshots happen on discrete ticks.</p>
+				<p>The current implementation is a one-adventurer versus one-monster encounter using shared combat actions, tick counters, bridge events, and deterministic action priority.</p>
+			</header>
+
+			<section class="summary" aria-label="At a glance">
+				<div class="metric">
+					<strong>0.25s</strong>
+					<span>Simulation tick interval owned by <code>GameController</code>.</span>
+				</div>
+				<div class="metric">
+					<strong>1v1</strong>
+					<span>Current encounter shape: one adventurer against one monster.</span>
+				</div>
+				<div class="metric">
+					<strong>3 + 1</strong>
+					<span>Adventurer has <code>heavy_strike</code>, <code>spark</code>, and <code>basic_attack</code>; monster has <code>basic_attack</code>.</span>
+				</div>
+				<div class="metric">
+					<strong>Ticks</strong>
+					<span>Basic attack, skill cooldown, global cooldown, cast, and recovery are integer counters.</span>
+				</div>
+			</section>
+
+			<section class="panel" id="status">
+				<div class="section-title">
+					<h2>Implementation Status</h2>
+					<span class="tag">Synced To Code</span>
+				</div>
+				<div class="grid-3">
+					<div class="card green">
+						<h3>Done</h3>
+						<ul>
+							<li>Combat resolves from simulation ticks.</li>
+							<li>Adventurer and monster runners update once per combat tick.</li>
+							<li>Queued actions resolve in rolled initiative order.</li>
+							<li><code>heavy_strike</code> exists as a cooldown skill.</li>
+							<li><code>spark</code> exists as a medium-range 12-tick cast spell.</li>
+							<li>Action range is enforced by the runner.</li>
+							<li>Attacked monsters aggro and move into attack distance.</li>
+							<li>A headless bridge verifier covers one full loop.</li>
+							<li>HUD and bridge state expose tick counters.</li>
+							<li>The idle loop still supports loot, recovery, respawn, and repeat.</li>
+						</ul>
+					</div>
+					<div class="card gold">
+						<h3>Partial</h3>
+						<ul>
+							<li><code>CanUseWhileMoving</code> is stored but not enforced by the runner.</li>
+							<li>Decision logic is list priority, not a separate controller.</li>
+						</ul>
+					</div>
+					<div class="card red">
+						<h3>Not Yet</h3>
+						<ul>
+							<li>Buffs, debuffs, regeneration, damage-over-time, and healing-over-time.</li>
+							<li>Multi-adventurer or multi-monster encounters.</li>
+							<li>Data-driven skill library.</li>
+							<li>Equipment, inventory, shops, and party composition.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="architecture">
+				<div class="section-title">
+					<h2>Current Architecture</h2>
+					<span class="tag">Where Responsibilities Live</span>
+				</div>
+				<div class="grid-3">
+					<div class="card">
+						<h3><code>GameController</code></h3>
+						<p>Owns the 0.25 second simulation clock, increments <code>SimulationTickCount</code>, emits <code>simulation_tick</code>, and calls the active combat controller.</p>
+					</div>
+					<div class="card">
+						<h3><code>AdventurerController</code></h3>
+						<p>Runs the high-level idle loop: choose target, travel, start combat, collect loot, return to town, recover, and repeat.</p>
+					</div>
+					<div class="card">
+						<h3><code>AdventurerCombatController</code></h3>
+						<p>Owns the active 1v1 encounter, creates runners, processes combat ticks, rolls action order, handles end conditions, and publishes encounter state.</p>
+					</div>
+					<div class="card">
+						<h3><code>CombatActionRunner</code></h3>
+						<p>Owns one combatant's state, target, queued action, active action, cooldowns, casts, recovery, action selection, hit rolls, damage, and snapshots.</p>
+					</div>
+					<div class="card">
+						<h3><code>CombatAction</code></h3>
+						<p>Describes action data: id, kind, range, cooldown, cast, recovery, target requirement, movement flag, order weight, damage multiplier, and basic cooldown use.</p>
+					</div>
+					<div class="card">
+						<h3><code>ICombatant</code></h3>
+						<p>Shared surface for <code>Adventurer</code> and <code>Monster</code>: stats, identity, alive state, damage application, combat snapshots, and bridge state.</p>
+					</div>
+				</div>
+				<div class="callout" style="margin-top: 1rem;">
+					<h3>Important Shape</h3>
+					<p>There is no standalone <code>CombatEncounter</code>, <code>CombatDecisionController</code>, <code>CombatTickResolver</code>, or cooldown object yet. Those responsibilities are currently folded into <code>AdventurerCombatController</code> and <code>CombatActionRunner</code>.</p>
+				</div>
+			</section>
+
+			<section class="panel" id="tick-flow">
+				<div class="section-title">
+					<h2>Tick Flow</h2>
+					<span class="tag">No Attacks Between Ticks</span>
+				</div>
+				<div class="pipeline" aria-label="Combat tick pipeline">
+					<div class="pipeline-step">
+						<strong>Clock</strong>
+						<code>GameController</code> accumulates 0.25 seconds and emits <code>simulation_tick</code>.
+					</div>
+					<div class="pipeline-step">
+						<strong>Start</strong>
+						The active encounter emits <code>combat_tick_started</code>.
+					</div>
+					<div class="pipeline-step">
+						<strong>Counters</strong>
+						Runners decrement cooldown, cast, recovery, and skill counters.
+					</div>
+					<div class="pipeline-step">
+						<strong>Queue</strong>
+						Ready runners choose the first available action and enter <code>Queued</code>.
+					</div>
+					<div class="pipeline-step">
+						<strong>Resolve</strong>
+						Actions roll order, resolve damage, handle death, publish state, and emit <code>combat_tick_completed</code>.
+					</div>
+				</div>
+				<div class="grid-2" style="margin-top: 1rem;">
+					<div class="card">
+						<h3>Game Tick Responsibilities</h3>
+						<ol>
+							<li>Accumulate physics delta.</li>
+							<li>Increment <code>SimulationTickCount</code>.</li>
+							<li>Emit <code>simulation_tick</code>.</li>
+							<li>Call <code>ProcessSimulationTick</code>.</li>
+							<li>Publish <code>simulation_clock</code>.</li>
+						</ol>
+					</div>
+					<div class="card">
+						<h3>Encounter Tick Responsibilities</h3>
+						<ol>
+							<li>Advance runner counters.</li>
+							<li>Queue ready actions.</li>
+							<li>Roll action order.</li>
+							<li>Resolve queued actions.</li>
+							<li>Handle death or defeat.</li>
+							<li>Publish <code>combat_encounter</code>.</li>
+						</ol>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="actions">
+				<div class="section-title">
+					<h2>Current Actions And Timing</h2>
+					<span class="tag">Live Values</span>
+				</div>
+				<table>
+					<thead>
+						<tr>
+							<th>Actor</th>
+							<th>Action</th>
+							<th>Cooldown</th>
+							<th>Cast</th>
+							<th>Recovery</th>
+							<th>Damage</th>
+							<th>Notes</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Adventurer</td>
+							<td><code>heavy_strike</code></td>
+							<td>12 ticks</td>
+							<td>0 ticks</td>
+							<td>12 ticks</td>
+							<td>1.5x attack</td>
+							<td>Skill, action weight 10, starts 4 tick global cooldown.</td>
+						</tr>
+						<tr>
+							<td>Adventurer</td>
+							<td><code>basic_attack</code></td>
+							<td><code>AttackSpeed</code>, currently 4 ticks</td>
+							<td>0 ticks</td>
+							<td>0 ticks</td>
+							<td>1.0x attack</td>
+							<td>Uses the owner's basic attack cooldown.</td>
+						</tr>
+						<tr>
+							<td>Adventurer</td>
+							<td><code>spark</code></td>
+							<td>8 ticks</td>
+							<td>1 tick</td>
+							<td>0 ticks</td>
+							<td>1.2x attack</td>
+							<td>Spell, range 160px, action weight 4, starts 4 tick global cooldown.</td>
+						</tr>
+						<tr>
+							<td>Monster</td>
+							<td><code>basic_attack</code></td>
+							<td><code>AttackSpeed</code>, currently 8 ticks</td>
+							<td>0 ticks</td>
+							<td>0 ticks</td>
+							<td>1.0x attack</td>
+							<td>Only configured monster action in this slice.</td>
+						</tr>
+					</tbody>
+				</table>
+				<div class="grid-2" style="margin-top: 1rem;">
+					<div class="card green">
+						<h3>Action Priority</h3>
+						<p>The adventurer scans actions in list order, so <code>heavy_strike</code> is preferred whenever ready, then <code>spark</code>, then <code>basic_attack</code>. Monsters currently only have <code>basic_attack</code>.</p>
+					</div>
+					<div class="card gold">
+						<h3>Attack Speed Meaning</h3>
+						<p><code>AttackSpeed</code> currently means basic attack cooldown ticks, not attacks per second. Basic cooldown is <code>max(1, owner.AttackSpeed)</code>.</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="states">
+				<div class="section-title">
+					<h2>State And Counters</h2>
+					<span class="tag">Runner Snapshot</span>
+				</div>
+				<div class="grid-2">
+					<div>
+						<h3>Combat States</h3>
+						<ul class="state-list">
+							<li><strong>OutOfCombat</strong>No active encounter.</li>
+							<li><strong>Engaging</strong>Target set, moving toward ready state.</li>
+							<li><strong>Ready</strong>Can evaluate available actions.</li>
+							<li><strong>Queued</strong>Action selected for tick-order resolution.</li>
+							<li><strong>Casting</strong>Cast counter is counting down.</li>
+							<li><strong>Recovering</strong>Post-action lockout is counting down.</li>
+							<li><strong>Disabled</strong>Reserved for conditions.</li>
+							<li><strong>Defeated</strong>Health is zero.</li>
+						</ul>
+					</div>
+					<div>
+						<h3>Published Counters</h3>
+						<ul class="status-list">
+							<li><strong>Basic Cooldown</strong><code>BasicAttackCooldownTicksRemaining</code></li>
+							<li><strong>Global Cooldown</strong><code>GlobalCooldownTicksRemaining</code></li>
+							<li><strong>Cast</strong><code>CastTicksRemaining</code></li>
+							<li><strong>Recovery</strong><code>RecoveryTicksRemaining</code></li>
+							<li><strong>Skill Cooldowns</strong><code>SkillCooldowns</code> map by action id.</li>
+							<li><strong>Action Ids</strong><code>QueuedActionId</code> and <code>ActiveActionId</code>.</li>
+							<li><strong>Capability</strong><code>IsDisabled</code> and <code>CanAct</code>.</li>
+							<li><strong>Target</strong><code>CurrentCombatTargetName</code>.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="resolution">
+				<div class="section-title">
+					<h2>Resolution Rules</h2>
+					<span class="tag">Rolls And Formulas</span>
+				</div>
+				<div class="grid-3">
+					<div class="card">
+						<h3>Action Order</h3>
+						<pre><code>initiative_score =
   random(1, 100)
   + initiative
-  + round(accuracy * 20)
-  + round(evasion * 10)
-  + round(attack_speed * 5)
+  + max(0, 12 - max(1, attack_speed_ticks))
   - action_weight</code></pre>
-<p>Suggested action weights:</p>
-<pre class="text"><code>basic_attack = 0
-heavy_strike = 10
-quick_skill = -5
-spell = 15</code></pre>
-<p>Sort descending by <code>initiative_score</code>.</p>
-<p>Tie breakers:</p>
-<ol type="1">
-<li>Higher initiative stat.</li>
-<li>Higher attack speed.</li>
-<li>Stable combatant id order.</li>
-</ol>
-<p>If a queued action’s target is defeated before the action resolves,
-cancel the action and emit <code>combat_action_cancelled</code>.</p>
-<h2 id="basic-attack-flow">Basic Attack Flow</h2>
-<p>When a combatant enters combat:</p>
-<ol type="1">
-<li>Set <code>CurrentTarget</code>.</li>
-<li>Enter <code>Engaging</code>.</li>
-<li>Validate target is alive and in range.</li>
-<li>Enter <code>Ready</code>.</li>
-<li>On the next tick, choose an action.</li>
-<li>If basic attack is chosen and its cooldown ticks are zero, queue
-it.</li>
-<li>During tick resolution, resolve the attack according to initiative
-order.</li>
-<li>Start basic attack cooldown ticks.</li>
-<li>Enter <code>Recovering</code> if recovery ticks are greater than
-zero, otherwise return to <code>Ready</code>.</li>
-</ol>
-<p>If no action is currently available because all relevant cooldowns
-are still running, the combatant stays <code>Ready</code> and waits for
-later ticks.</p>
-<h2 id="skill-and-spell-flow">Skill And Spell Flow</h2>
-<p>Represent adventurer skills and spells with the same
-<code>CombatAction</code> shape. Monsters can remain simpler in this
-slice and use only basic attacks.</p>
-<p>Suggested fields:</p>
-<ul>
-<li><code>ActionId</code></li>
-<li><code>DisplayName</code></li>
-<li><code>ActionKind</code>: <code>BasicAttack</code>,
-<code>Skill</code>, <code>Spell</code></li>
-<li><code>Range</code></li>
-<li><code>CooldownTicks</code></li>
-<li><code>CastTicks</code></li>
-<li><code>RecoveryTicks</code></li>
-<li><code>RequiresTarget</code></li>
-<li><code>CanUseWhileMoving</code></li>
-<li><code>ActionWeight</code></li>
-<li><code>HitFormula</code></li>
-<li><code>DamageFormula</code></li>
-<li><code>Effects</code></li>
-</ul>
-<p>Initial examples:</p>
-<ul>
-<li><code>basic_attack</code>: instant, cooldown derived from attack
-speed in ticks.</li>
-<li><code>heavy_strike</code>: instant, 4 tick cooldown, higher damage,
-heavier initiative weight.</li>
-<li><code>spark</code>: 5 tick cast time, 12 tick cooldown, magic
-damage.</li>
-</ul>
-<p>The first implementation does not need a large skill library. One
-basic attack plus one simple cooldown skill is enough to prove the
-model.</p>
-<h2 id="decision-rules">Decision Rules</h2>
-<p>Start with deterministic priority rules before adding more advanced
-AI.</p>
-<p>Adventurer decision priority:</p>
-<ol type="1">
-<li>If dead, stop.</li>
-<li>If disabled, wait.</li>
-<li>If casting, continue cast countdown.</li>
-<li>If recovering, continue recovery countdown.</li>
-<li>If no valid target, exit combat.</li>
-<li>If a high-priority skill is ready and conditions match, queue
-it.</li>
-<li>If basic attack is ready, queue basic attack.</li>
-<li>Otherwise wait for a later tick.</li>
-</ol>
-<p>Monster decision priority:</p>
-<ol type="1">
-<li>If dead, stop.</li>
-<li>If disabled, wait.</li>
-<li>If recovering, continue recovery countdown.</li>
-<li>If no valid target, exit combat.</li>
-<li>If basic attack is ready, queue basic attack.</li>
-<li>Otherwise wait for a later tick.</li>
-</ol>
-<h2 id="testbridge-events">TestBridge Events</h2>
-<p>Keep existing events:</p>
-<ul>
-<li><code>combat_started</code></li>
-<li><code>combat_state_changed</code></li>
-<li><code>attack_roll_resolved</code></li>
-<li><code>damage_applied</code></li>
-<li><code>monster_defeated</code></li>
-<li><code>adventurer_died</code></li>
-</ul>
-<p>Tick-specific events:</p>
-<ul>
-<li><code>simulation_tick</code></li>
-<li><code>combat_tick_started</code></li>
-<li><code>combat_tick_completed</code></li>
-<li><code>combatant_ready</code></li>
-<li><code>combat_action_queued</code></li>
-<li><code>combat_action_order_rolled</code></li>
-<li><code>combat_action_started</code></li>
-<li><code>combat_action_resolved</code></li>
-<li><code>combat_action_cancelled</code></li>
-<li><code>combat_action_cooldown_started</code></li>
-<li><code>combat_action_cooldown_ready</code></li>
-<li><code>combat_cast_started</code></li>
-<li><code>combat_cast_completed</code></li>
-<li><code>combat_recovery_started</code></li>
-<li><code>combat_recovery_completed</code></li>
-<li><code>effect_applied</code></li>
-<li><code>effect_expired</code></li>
-<li><code>regeneration_applied</code></li>
-</ul>
-<p>Named states:</p>
-<ul>
-<li><code>adventurer</code></li>
-<li><code>monster</code></li>
-<li><code>combat_encounter</code></li>
-<li><code>simulation_clock</code></li>
-</ul>
-<p>State should expose each combatant’s tick counters so tests can
-verify that combat is resolved only on simulation ticks.</p>
-<h2 id="implementation-steps">Implementation Steps</h2>
-<ol type="1">
-<li>Preserve the current independent-timer implementation in git as a
-reference point.</li>
-<li>Replace real-time combat cooldowns with integer tick counters.</li>
-<li>Remove action resolution from per-frame
-<code>CombatActionRunner.Update(delta)</code>.</li>
-<li>Move combat actor updates into the simulation tick.</li>
-<li>Add a per-encounter action queue for actions selected during the
-current tick.</li>
-<li>Add initiative/order rolling for queued actions.</li>
-<li>Resolve queued actions in initiative order.</li>
-<li>Convert basic attack speed into tick cooldowns.</li>
-<li>Convert <code>heavy_strike</code> cooldown and recovery into tick
-counters.</li>
-<li>Publish tick-specific bridge events and state.</li>
-<li>Update HUD labels to show tick counters rather than fractional
-seconds.</li>
-<li>Run headless TestBridge verification.</li>
-</ol>
-<h2 id="acceptance-criteria">Acceptance Criteria</h2>
-<ul>
-<li>Combat actions resolve only on simulation ticks.</li>
-<li>Adventurer and monster updates are processed once per tick.</li>
-<li>Basic attacks, skills, spells, casts, and recovery use integer tick
-counters.</li>
-<li>The game does not run per-combatant per-frame action timers.</li>
-<li>Basic attack speed affects attack cadence through tick cooldown
-conversion.</li>
-<li>At least one cooldown skill exists and matures through tick
-counters.</li>
-<li>If multiple actors queue actions on the same tick, initiative/order
-resolution decides action order.</li>
-<li>If a target dies before a later queued action resolves, that action
-is cancelled.</li>
-<li>Combat still resolves death, rewards, return to town, recovery, and
-repeat loop.</li>
-<li>TestBridge events expose tick start, tick complete, action queue,
-order roll, action resolve, cooldown start, cooldown ready, and
-simulation tick.</li>
-<li>Bridge state exposes per-combatant tick counters.</li>
-<li>Headless verification proves at least one full loop completes.</li>
-</ul>
-<h2 id="risks-and-constraints">Risks And Constraints</h2>
-<ul>
-<li>Do not overbuild the action system into a full RPG rules engine
-yet.</li>
-<li>Keep the tick interval explicit and easy to tune.</li>
-<li>Keep formulas explicit and logged.</li>
-<li>Keep bridge events precise enough to debug ordering bugs.</li>
-<li>Preserve the current simple visible arena.</li>
-<li>Do not add parties, equipment, inventory, or shops in this
-slice.</li>
-</ul>
-<h2 id="resolved-decisions">Resolved Decisions</h2>
-<ul>
-<li>Combat timing should be tick-based for now.</li>
-<li>Do not clamp continuous action timers to ticks; remove continuous
-combat timing instead.</li>
-<li>Use one simulation tick for world and combat updates in this
-slice.</li>
-<li>Store attack speed as attacks per second, but convert it to basic
-attack cooldown ticks.</li>
-<li>Do not add a global cooldown in this slice.</li>
-<li>Do not make monsters use the same action list format as adventurers
-yet.</li>
-<li>Buffs, debuffs, regeneration, damage-over-time, and
-healing-over-time tick on the same simulation tick.</li>
-</ul>
+					</div>
+					<div class="card">
+						<h3>Hit Chance</h3>
+						<pre><code>hit_chance =
+  clamp(
+    0.75 + attacker_accuracy - defender_evasion,
+    0.05,
+    0.95
+  )</code></pre>
+					</div>
+					<div class="card">
+						<h3>Damage</h3>
+						<pre><code>damage =
+  hit
+    ? max(1, round(attack * multiplier) - defense)
+    : 0</code></pre>
+					</div>
+				</div>
+				<div class="card blue" style="margin-top: 1rem;">
+					<h3>Tie Breakers And Cancellation</h3>
+					<p>Actions sort by higher score, higher initiative, lower <code>AttackSpeed</code> tick value, then stable <code>CombatantId</code>. The runner enforces <code>Range</code> before selection, queueing, and resolution. The opening distance is derived from the longest adventurer action range, which currently means <code>spark</code> range and keeps melee out of range. Mira stops moving while casting. When <code>spark</code> resolves and hits, the affected monster aggros onto the adventurer and moves to attack distance. Monsters can also aggro when an adventurer enters <code>AggroRange</code>. Social aggro is backlog.</p>
+				</div>
+			</section>
+
+			<section class="panel" id="bridge">
+				<div class="section-title">
+					<h2>TestBridge Surface</h2>
+					<span class="tag">Debug At Runtime</span>
+				</div>
+				<div class="grid-2">
+					<div class="card">
+						<h3>Key Events</h3>
+						<ul class="event-list">
+							<li><code>simulation_tick</code></li>
+							<li><code>combat_started</code></li>
+							<li><code>combat_tick_started</code></li>
+							<li><code>combat_tick_completed</code></li>
+							<li><code>combatant_ready</code></li>
+							<li><code>combat_action_queued</code></li>
+							<li><code>combat_action_order_rolled</code></li>
+							<li><code>combat_action_started</code></li>
+							<li><code>combat_action_resolved</code></li>
+							<li><code>combat_action_cancelled</code></li>
+							<li><code>combat_action_cooldown_started</code></li>
+							<li><code>combat_action_cooldown_ready</code></li>
+							<li><code>combat_cast_started</code></li>
+							<li><code>adventurer_cast_movement_paused</code></li>
+							<li><code>combat_cast_completed</code></li>
+							<li><code>monster_aggro_target_set</code></li>
+							<li><code>monster_aggro_moving</code></li>
+							<li><code>monster_aggro_arrived</code></li>
+							<li><code>attack_roll_resolved</code></li>
+							<li><code>damage_applied</code></li>
+							<li><code>monster_defeated</code></li>
+							<li><code>loot_collected</code></li>
+						</ul>
+					</div>
+					<div class="card">
+						<h3>Named States</h3>
+						<ul class="status-list">
+							<li><strong>Adventurer</strong><code>adventurer</code></li>
+							<li><strong>Monster</strong><code>monster</code></li>
+							<li><strong>Encounter</strong><code>combat_encounter</code></li>
+							<li><strong>Clock</strong><code>simulation_clock</code></li>
+							<li><strong>Loop</strong><code>game_loop</code></li>
+						</ul>
+						<div class="card red" style="margin-top: 1rem;">
+							<h3>Planned Events Not Yet Live</h3>
+							<ul>
+								<li><code>effect_applied</code></li>
+								<li><code>effect_expired</code></li>
+								<li><code>regeneration_applied</code></li>
+							</ul>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="remaining">
+				<div class="section-title">
+					<h2>Remaining Work</h2>
+					<span class="tag">Concrete Next Steps</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Settled For This Slice</h3>
+						<ul>
+							<li><code>AttackSpeed</code> remains basic-attack cooldown ticks.</li>
+							<li>Skills and spells keep the 4-tick global cooldown.</li>
+							<li>Effects and encounter extraction stay deferred.</li>
+						</ul>
+					</div>
+					<div class="card gold">
+						<h3>Verified</h3>
+						<p><code>scripts/verify_combat_main_loop.sh</code> waits for <code>game_loop_completed</code> and checks representative tick, action, medium-range cast, casting movement pause, monster aggro movement, melee follow-up, monster retaliation, cooldown, loot, and shutdown events.</p>
+					</div>
+				</div>
+				<ol class="flow" style="margin-top: 1rem;">
+					<li>Added <code>scripts/verify_combat_main_loop.sh</code> for headless full-loop bridge verification.</li>
+					<li>Enforced <code>CombatAction.Range</code> when selecting, keeping, queueing, and resolving actions.</li>
+					<li>Added the <code>spark</code> spell with nonzero <code>CastTicks</code>, cooldown, and modest damage.</li>
+					<li>Removed the unused <code>CombatState.UsingAction</code> state.</li>
+					<li>Re-ran verification on May 13, 2026; artifacts were written to <code>/tmp/idle-fantasy-combat.lob14h</code>.</li>
+				</ol>
+					<div class="card blue" style="margin-top: 1rem;">
+						<h3>Deferred</h3>
+						<ul class="two-column">
+							<li>Buff, debuff, regeneration, damage-over-time, healing-over-time, and effect ticking.</li>
+							<li>Social aggro for monster groups when a group member is damaged or affected.</li>
+							<li><code>CombatEncounter</code> or <code>CombatTickResolver</code> extraction for multi-combatant encounters.</li>
+							<li>Attacks-per-second conversion if equipment, class, or stat presentation needs a player-facing speed value.</li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="panel" id="criteria">
+				<div class="section-title">
+					<h2>Acceptance Criteria</h2>
+					<span class="tag">Definition Of Done</span>
+				</div>
+				<ul class="two-column">
+					<li>Combat actions resolve only on simulation ticks.</li>
+					<li>Adventurer and monster updates process once per combat tick.</li>
+					<li>Basic attacks and <code>heavy_strike</code> use integer tick counters.</li>
+					<li><code>spark</code> uses a 12-tick cast plus integer skill cooldown and global cooldown counters.</li>
+					<li>The game does not run per-combatant per-frame action timers.</li>
+					<li>Basic attack cadence comes from <code>AttackSpeed</code> tick values.</li>
+					<li>At least one cooldown skill exists and matures through tick counters.</li>
+					<li>At least one spell casts and resolves through tick counters.</li>
+					<li>Action range is enforced before actions resolve.</li>
+					<li>Attacked monsters aggro onto the attacking adventurer and move into attack distance.</li>
+					<li>Same-tick actions use initiative/order resolution.</li>
+					<li>Dead targets cancel later queued actions.</li>
+					<li>Combat resolves death, rewards, return to town, recovery, respawn, and repeat loop.</li>
+					<li>Bridge events expose tick start, tick complete, queue, order roll, resolve, cooldown start, cooldown ready, cast start, cast complete, and simulation tick.</li>
+					<li>Bridge state exposes per-combatant tick counters.</li>
+					<li>Headless verification proves at least one full loop completes.</li>
+				</ul>
+			</section>
+
+			<p class="footer-note">HTML overview page synced with plans/combat-main-loop-plan.md and the current combat implementation.</p>
+		</main>
+	</div>
 </body>
 </html>

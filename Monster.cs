@@ -40,6 +40,15 @@ public partial class Monster : Node2D, ICombatant
 	[Export]
 	public int ExperienceReward { get; set; } = 10;
 
+	[Export]
+	public float Speed { get; set; } = 90.0f;
+
+	[Export]
+	public float AggroRange { get; set; } = 48.0f;
+
+	[Export]
+	public float AggroAttackDistance { get; set; } = 42.0f;
+
 	public int Health { get; private set; }
 	public CombatState CombatState { get; private set; } = CombatState.OutOfCombat;
 	public bool IsAlive => Health > 0;
@@ -57,21 +66,32 @@ public partial class Monster : Node2D, ICombatant
 	public IReadOnlyDictionary<string, int> SkillCooldowns => _skillCooldowns;
 	public bool IsDisabled { get; private set; }
 	public bool CanAct { get; private set; }
+	public Adventurer? AggroTarget { get; private set; }
+	public bool HasAggroTarget => AggroTarget?.IsAlive == true;
 
 	private readonly Dictionary<string, int> _skillCooldowns = new();
 	private bool _hasSetup;
 	private ProgressBar? _healthBar;
+	private bool _wasMovingToAggroTarget;
+	private Vector2 _homePosition;
 
 	public override void _Ready()
 	{
 		if (!_hasSetup)
 		{
 			Health = MaxHealth;
+			_homePosition = Position;
 		}
 
 		_healthBar = GetNodeOrNull<ProgressBar>("HealthBar");
 		UpdateHealthBar();
 		PublishState();
+	}
+
+	public override void _PhysicsProcess(double delta)
+	{
+		UpdateProximityAggro();
+		UpdateAggroMovement(delta);
 	}
 
 	public CombatStats CreateStartingStats()
@@ -109,10 +129,17 @@ public partial class Monster : Node2D, ICombatant
 		if (position is Vector2 setupPosition)
 		{
 			Position = setupPosition;
+			_homePosition = setupPosition;
+		}
+		else
+		{
+			_homePosition = Position;
 		}
 
 		GoldReward = goldReward ?? GoldReward;
 		ExperienceReward = experienceReward ?? ExperienceReward;
+		AggroTarget = null;
+		_wasMovingToAggroTarget = false;
 		CombatState = Health > 0 ? global::CombatState.OutOfCombat : global::CombatState.Defeated;
 		CurrentCombatTargetName = string.Empty;
 		QueuedActionId = string.Empty;
@@ -153,6 +180,36 @@ public partial class Monster : Node2D, ICombatant
 		return previousHealth - Health;
 	}
 
+	public void SetAggroTarget(Adventurer attacker, string actionId, string aggroTrigger, long tick)
+	{
+		if (!IsAlive || !attacker.IsAlive)
+		{
+			return;
+		}
+
+		bool changedTarget = !ReferenceEquals(AggroTarget, attacker);
+		AggroTarget = attacker;
+
+		if (changedTarget)
+		{
+			_wasMovingToAggroTarget = false;
+			EmitBridgeEvent("monster_aggro_target_set", new GDict
+			{
+				{ "source", nameof(Monster) },
+				{ "tick", tick },
+				{ "monster", MonsterName },
+				{ "target", attacker.AdventurerName },
+				{ "action_id", actionId },
+				{ "aggro_trigger", aggroTrigger },
+				{ "distance_to_target", GlobalPosition.DistanceTo(attacker.GlobalPosition) },
+				{ "aggro_range", AggroRange },
+				{ "aggro_attack_distance", AggroAttackDistance }
+			});
+		}
+
+		PublishState();
+	}
+
 	public void SetCombatSnapshot(CombatantCombatSnapshot snapshot)
 	{
 		CombatState = !IsAlive ? global::CombatState.Defeated : snapshot.State;
@@ -176,6 +233,9 @@ public partial class Monster : Node2D, ICombatant
 	public void ResetForNextHunt()
 	{
 		Health = MaxHealth;
+		Position = _homePosition;
+		AggroTarget = null;
+		_wasMovingToAggroTarget = false;
 		SetCombatSnapshot(new CombatantCombatSnapshot
 		{
 			State = global::CombatState.OutOfCombat
@@ -205,6 +265,9 @@ public partial class Monster : Node2D, ICombatant
 			{ "evasion", Evasion },
 			{ "initiative", Initiative },
 			{ "attack_speed", AttackSpeed },
+			{ "speed", Speed },
+			{ "aggro_range", AggroRange },
+			{ "aggro_attack_distance", AggroAttackDistance },
 			{ "gold_reward", GoldReward },
 			{ "experience_reward", ExperienceReward },
 			{ "is_alive", IsAlive },
@@ -219,6 +282,8 @@ public partial class Monster : Node2D, ICombatant
 			{ "skill_cooldowns", BuildSkillCooldownState() },
 			{ "is_disabled", IsDisabled },
 			{ "can_act", CanAct },
+			{ "has_aggro_target", HasAggroTarget },
+			{ "aggro_target", AggroTarget?.AdventurerName ?? string.Empty },
 			{ "position", BridgePayload.VectorToArray(GlobalPosition) }
 		});
 	}
@@ -232,6 +297,103 @@ public partial class Monster : Node2D, ICombatant
 
 		_healthBar.MaxValue = Mathf.Max(1, MaxHealth);
 		_healthBar.Value = Mathf.Clamp(Health, 0, MaxHealth);
+	}
+
+	private void UpdateProximityAggro()
+	{
+		if (!IsAlive || HasAggroTarget)
+		{
+			return;
+		}
+
+		Adventurer? adventurer = (GetTree().CurrentScene as GameController)?.Adventurer;
+
+		if (adventurer?.IsAlive != true)
+		{
+			return;
+		}
+
+		float distance = GlobalPosition.DistanceTo(adventurer.GlobalPosition);
+
+		if (distance > AggroRange)
+		{
+			return;
+		}
+
+		SetAggroTarget(adventurer, string.Empty, "proximity", (GetTree().CurrentScene as GameController)?.SimulationTickCount ?? 0);
+	}
+
+	private void UpdateAggroMovement(double delta)
+	{
+		if (!IsAlive)
+		{
+			ClearAggroTarget();
+			return;
+		}
+
+		if (AggroTarget is not Adventurer target || !target.IsAlive)
+		{
+			ClearAggroTarget();
+			return;
+		}
+
+		Vector2 toTarget = target.GlobalPosition - GlobalPosition;
+		float distance = toTarget.Length();
+
+		if (distance <= AggroAttackDistance)
+		{
+			if (_wasMovingToAggroTarget)
+			{
+				_wasMovingToAggroTarget = false;
+				EmitBridgeEvent("monster_aggro_arrived", new GDict
+				{
+					{ "source", nameof(Monster) },
+					{ "monster", MonsterName },
+					{ "target", target.AdventurerName },
+					{ "distance_to_target", distance },
+					{ "aggro_attack_distance", AggroAttackDistance }
+				});
+			}
+
+			PublishState();
+			return;
+		}
+
+		if (!_wasMovingToAggroTarget)
+		{
+			_wasMovingToAggroTarget = true;
+			EmitBridgeEvent("monster_aggro_moving", new GDict
+			{
+				{ "source", nameof(Monster) },
+				{ "monster", MonsterName },
+				{ "target", target.AdventurerName },
+				{ "distance_to_target", distance },
+				{ "aggro_attack_distance", AggroAttackDistance }
+			});
+		}
+
+		Vector2 movement = toTarget.Normalized() * Speed * (float)delta;
+		GlobalPosition += movement.Length() >= distance - AggroAttackDistance
+			? toTarget.Normalized() * Mathf.Max(0.0f, distance - AggroAttackDistance)
+			: movement;
+		PublishState();
+	}
+
+	private void ClearAggroTarget()
+	{
+		if (AggroTarget is null && !_wasMovingToAggroTarget)
+		{
+			return;
+		}
+
+		AggroTarget = null;
+		_wasMovingToAggroTarget = false;
+		PublishState();
+	}
+
+	private static void EmitBridgeEvent(string type, GDict payload)
+	{
+		TestBridge.Instance?.EmitEvent(type, payload);
 	}
 
 	private GDict BuildSkillCooldownState()

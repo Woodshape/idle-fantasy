@@ -8,7 +8,6 @@ public enum CombatState
 	Engaging,
 	Ready,
 	Queued,
-	UsingAction,
 	Casting,
 	Recovering,
 	Disabled,
