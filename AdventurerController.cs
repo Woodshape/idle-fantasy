@@ -92,10 +92,8 @@ public partial class AdventurerController : Node
 				UpdateReturn(delta);
 				break;
 			case AdventurerIntentionState.RecoverInTown:
-				if (_stateTimer <= 0.0)
+				if (_town.Recover(_adventurer, delta))
 				{
-					_town.Recover(_adventurer);
-					_game.NotifyLoopCompleted();
 					ChangeState(AdventurerIntentionState.IdleInTown);
 				}
 				break;
@@ -202,7 +200,12 @@ public partial class AdventurerController : Node
 
 	private float GetOpeningApproachDistance()
 	{
-		double longestActionRange = AdventurerCombatController.CreateAdventurerActions()
+		if (_adventurer is null)
+		{
+			return MeleeApproachDistance;
+		}
+
+		double longestActionRange = AdventurerCombatController.CreateAdventurerActions(_adventurer)
 			.Where(action => action.RequiresTarget)
 			.Select(action => action.Range)
 			.DefaultIfEmpty(MeleeApproachDistance)
@@ -391,7 +394,6 @@ public partial class AdventurerController : Node
 		_stateTimer = nextState switch
 		{
 			AdventurerIntentionState.IdleInTown => 0.35,
-			AdventurerIntentionState.RecoverInTown => 0.5,
 			_ => 0.0
 		};
 

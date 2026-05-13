@@ -76,7 +76,7 @@ public partial class AdventurerCombatController : Node
 		{
 			CombatActionRunner runner = new(
 				adventurer,
-				CreateAdventurerActions(),
+				CreateAdventurerActions(adventurer),
 				_rng,
 				EmitBridgeEvent,
 				() => SelectMonsterTarget(adventurer));
@@ -250,34 +250,61 @@ public partial class AdventurerCombatController : Node
 	{
 		return new[]
 		{
-			new CombatAction(
-				"heavy_strike",
-				"Heavy Strike",
-				CombatActionKind.Skill,
-				48.0,
-				12,
-				0,
-				1,
-				true,
-				false,
-				10,
-				1.5,
-				false),
-			new CombatAction(
-				"spark",
-				"Spark",
-				CombatActionKind.Spell,
-				160.0,
-				8,
-				8,
-				0,
-				true,
-				false,
-				4,
-				1.2,
-				false),
+			CreateHeavyStrike(),
+			CreateSpark(),
 			CombatAction.BasicAttack()
 		};
+	}
+
+	public static IReadOnlyList<CombatAction> CreateAdventurerActions(Adventurer adventurer)
+	{
+		return adventurer.Archetype switch
+		{
+			AdventurerArchetype.Mage => new[]
+			{
+				CreateSpark(),
+				CombatAction.BasicAttack(160.0)
+			},
+			_ => new[]
+			{
+				CreateHeavyStrike(),
+				CombatAction.BasicAttack()
+			}
+		};
+	}
+
+	private static CombatAction CreateHeavyStrike()
+	{
+		return new CombatAction(
+			"heavy_strike",
+			"Heavy Strike",
+			CombatActionKind.Skill,
+			48.0,
+			12,
+			0,
+			1,
+			true,
+			false,
+			10,
+			1.5,
+			false);
+	}
+
+	private static CombatAction CreateSpark()
+	{
+		return new CombatAction(
+			"spark",
+			"Spark",
+			CombatActionKind.Spell,
+			160.0,
+			8,
+			8,
+			0,
+			true,
+			false,
+			4,
+			1.2,
+			false);
 	}
 
 	private IEnumerable<RolledCombatAction> RollActionOrder(IReadOnlyList<QueuedCombatAction> queuedActions, long tick)
@@ -453,6 +480,7 @@ public partial class AdventurerCombatController : Node
 			{ "target", runner?.Target?.DisplayName ?? "none" },
 			{ "active_action", runner?.ActiveActionId ?? string.Empty },
 			{ "queued_action", runner?.QueuedActionId ?? string.Empty },
+			{ "last_action", combatant is Adventurer adventurer4 ? adventurer4.LastActionId : combatant is Monster monster4 ? monster4.LastActionId : string.Empty },
 			{ "basic_attack_cooldown_ticks_remaining", runner?.BasicAttackCooldownTicksRemaining ?? 0 },
 			{ "global_cooldown_ticks_remaining", combatant is Adventurer adventurer3 ? adventurer3.GlobalCooldownTicksRemaining : combatant is Monster monster3 ? monster3.GlobalCooldownTicksRemaining : 0 },
 			{ "cast_ticks_remaining", combatant is Adventurer adventurer ? adventurer.CastTicksRemaining : combatant is Monster monster ? monster.CastTicksRemaining : 0 },

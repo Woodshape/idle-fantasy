@@ -41,8 +41,11 @@ done
 
 cat >> "${COMMANDS_FILE}" <<'JSONL'
 {"id":1,"cmd":"set_time_scale","scale":4.0}
-{"id":2,"cmd":"wait_for_event","event":"game_loop_completed","timeout_ms":30000}
-{"id":3,"cmd":"quit"}
+{"id":2,"cmd":"click_world","x":160,"y":272}
+{"id":3,"cmd":"wait_for_event","event":"character_selected","timeout_ms":5000}
+{"id":4,"cmd":"wait_for_event","event":"game_loop_completed","timeout_ms":30000}
+{"id":5,"cmd":"wait_for_event","event":"monster_wave_respawned","timeout_ms":15000}
+{"id":6,"cmd":"quit"}
 JSONL
 
 if ! wait "${GODOT_PID}"; then
@@ -66,7 +69,11 @@ required_events=(
 	"monster_aggro_moving"
 	"combat_tick_completed"
 	"loot_collected"
+	"character_selected"
 	"game_loop_completed"
+	"monster_wave_cleared"
+	"monster_wave_respawned"
+	"adventurer_recovery_tick"
 	"bridge_stopped"
 )
 
@@ -109,10 +116,12 @@ if ! printf '%s\n' "${cast_pause_line}" | grep -q '"distance_to_monster":1[5-6][
 	exit 1
 fi
 
-spark_resolved_numbered_line="$(grep -n '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"adventurer"' | grep '"action_id":"spark"' | head -n 1 || true)"
+spark_target="$(printf '%s\n' "${spark_cast_line}" | sed -n 's/.*"target":"\([^"]*\)".*/\1/p')"
+spark_adventurer="$(printf '%s\n' "${spark_cast_line}" | sed -n 's/.*"combatant":"\([^"]*\)".*/\1/p')"
+spark_resolved_numbered_line="$(grep -n '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"adventurer"' | grep '"action_id":"spark"' | grep "\"combatant\":\"${spark_adventurer}\"" | grep "\"target\":\"${spark_target}\"" | head -n 1 || true)"
 spark_resolved_line_number="$(printf '%s\n' "${spark_resolved_numbered_line}" | cut -d: -f1)"
 spark_resolved_line="$(printf '%s\n' "${spark_resolved_numbered_line}" | cut -d: -f2-)"
-first_monster_attack_line_number="$(grep -n '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | head -n 1 | cut -d: -f1 || true)"
+first_spark_target_attack_line_number="$(grep -n '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep "\"combatant\":\"${spark_target}\"" | grep "\"target\":\"${spark_adventurer}\"" | head -n 1 | cut -d: -f1 || true)"
 
 if [[ -z "${spark_resolved_line_number}" ]]; then
 	echo "Missing spark action resolution. Session: ${SESSION_DIR}" >&2
@@ -124,8 +133,8 @@ if ! grep '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep -q '"combata
 	exit 1
 fi
 
-if (( first_monster_attack_line_number <= spark_resolved_line_number )); then
-	echo "Monster attacked before spark resolved. Session: ${SESSION_DIR}" >&2
+if [[ -n "${first_spark_target_attack_line_number}" ]] && (( first_spark_target_attack_line_number <= spark_resolved_line_number )); then
+	echo "Spark target attacked the mage before spark resolved. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
@@ -134,7 +143,7 @@ if ! grep '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_
 	exit 1
 fi
 
-aggro_numbered_line="$(grep -n '"type":"monster_aggro_target_set"' "${EVENTS_FILE}" | head -n 1 || true)"
+aggro_numbered_line="$(grep -n '"type":"monster_aggro_target_set"' "${EVENTS_FILE}" | grep "\"monster\":\"${spark_target}\"" | grep "\"target\":\"${spark_adventurer}\"" | head -n 1 || true)"
 aggro_line="$(printf '%s\n' "${aggro_numbered_line}" | cut -d: -f2-)"
 aggro_line_number="$(printf '%s\n' "${aggro_numbered_line}" | cut -d: -f1)"
 

@@ -9,6 +9,8 @@ using GDict = Godot.Collections.Dictionary;
 public partial class GameController : Node2D
 {
 	private const double SimulationTickInterval = 0.25;
+	private const double MonsterWaveRespawnDelaySeconds = 5.0;
+	private const float CharacterSelectionRadius = 34.0f;
 
 	[Export]
 	public NodePath TownPath { get; set; } = new("Town");
@@ -36,6 +38,9 @@ public partial class GameController : Node2D
 	private bool _loopStopped;
 	private double _simulationAccumulator;
 	private long _simulationTickCount;
+	private bool _monsterWaveRespawnPending;
+	private double _monsterWaveRespawnTimer;
+	private ICombatant? _selectedCombatant;
 
 	public Town? Town => _town;
 	public Adventurer? Adventurer => _adventurer;
@@ -51,11 +56,6 @@ public partial class GameController : Node2D
 		Node monsterContainer = GetOrCreateMonsterContainer();
 		_monsters.Clear();
 
-		if (_adventurer is null)
-		{
-			_adventurer = SpawnDefaultAdventurer();
-		}
-
 		_adventurers.Clear();
 
 		foreach (Node child in GetChildren())
@@ -66,12 +66,15 @@ public partial class GameController : Node2D
 			}
 		}
 
+		EnsureDefaultAdventurers();
+
 		if (_adventurer is not null && !_adventurers.Contains(_adventurer))
 		{
 			_adventurers.Insert(0, _adventurer);
 		}
 
 		_adventurer ??= _adventurers.FirstOrDefault();
+		_selectedCombatant ??= _adventurer;
 
 		foreach (Node child in monsterContainer.GetChildren())
 		{
@@ -94,6 +97,27 @@ public partial class GameController : Node2D
 		PublishState();
 	}
 
+	public override void _UnhandledInput(InputEvent @event)
+	{
+		if (@event is not InputEventMouseButton mouseButton
+			|| mouseButton.ButtonIndex != MouseButton.Left
+			|| !mouseButton.Pressed)
+		{
+			return;
+		}
+
+		Vector2 worldPosition = GetViewport().GetCanvasTransform().AffineInverse() * mouseButton.Position;
+
+		if (!TrySelectCharacterAt(worldPosition))
+		{
+			return;
+		}
+
+		GetViewport().SetInputAsHandled();
+		UpdateHud();
+		PublishState();
+	}
+
 	private Node GetOrCreateMonsterContainer()
 	{
 		Node? monsterContainer = GetNodeOrNull(MonsterContainerPath);
@@ -111,7 +135,46 @@ public partial class GameController : Node2D
 		return createdContainer;
 	}
 
-	private Adventurer? SpawnDefaultAdventurer()
+	private void EnsureDefaultAdventurers()
+	{
+		bool hasWarrior = _adventurers.Any(adventurer => adventurer.Archetype == AdventurerArchetype.Warrior);
+		bool hasMage = _adventurers.Any(adventurer => adventurer.Archetype == AdventurerArchetype.Mage);
+
+		if (!hasWarrior)
+		{
+			Adventurer? warrior = SpawnDefaultAdventurer(
+				nodeName: "Warrior",
+				adventurerName: "Warrior",
+				archetype: AdventurerArchetype.Warrior,
+				stats: new CombatStats(8, 0.22, 2, 0.12, 3, 4, 36, 36),
+				positionOffset: new Vector2(0.0f, -28.0f),
+				spriteModulate: new Color(0.25f, 0.55f, 1.0f));
+
+			if (warrior is not null)
+			{
+				_adventurer ??= warrior;
+			}
+		}
+
+		if (!hasMage)
+		{
+			SpawnDefaultAdventurer(
+				nodeName: "Mage",
+				adventurerName: "Mage",
+				archetype: AdventurerArchetype.Mage,
+				stats: new CombatStats(7, 0.30, 1, 0.18, 5, 5, 32, 32),
+				positionOffset: new Vector2(0.0f, 28.0f),
+				spriteModulate: new Color(0.75f, 0.45f, 1.0f));
+		}
+	}
+
+	private Adventurer? SpawnDefaultAdventurer(
+		string nodeName,
+		string adventurerName,
+		AdventurerArchetype archetype,
+		CombatStats stats,
+		Vector2 positionOffset,
+		Color spriteModulate)
 	{
 		if (AdventurerScene is null)
 		{
@@ -120,11 +183,18 @@ public partial class GameController : Node2D
 		}
 
 		Adventurer adventurer = AdventurerScene.Instantiate<Adventurer>();
-		adventurer.Name = "Adventurer";
+		adventurer.Name = nodeName;
 		adventurer.Setup(
-			stats: adventurer.CreateStartingStats(),
-			position: _town?.ReturnPosition ?? adventurer.Position);
+			adventurerName: adventurerName,
+			archetype: archetype,
+			stats: stats,
+			position: (_town?.ReturnPosition ?? adventurer.Position) + positionOffset);
+		if (adventurer.GetNodeOrNull<Sprite2D>("Sprite2D") is Sprite2D sprite)
+		{
+			sprite.Modulate = spriteModulate;
+		}
 		AddChild(adventurer);
+		_adventurers.Add(adventurer);
 		return adventurer;
 	}
 
@@ -160,6 +230,7 @@ public partial class GameController : Node2D
 
 	public override void _Process(double delta)
 	{
+		UpdateMonsterWaveRespawn(delta);
 		UpdateHud();
 		PublishState();
 	}
@@ -197,9 +268,18 @@ public partial class GameController : Node2D
 	{
 		return _monsters
 			.Where(monster => monster.IsAlive)
+			.Where(monster => !IsMonsterClaimedByAnotherAdventurer(monster, adventurer))
 			.OrderBy(monster => monster.GlobalPosition.DistanceSquaredTo(adventurer.GlobalPosition))
 			.Take(Math.Max(1, maximumTargets))
 			.ToArray();
+	}
+
+	private bool IsMonsterClaimedByAnotherAdventurer(Monster monster, Adventurer adventurer)
+	{
+		return _adventurers.Any(candidate =>
+			!ReferenceEquals(candidate, adventurer)
+			&& candidate.IsAlive
+			&& ReferenceEquals(candidate.CurrentMonsterTarget, monster));
 	}
 
 	public IReadOnlyList<Adventurer> FindEncounterAdventurers(Adventurer leader, int maximumAdventurers)
@@ -222,11 +302,49 @@ public partial class GameController : Node2D
 			{ "completed_loops", _completedLoops }
 		});
 
+		PublishState();
+	}
+
+	private void UpdateMonsterWaveRespawn(double delta)
+	{
+		if (_monsters.Count == 0 || _monsters.Any(monster => monster.IsAlive))
+		{
+			return;
+		}
+
+		if (!_monsterWaveRespawnPending)
+		{
+			_monsterWaveRespawnPending = true;
+			_monsterWaveRespawnTimer = MonsterWaveRespawnDelaySeconds;
+			NotifyLoopCompleted();
+			EmitBridgeEvent("monster_wave_cleared", new GDict
+			{
+				{ "source", nameof(GameController) },
+				{ "completed_loops", _completedLoops },
+				{ "respawn_delay_seconds", MonsterWaveRespawnDelaySeconds }
+			});
+		}
+
+		_monsterWaveRespawnTimer -= delta;
+
+		if (_monsterWaveRespawnTimer > 0.0)
+		{
+			return;
+		}
+
 		foreach (Monster monster in _monsters.Where(monster => !monster.IsAlive))
 		{
 			monster.ResetForNextHunt();
 		}
 
+		_monsterWaveRespawnPending = false;
+		_monsterWaveRespawnTimer = 0.0;
+		EmitBridgeEvent("monster_wave_respawned", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "completed_loops", _completedLoops },
+			{ "monster_count", _monsters.Count }
+		});
 		PublishState();
 	}
 
@@ -238,26 +356,135 @@ public partial class GameController : Node2D
 
 	private void UpdateHud()
 	{
-		if (_adventurer is null)
+		ICombatant? selectedCombatant = GetSelectedCombatant();
+
+		if (selectedCombatant is null)
 		{
 			return;
 		}
 
+		switch (selectedCombatant)
+		{
+			case Adventurer adventurer:
+				UpdateAdventurerHud(adventurer);
+				break;
+			case Monster monster:
+				UpdateMonsterHud(monster);
+				break;
+		}
+	}
+
+	private void UpdateAdventurerHud(Adventurer adventurer)
+	{
 		if (_stateLabel is not null)
 		{
-			_stateLabel.Text = $"Adventurer: {_adventurer.AdventurerName} | Intention: {_adventurer.IntentionStateName} | HP: {_adventurer.Health}/{_adventurer.MaxHealth}";
+			_stateLabel.Text = $"Adventurer: {adventurer.AdventurerName} | Role: {adventurer.Archetype} | Intention: {adventurer.IntentionStateName} | HP: {adventurer.Health}/{adventurer.MaxHealth}";
 		}
 
 		if (_combatLabel is not null)
 		{
-			string targetName = _adventurer.CurrentMonsterTarget?.MonsterName ?? "none";
-			_combatLabel.Text = $"Combat: {_adventurer.CombatStateName} | Target: {targetName} | Action: {(_adventurer.ActiveActionId == string.Empty ? "none" : _adventurer.ActiveActionId)} | Basic CD: {_adventurer.BasicAttackCooldownTicksRemaining} ticks | Global CD: {_adventurer.GlobalCooldownTicksRemaining} ticks | Heavy CD: {GetCooldown(_adventurer, "heavy_strike")} ticks | Spark CD: {GetCooldown(_adventurer, "spark")} ticks";
+			string targetName = adventurer.CurrentMonsterTarget?.MonsterName ?? adventurer.CurrentCombatTargetName;
+			_combatLabel.Text = $"Combat: {adventurer.CombatStateName} | Target: {FormatNone(targetName)} | Action: {GetDisplayedAction(adventurer)} | Basic CD: {adventurer.BasicAttackCooldownTicksRemaining} ticks | Global CD: {adventurer.GlobalCooldownTicksRemaining} ticks | Heavy CD: {GetCooldown(adventurer, "heavy_strike")} ticks | Spark CD: {GetCooldown(adventurer, "spark")} ticks";
 		}
 
 		if (_rewardLabel is not null)
 		{
-			_rewardLabel.Text = $"Gold: {_adventurer.Gold} | XP: {_adventurer.Experience} | Loops: {_completedLoops}";
+			_rewardLabel.Text = $"Gold: {adventurer.Gold} | XP: {adventurer.Experience} | Loops: {_completedLoops}";
 		}
+	}
+
+	private void UpdateMonsterHud(Monster monster)
+	{
+		if (_stateLabel is not null)
+		{
+			_stateLabel.Text = $"Monster: {monster.MonsterName} | HP: {monster.Health}/{monster.MaxHealth} | Alive: {monster.IsAlive}";
+		}
+
+		if (_combatLabel is not null)
+		{
+			string targetName = monster.CurrentCombatTargetName != string.Empty
+				? monster.CurrentCombatTargetName
+				: monster.AggroTarget?.AdventurerName ?? string.Empty;
+			_combatLabel.Text = $"Combat: {monster.CombatState} | Target: {FormatNone(targetName)} | Action: {GetDisplayedAction(monster)} | Basic CD: {monster.BasicAttackCooldownTicksRemaining} ticks | Global CD: {monster.GlobalCooldownTicksRemaining} ticks";
+		}
+
+		if (_rewardLabel is not null)
+		{
+			_rewardLabel.Text = $"Gold Reward: {monster.GoldReward} | XP Reward: {monster.ExperienceReward} | Loops: {_completedLoops}";
+		}
+	}
+
+	private ICombatant? GetSelectedCombatant()
+	{
+		return _selectedCombatant switch
+		{
+			Adventurer adventurer when _adventurers.Contains(adventurer) => adventurer,
+			Monster monster when _monsters.Contains(monster) => monster,
+			_ => _adventurer
+		};
+	}
+
+	private bool TrySelectCharacterAt(Vector2 worldPosition)
+	{
+		ICombatant? closestCombatant = null;
+		float closestDistanceSquared = CharacterSelectionRadius * CharacterSelectionRadius;
+
+		foreach (Adventurer adventurer in _adventurers)
+		{
+			UpdateClosest(adventurer, adventurer);
+		}
+
+		foreach (Monster monster in _monsters)
+		{
+			UpdateClosest(monster, monster);
+		}
+
+		if (closestCombatant is null)
+		{
+			return false;
+		}
+
+		_selectedCombatant = closestCombatant;
+		EmitBridgeEvent("character_selected", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "name", closestCombatant.DisplayName },
+			{ "kind", closestCombatant.CombatantKind },
+			{ "position", BridgePayload.VectorToArray(((Node2D)closestCombatant).GlobalPosition) }
+		});
+		return true;
+
+		void UpdateClosest(Node2D node, ICombatant combatant)
+		{
+			float distanceSquared = node.GlobalPosition.DistanceSquaredTo(worldPosition);
+
+			if (distanceSquared > closestDistanceSquared)
+			{
+				return;
+			}
+
+			closestDistanceSquared = distanceSquared;
+			closestCombatant = combatant;
+		}
+	}
+
+	private static string GetDisplayedAction(Adventurer adventurer)
+	{
+		return FormatNone(adventurer.ActiveActionId != string.Empty
+			? adventurer.ActiveActionId
+			: adventurer.LastActionId);
+	}
+
+	private static string GetDisplayedAction(Monster monster)
+	{
+		return FormatNone(monster.ActiveActionId != string.Empty
+			? monster.ActiveActionId
+			: monster.LastActionId);
+	}
+
+	private static string FormatNone(string value)
+	{
+		return string.IsNullOrWhiteSpace(value) ? "none" : value;
 	}
 
 	private void PublishState()
@@ -276,7 +503,11 @@ public partial class GameController : Node2D
 			{ "living_adventurers", _adventurers.Count(adventurer => adventurer.IsAlive) },
 			{ "adventurer_count", _adventurers.Count },
 			{ "living_monsters", _monsters.Count(monster => monster.IsAlive) },
-			{ "monster_count", _monsters.Count }
+			{ "monster_count", _monsters.Count },
+			{ "monster_wave_respawn_pending", _monsterWaveRespawnPending },
+			{ "monster_wave_respawn_seconds_remaining", Math.Max(0.0, _monsterWaveRespawnTimer) },
+			{ "selected_combatant", GetSelectedCombatant()?.DisplayName ?? string.Empty },
+			{ "selected_combatant_kind", GetSelectedCombatant()?.CombatantKind ?? string.Empty }
 		});
 		PublishSimulationClockState();
 	}

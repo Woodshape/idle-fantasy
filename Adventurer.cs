@@ -5,10 +5,19 @@ using System;
 using System.Collections.Generic;
 using GDict = Godot.Collections.Dictionary;
 
+public enum AdventurerArchetype
+{
+	Warrior,
+	Mage
+}
+
 public partial class Adventurer : Node2D, ICombatant
 {
 	[Export]
 	public string AdventurerName { get; set; } = "Mira";
+
+	[Export]
+	public AdventurerArchetype Archetype { get; set; } = AdventurerArchetype.Warrior;
 
 	[Export]
 	public int Level { get; set; } = 1;
@@ -58,6 +67,7 @@ public partial class Adventurer : Node2D, ICombatant
 	public string CurrentCombatTargetName { get; private set; } = string.Empty;
 	public string QueuedActionId { get; private set; } = string.Empty;
 	public string ActiveActionId { get; private set; } = string.Empty;
+	public string LastActionId { get; private set; } = string.Empty;
 	public int BasicAttackCooldownTicksRemaining { get; private set; }
 	public int GlobalCooldownTicksRemaining { get; private set; }
 	public int CastTicksRemaining { get; private set; }
@@ -91,6 +101,7 @@ public partial class Adventurer : Node2D, ICombatant
 
 	public void Setup(
 		string? adventurerName = null,
+		AdventurerArchetype? archetype = null,
 		int? level = null,
 		CombatStats? stats = null,
 		Vector2? position = null,
@@ -100,6 +111,7 @@ public partial class Adventurer : Node2D, ICombatant
 		int gold = 0)
 	{
 		AdventurerName = adventurerName ?? AdventurerName;
+		Archetype = archetype ?? Archetype;
 		Level = level ?? Level;
 
 		if (stats is CombatStats setupStats)
@@ -133,6 +145,7 @@ public partial class Adventurer : Node2D, ICombatant
 		CurrentCombatTargetName = string.Empty;
 		QueuedActionId = string.Empty;
 		ActiveActionId = string.Empty;
+		LastActionId = string.Empty;
 		BasicAttackCooldownTicksRemaining = 0;
 		GlobalCooldownTicksRemaining = 0;
 		CastTicksRemaining = 0;
@@ -231,12 +244,29 @@ public partial class Adventurer : Node2D, ICombatant
 		PublishState();
 	}
 
+	public int Heal(int amount)
+	{
+		if (!IsAlive || amount <= 0)
+		{
+			return 0;
+		}
+
+		int previousHealth = Health;
+		Health = Mathf.Min(MaxHealth, Health + amount);
+		UpdateHealthBar();
+		PublishState();
+		return Health - previousHealth;
+	}
+
 	public void SetCombatSnapshot(CombatantCombatSnapshot snapshot)
 	{
 		CombatState = !IsAlive ? global::CombatState.Defeated : snapshot.State;
 		CurrentCombatTargetName = snapshot.CurrentTargetName;
 		QueuedActionId = snapshot.QueuedActionId;
 		ActiveActionId = snapshot.ActiveActionId;
+		LastActionId = snapshot.State == global::CombatState.OutOfCombat
+			? string.Empty
+			: snapshot.LastActionId;
 		BasicAttackCooldownTicksRemaining = snapshot.BasicAttackCooldownTicksRemaining;
 		GlobalCooldownTicksRemaining = snapshot.GlobalCooldownTicksRemaining;
 		CastTicksRemaining = snapshot.CastTicksRemaining;
@@ -262,6 +292,7 @@ public partial class Adventurer : Node2D, ICombatant
 		{
 			{ "source", nameof(Adventurer) },
 			{ "name", AdventurerName },
+			{ "archetype", Archetype.ToString() },
 			{ "level", Level },
 			{ "experience", Experience },
 			{ "gold", Gold },
@@ -280,6 +311,7 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "current_combat_target", CurrentCombatTargetName },
 			{ "queued_action", QueuedActionId },
 			{ "active_action", ActiveActionId },
+			{ "last_action", LastActionId },
 			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining },
 			{ "global_cooldown_ticks_remaining", GlobalCooldownTicksRemaining },
 			{ "cast_ticks_remaining", CastTicksRemaining },

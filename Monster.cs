@@ -60,6 +60,7 @@ public partial class Monster : Node2D, ICombatant
 	public string CurrentCombatTargetName { get; private set; } = string.Empty;
 	public string QueuedActionId { get; private set; } = string.Empty;
 	public string ActiveActionId { get; private set; } = string.Empty;
+	public string LastActionId { get; private set; } = string.Empty;
 	public int BasicAttackCooldownTicksRemaining { get; private set; }
 	public int GlobalCooldownTicksRemaining { get; private set; }
 	public int CastTicksRemaining { get; private set; }
@@ -145,6 +146,7 @@ public partial class Monster : Node2D, ICombatant
 		CurrentCombatTargetName = string.Empty;
 		QueuedActionId = string.Empty;
 		ActiveActionId = string.Empty;
+		LastActionId = string.Empty;
 		BasicAttackCooldownTicksRemaining = 0;
 		GlobalCooldownTicksRemaining = 0;
 		CastTicksRemaining = 0;
@@ -217,6 +219,7 @@ public partial class Monster : Node2D, ICombatant
 		CurrentCombatTargetName = snapshot.CurrentTargetName;
 		QueuedActionId = snapshot.QueuedActionId;
 		ActiveActionId = snapshot.ActiveActionId;
+		LastActionId = snapshot.LastActionId;
 		BasicAttackCooldownTicksRemaining = snapshot.BasicAttackCooldownTicksRemaining;
 		GlobalCooldownTicksRemaining = snapshot.GlobalCooldownTicksRemaining;
 		CastTicksRemaining = snapshot.CastTicksRemaining;
@@ -276,6 +279,7 @@ public partial class Monster : Node2D, ICombatant
 			{ "current_combat_target", CurrentCombatTargetName },
 			{ "queued_action", QueuedActionId },
 			{ "active_action", ActiveActionId },
+			{ "last_action", LastActionId },
 			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining },
 			{ "global_cooldown_ticks_remaining", GlobalCooldownTicksRemaining },
 			{ "cast_ticks_remaining", CastTicksRemaining },

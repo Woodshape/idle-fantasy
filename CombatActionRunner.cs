@@ -23,6 +23,7 @@ public sealed class CombatActionRunner
 	private CombatAction? _activeAction;
 	private ICombatant? _target;
 	private ICombatant? _queuedTarget;
+	private string _lastActionId = string.Empty;
 	private long _currentTick;
 
 	public CombatActionRunner(
@@ -275,6 +276,7 @@ public sealed class CombatActionRunner
 			{ "hit", resolution.Hit },
 			{ "damage", resolution.Damage }
 		});
+		_lastActionId = action.ActionId;
 
 		if (action.RequiresTarget)
 		{
@@ -743,6 +745,7 @@ public sealed class CombatActionRunner
 			CurrentTargetName = _target?.DisplayName ?? string.Empty,
 			QueuedActionId = _queuedAction?.ActionId ?? string.Empty,
 			ActiveActionId = _activeAction?.ActionId ?? string.Empty,
+			LastActionId = _lastActionId,
 			BasicAttackCooldownTicksRemaining = BasicAttackCooldownTicksRemaining,
 			GlobalCooldownTicksRemaining = GlobalCooldownTicksRemaining,
 			CastTicksRemaining = CastTicksRemaining,
