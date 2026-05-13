@@ -766,7 +766,7 @@
 						<h3>Hit Chance</h3>
 						<pre><code>hit_chance =
   clamp(
-    0.75 + attacker_accuracy - defender_evasion,
+	    0.5 + clamp(attacker_accuracy - defender_evasion, 0, 1),
     0.05,
     0.95
   )</code></pre>
@@ -868,13 +868,25 @@
 					<div class="card blue" style="margin-top: 1rem;">
 						<h3>Deferred</h3>
 						<ul class="two-column">
-							<li>Buff, debuff, regeneration, damage-over-time, healing-over-time, and effect ticking.</li>
-							<li>Social aggro for monster groups when a group member is damaged or affected.</li>
-							<li><code>CombatEncounter</code> or <code>CombatTickResolver</code> extraction for multi-combatant encounters.</li>
-							<li>Attacks-per-second conversion if equipment, class, or stat presentation needs a player-facing speed value.</li>
-					</ul>
-				</div>
-			</section>
+								<li>Buff, debuff, regeneration, damage-over-time, healing-over-time, and effect ticking.</li>
+								<li>Social aggro for monster groups when a group member is damaged or affected.</li>
+								<li>Accuracy/evasion formula alternatives: symmetric linear, scaled symmetric linear, or diminishing returns.</li>
+								<li><code>CombatEncounter</code> or <code>CombatTickResolver</code> extraction for multi-combatant encounters.</li>
+								<li>Attacks-per-second conversion if equipment, class, or stat presentation needs a player-facing speed value.</li>
+						</ul>
+					</div>
+					<div class="card gold" style="margin-top: 1rem;">
+						<h3>Accuracy/Evasion Options</h3>
+						<pre><code>symmetric_linear =
+  clamp(0.5 + accuracy - evasion, 0.05, 0.95)
+
+scaled_symmetric =
+  clamp(0.5 + 0.5 * clamp(accuracy - evasion, -1, 1), 0.05, 0.95)
+
+diminishing_returns =
+  0.05 + 0.90 * accuracy / (accuracy + evasion + constant)</code></pre>
+					</div>
+				</section>
 
 			<section class="panel" id="criteria">
 				<div class="section-title">

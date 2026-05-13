@@ -109,7 +109,9 @@ if ! printf '%s\n' "${cast_pause_line}" | grep -q '"distance_to_monster":1[5-6][
 	exit 1
 fi
 
-spark_resolved_line_number="$(grep -n '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"adventurer"' | grep '"action_id":"spark"' | head -n 1 | cut -d: -f1 || true)"
+spark_resolved_numbered_line="$(grep -n '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"adventurer"' | grep '"action_id":"spark"' | head -n 1 || true)"
+spark_resolved_line_number="$(printf '%s\n' "${spark_resolved_numbered_line}" | cut -d: -f1)"
+spark_resolved_line="$(printf '%s\n' "${spark_resolved_numbered_line}" | cut -d: -f2-)"
 first_monster_attack_line_number="$(grep -n '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | head -n 1 | cut -d: -f1 || true)"
 
 if [[ -z "${spark_resolved_line_number}" ]]; then
@@ -141,11 +143,6 @@ if [[ -z "${aggro_line}" ]]; then
 	exit 1
 fi
 
-if ! printf '%s\n' "${aggro_line}" | grep -q '"aggro_trigger":"ability_resolved"'; then
-	echo "First combat aggro was not caused by resolved ability/spell impact. Session: ${SESSION_DIR}" >&2
-	exit 1
-fi
-
 if (( aggro_line_number <= spark_resolved_line_number )); then
 	echo "Monster aggro triggered before spark resolved. Session: ${SESSION_DIR}" >&2
 	exit 1
@@ -153,9 +150,26 @@ fi
 
 aggro_distance="$(printf '%s\n' "${aggro_line}" | sed -n 's/.*"distance_to_target":\([0-9.]*\).*/\1/p')"
 
-if ! awk -v distance="${aggro_distance}" 'BEGIN { exit !(distance >= 150) }'; then
-	echo "Monster aggro was not triggered from outside melee range. distance=${aggro_distance:-missing}. Session: ${SESSION_DIR}" >&2
-	exit 1
+if printf '%s\n' "${spark_resolved_line}" | grep -q '"hit":true'; then
+	if ! printf '%s\n' "${aggro_line}" | grep -q '"aggro_trigger":"ability_resolved"'; then
+		echo "Spark hit, but first combat aggro was not caused by resolved ability/spell impact. Session: ${SESSION_DIR}" >&2
+		exit 1
+	fi
+
+	if ! awk -v distance="${aggro_distance}" 'BEGIN { exit !(distance >= 150) }'; then
+		echo "Ability aggro was not triggered from ranged spark distance. distance=${aggro_distance:-missing}. Session: ${SESSION_DIR}" >&2
+		exit 1
+	fi
+else
+	if ! printf '%s\n' "${aggro_line}" | grep -q '"aggro_trigger":"proximity"'; then
+		echo "Spark missed, but first combat aggro was not caused by proximity. Session: ${SESSION_DIR}" >&2
+		exit 1
+	fi
+
+	if ! awk -v distance="${aggro_distance}" 'BEGIN { exit !(distance <= 48) }'; then
+		echo "Proximity aggro was not triggered inside aggro range. distance=${aggro_distance:-missing}. Session: ${SESSION_DIR}" >&2
+		exit 1
+	fi
 fi
 
 if ! grep -q '"skill_cooldowns"' "${SESSION_DIR}/state.json"; then

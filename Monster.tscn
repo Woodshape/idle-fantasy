@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://hqsfpal0jyrh"]
 
 [ext_resource type="Script" uid="uid://btqlfuvh0d8cq" path="res://Monster.cs" id="1_v6vgc"]
 [ext_resource type="Texture2D" uid="uid://nv01a6tbu2gc" path="res://icon.svg" id="2_y7kkm"]
@@ -9,15 +9,15 @@ bg_color = Color(0.08, 0.08, 0.09, 1)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_53eer"]
 bg_color = Color(0.22, 0.78, 0.34, 1)
 
-[node name="Monster" type="Node2D"]
+[node name="Monster" type="Node2D" unique_id=172330841]
 script = ExtResource("1_v6vgc")
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=494707271]
 modulate = Color(1, 0.2, 0.2, 1)
 scale = Vector2(0.25, 0.25)
 texture = ExtResource("2_y7kkm")
 
-[node name="HealthBar" type="ProgressBar" parent="."]
+[node name="HealthBar" type="ProgressBar" parent="." unique_id=1709481000]
 offset_left = -24.0
 offset_top = -34.0
 offset_right = 24.0

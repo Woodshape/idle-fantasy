@@ -200,7 +200,7 @@ If a queued action is no longer valid, the runner emits `combat_action_cancelled
 Current hit chance:
 
 ```text
-hit_chance = clamp(0.75 + attacker_accuracy - defender_evasion, 0.05, 0.95)
+hit_chance = clamp(0.5 + clamp(attacker_accuracy - defender_evasion, 0, 1), 0.05, 0.95)
 ```
 
 Current damage:
@@ -327,6 +327,10 @@ Deferred after this slice:
 
 - Add buff, debuff, regeneration, damage-over-time, healing-over-time, and effect ticking.
 - Add social aggro for monster groups when a group member is damaged or affected by an ability or spell.
+- Revisit accuracy/evasion formula options:
+  - Symmetric linear: `clamp(0.5 + attacker_accuracy - defender_evasion, 0.05, 0.95)`.
+  - Scaled symmetric linear: `clamp(0.5 + 0.5 * clamp(attacker_accuracy - defender_evasion, -1, 1), 0.05, 0.95)`.
+  - Diminishing returns: `0.05 + 0.90 * attacker_accuracy / (attacker_accuracy + defender_evasion + constant)`.
 - Extract `CombatEncounter` or `CombatTickResolver` when multi-combatant encounters make the current controller too cramped.
 - Revisit attacks-per-second conversion only when equipment, class, or stat presentation needs a player-facing speed value.
 

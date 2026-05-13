@@ -8,7 +8,7 @@ using GDict = Godot.Collections.Dictionary;
 
 public sealed class CombatActionRunner
 {
-	private const double BaseHitChance = 0.75;
+	private const double BaseHitChance = 0.50;
 	private const double MinHitChance = 0.05;
 	private const double MaxHitChance = 0.95;
 	private const int GlobalCooldownTicks = 4;
@@ -433,7 +433,8 @@ public sealed class CombatActionRunner
 			return new ActionResolution(false, 0);
 		}
 
-		double hitChance = Math.Clamp(BaseHitChance + _owner.Accuracy - _target.Evasion, MinHitChance, MaxHitChance);
+			double accuracyAdvantage = Math.Clamp(_owner.Accuracy - _target.Evasion, 0.0, 1.0);
+			double hitChance = Math.Clamp(BaseHitChance + accuracyAdvantage, MinHitChance, MaxHitChance);
 		double roll = _rng.Randf();
 		bool hit = roll <= hitChance;
 		int rawDamage = (int)Math.Round(_owner.Attack * action.DamageMultiplier, MidpointRounding.AwayFromZero);
@@ -449,7 +450,7 @@ public sealed class CombatActionRunner
 			{ "defender", _target.DisplayName },
 			{ "defender_kind", _target.CombatantKind },
 			{ "action_id", action.ActionId },
-			{ "hit_formula", "clamp(0.75 + attacker_accuracy - defender_evasion, 0.05, 0.95)" },
+				{ "hit_formula", "clamp(0.5 + clamp(attacker_accuracy - defender_evasion, 0, 1), 0.05, 0.95)" },
 			{ "damage_formula", "max(1, round(attacker_attack * action_multiplier) - defender_defense)" },
 			{ "hit_chance", hitChance },
 			{ "roll", roll },
