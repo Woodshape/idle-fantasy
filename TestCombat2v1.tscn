@@ -1,0 +1,86 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" uid="uid://crvc53pr1gid8" path="res://GameController.cs" id="1_game"]
+[ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://Town.cs" id="2_town"]
+[ext_resource type="PackedScene" path="res://Adventurer.tscn" id="3_adventurer"]
+[ext_resource type="PackedScene" path="res://Monster.tscn" id="4_monster"]
+
+[node name="TestCombat2v1" type="Node2D"]
+script = ExtResource("1_game")
+AdventurerPath = NodePath("Warrior")
+AdventurerScene = ExtResource("3_adventurer")
+MonsterScene = ExtResource("4_monster")
+AutoSpawnDefaultAdventurers = false
+AutoSpawnDefaultMonsters = false
+
+[node name="Town" type="Node2D" parent="."]
+position = Vector2(160, 300)
+script = ExtResource("2_town")
+
+[node name="Warrior" parent="." instance=ExtResource("3_adventurer")]
+position = Vector2(430, 270)
+AdventurerName = "Warrior"
+Archetype = 0
+MaxHealth = 36
+Attack = 8
+Accuracy = 0.22
+Defense = 2
+Evasion = 0.12
+Initiative = 3
+AttackSpeed = 4
+
+[node name="Sprite2D" parent="Warrior"]
+modulate = Color(0.25, 0.55, 1, 1)
+
+[node name="AdventurerController" parent="Warrior"]
+MaxEncounterMonsters = 1
+MaxEncounterAdventurers = 2
+
+[node name="Mage" parent="." instance=ExtResource("3_adventurer")]
+position = Vector2(430, 330)
+AdventurerName = "Mage"
+Archetype = 1
+MaxHealth = 32
+Attack = 7
+Accuracy = 0.30
+Defense = 1
+Evasion = 0.18
+Initiative = 5
+AttackSpeed = 5
+
+[node name="Sprite2D" parent="Mage"]
+modulate = Color(0.75, 0.45, 1, 1)
+
+[node name="AdventurerController" parent="Mage"]
+process_mode = 4
+MaxEncounterMonsters = 1
+MaxEncounterAdventurers = 2
+
+[node name="Monsters" type="Node2D" parent="."]
+
+[node name="Slime" parent="Monsters" instance=ExtResource("4_monster")]
+position = Vector2(560, 300)
+MonsterName = "Slime"
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="PanelContainer" parent="Hud"]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 430.0
+offset_bottom = 118.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Hud/Panel"]
+layout_mode = 2
+
+[node name="StateLabel" type="Label" parent="Hud/Panel/VBoxContainer"]
+layout_mode = 2
+text = "2 Adventurers vs 1 Monster"
+
+[node name="CombatLabel" type="Label" parent="Hud/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Combat"
+
+[node name="RewardLabel" type="Label" parent="Hud/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Rewards"
