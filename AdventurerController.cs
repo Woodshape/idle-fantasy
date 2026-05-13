@@ -2,6 +2,7 @@
 
 using Godot;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using GDict = Godot.Collections.Dictionary;
 
@@ -25,9 +26,17 @@ public partial class AdventurerController : Node
 	[Export(PropertyHint.Range, "0.0,1.0,0.05")]
 	public float RestHealthRatio { get; set; } = 0.60f;
 
+	[Export]
+	public int MaxEncounterMonsters { get; set; } = 1;
+
+	[Export]
+	public int MaxEncounterAdventurers { get; set; } = 1;
+
 	private Adventurer? _adventurer;
 	private GameController? _game;
 	private Town? _town;
+	private readonly List<Monster> _encounterMonsters = new();
+	private readonly HashSet<string> _lootedMonsterIds = new(StringComparer.Ordinal);
 	private double _stateTimer;
 	private bool _combatStartedForTarget;
 	private bool _movementPausedForCurrentCast;
@@ -112,7 +121,10 @@ public partial class AdventurerController : Node
 			return;
 		}
 
-		Monster? target = _game.FindHuntTarget(_adventurer);
+		_encounterMonsters.Clear();
+		_lootedMonsterIds.Clear();
+		_encounterMonsters.AddRange(_game.FindHuntTargets(_adventurer, MaxEncounterMonsters));
+		Monster? target = _encounterMonsters.FirstOrDefault();
 
 		if (target is null)
 		{
@@ -130,6 +142,7 @@ public partial class AdventurerController : Node
 			{ "source", nameof(AdventurerController) },
 			{ "adventurer", _adventurer.AdventurerName },
 			{ "monster", target.MonsterName },
+			{ "monster_count", _encounterMonsters.Count },
 			{ "target_position", BridgePayload.VectorToArray(approachPosition) },
 			{ "monster_position", BridgePayload.VectorToArray(target.GlobalPosition) },
 			{ "combat_approach_distance", approachDistance },
@@ -221,26 +234,44 @@ public partial class AdventurerController : Node
 
 		if (!_combatStartedForTarget)
 		{
-			_adventurer.CombatController?.StartCombat(target, _game.SimulationTickCount);
+			IReadOnlyList<Adventurer> adventurers = _game.FindEncounterAdventurers(_adventurer, MaxEncounterAdventurers);
+			IReadOnlyList<Monster> monsters = _encounterMonsters.Count > 0
+				? _encounterMonsters.Where(monster => monster.IsAlive).ToArray()
+				: new[] { target };
+			_adventurer.CombatController?.StartCombat(adventurers, monsters, _game.SimulationTickCount);
 			_combatStartedForTarget = true;
 		}
 
-			if (target.IsAlive)
+		if (target.IsAlive)
+		{
+			if (_adventurer.CombatState == CombatState.Casting)
 			{
-				if (_adventurer.CombatState == CombatState.Casting)
-				{
-					PauseMovementForCast(target);
-				}
-				else if (_adventurer.CombatState is not CombatState.OutOfCombat and not CombatState.Engaging)
-				{
-					_movementPausedForCurrentCast = false;
-					_adventurer.SetMoveTarget(GetCombatApproachPosition(target, MeleeApproachDistance));
+				PauseMovementForCast(target);
+			}
+			else if (_adventurer.CombatState is not CombatState.OutOfCombat and not CombatState.Engaging)
+			{
+				_movementPausedForCurrentCast = false;
+				_adventurer.SetMoveTarget(GetCombatApproachPosition(target, MeleeApproachDistance));
 				_adventurer.MoveTowardTarget(delta);
 			}
 		}
 
 		if (!target.IsAlive)
 		{
+			Monster? nextTarget = _adventurer.CombatController?.GetCurrentMonsterTarget(_adventurer)
+				?? _encounterMonsters.FirstOrDefault(monster => monster.IsAlive);
+
+			if (nextTarget?.IsAlive == true)
+			{
+				_adventurer.SetCombatTarget(nextTarget);
+				return;
+			}
+
+			if (_adventurer.CombatController?.HasLivingMonsters == true)
+			{
+				return;
+			}
+
 			ChangeState(AdventurerIntentionState.CollectLoot);
 		}
 	}
@@ -275,27 +306,42 @@ public partial class AdventurerController : Node
 			return;
 		}
 
-		Monster? target = _adventurer.CurrentMonsterTarget;
+		List<Monster> defeatedMonsters = _encounterMonsters.Count > 0
+			? _encounterMonsters
+				.Where(monster => !monster.IsAlive && !_lootedMonsterIds.Contains(monster.CombatantId))
+				.ToList()
+			: _adventurer.CurrentMonsterTarget is Monster target
+				&& !target.IsAlive
+				&& !_lootedMonsterIds.Contains(target.CombatantId)
+					? new List<Monster> { target }
+					: new List<Monster>();
 
-		if (target is null)
+		if (defeatedMonsters.Count == 0)
 		{
+			_encounterMonsters.Clear();
 			ChangeState(AdventurerIntentionState.ReturnToTown);
 			return;
 		}
 
-		_adventurer.AddRewards(target.GoldReward, target.ExperienceReward);
-		GD.Print($"LOOT_COLLECTED adventurer={_adventurer.AdventurerName} monster={target.MonsterName} gold={target.GoldReward} xp={target.ExperienceReward}");
-		EmitBridgeEvent("loot_collected", new GDict
+		foreach (Monster defeatedMonster in defeatedMonsters)
 		{
-			{ "source", nameof(AdventurerController) },
-			{ "adventurer", _adventurer.AdventurerName },
-			{ "monster", target.MonsterName },
-			{ "gold", target.GoldReward },
-			{ "experience", target.ExperienceReward },
-			{ "total_gold", _adventurer.Gold },
-			{ "total_experience", _adventurer.Experience }
-		});
+			_lootedMonsterIds.Add(defeatedMonster.CombatantId);
+			_adventurer.AddRewards(defeatedMonster.GoldReward, defeatedMonster.ExperienceReward);
+			GD.Print($"LOOT_COLLECTED adventurer={_adventurer.AdventurerName} monster={defeatedMonster.MonsterName} gold={defeatedMonster.GoldReward} xp={defeatedMonster.ExperienceReward}");
+			EmitBridgeEvent("loot_collected", new GDict
+			{
+				{ "source", nameof(AdventurerController) },
+				{ "adventurer", _adventurer.AdventurerName },
+				{ "monster", defeatedMonster.MonsterName },
+				{ "gold", defeatedMonster.GoldReward },
+				{ "experience", defeatedMonster.ExperienceReward },
+				{ "total_gold", _adventurer.Gold },
+				{ "total_experience", _adventurer.Experience }
+			});
+		}
+
 		_adventurer.ClearCombatTarget();
+		_encounterMonsters.Clear();
 		ChangeState(ShouldReturnToTownForRest() ? AdventurerIntentionState.ReturnToTown : AdventurerIntentionState.ChooseTarget);
 	}
 

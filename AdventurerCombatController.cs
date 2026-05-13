@@ -4,23 +4,29 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GArray = Godot.Collections.Array;
 using GDict = Godot.Collections.Dictionary;
 
 public partial class AdventurerCombatController : Node
 {
 	private readonly RandomNumberGenerator _rng = new();
+	private readonly List<Adventurer> _encounterAdventurers = new();
+	private readonly List<Monster> _encounterMonsters = new();
+	private readonly List<CombatActionRunner> _runners = new();
+	private readonly HashSet<string> _defeatedMonsterEventIds = new(StringComparer.Ordinal);
+	private readonly HashSet<string> _deadAdventurerEventIds = new(StringComparer.Ordinal);
 	private Adventurer? _adventurer;
-	private Monster? _target;
-	private CombatActionRunner? _adventurerRunner;
-	private CombatActionRunner? _monsterRunner;
 	private int _encounterId;
 	private long _lastProcessedTick;
 	private double _tickIntervalSeconds = 0.25;
-	private bool _monsterDefeatedEmitted;
-	private bool _adventurerDiedEmitted;
+	private bool _encounterActive;
 
-	public CombatState State => _adventurer?.CombatState ?? CombatState.OutOfCombat;
-	public int AttackCooldownTicksRemaining => _adventurerRunner?.BasicAttackCooldownTicksRemaining ?? 0;
+	public CombatState State => GetRunner(_adventurer)?.State ?? _adventurer?.CombatState ?? CombatState.OutOfCombat;
+	public int AttackCooldownTicksRemaining => GetRunner(_adventurer)?.BasicAttackCooldownTicksRemaining ?? 0;
+	public IReadOnlyList<Adventurer> EncounterAdventurers => _encounterAdventurers;
+	public IReadOnlyList<Monster> EncounterMonsters => _encounterMonsters;
+	public bool HasActiveEncounter => _encounterActive;
+	public bool HasLivingMonsters => _encounterMonsters.Any(monster => monster.IsAlive);
 
 	public override void _Ready()
 	{
@@ -37,26 +43,73 @@ public partial class AdventurerCombatController : Node
 			return;
 		}
 
-		_target = target;
+		StartCombat(new[] { _adventurer }, new[] { target }, currentTick);
+	}
+
+	public void StartCombat(IEnumerable<Adventurer> adventurers, IEnumerable<Monster> monsters, long currentTick)
+	{
+		_adventurer ??= GetParentOrNull<Adventurer>();
+		List<Adventurer> liveAdventurers = adventurers
+			.Where(adventurer => adventurer.IsAlive)
+			.Distinct()
+			.ToList();
+		List<Monster> liveMonsters = monsters
+			.Where(monster => monster.IsAlive)
+			.Distinct()
+			.ToList();
+
+		if (liveAdventurers.Count == 0 || liveMonsters.Count == 0)
+		{
+			return;
+		}
+
+		StopCombat();
+		_encounterAdventurers.AddRange(liveAdventurers);
+		_encounterMonsters.AddRange(liveMonsters);
+		_defeatedMonsterEventIds.Clear();
+		_deadAdventurerEventIds.Clear();
 		_encounterId++;
 		_lastProcessedTick = currentTick;
-		_monsterDefeatedEmitted = false;
-		_adventurerDiedEmitted = false;
-		_adventurerRunner = new CombatActionRunner(_adventurer, CreateAdventurerActions(), _rng, EmitBridgeEvent);
-		_monsterRunner = new CombatActionRunner(target, CreateMonsterActions(), _rng, EmitBridgeEvent);
-		_adventurerRunner.Start(target, currentTick);
-		_monsterRunner.Start(_adventurer, currentTick);
+		_encounterActive = true;
 
-		GD.Print($"COMBAT_STARTED tick={currentTick} encounter={_encounterId} adventurer={_adventurer.AdventurerName} monster={target.MonsterName}");
+		foreach (Adventurer adventurer in _encounterAdventurers)
+		{
+			CombatActionRunner runner = new(
+				adventurer,
+				CreateAdventurerActions(),
+				_rng,
+				EmitBridgeEvent,
+				() => SelectMonsterTarget(adventurer));
+			_runners.Add(runner);
+			runner.Start(currentTick);
+		}
+
+		foreach (Monster monster in _encounterMonsters)
+		{
+			CombatActionRunner runner = new(
+				monster,
+				CreateMonsterActions(),
+				_rng,
+				EmitBridgeEvent,
+				() => SelectAdventurerTarget(monster));
+			_runners.Add(runner);
+			runner.Start(currentTick);
+		}
+
+		GD.Print($"COMBAT_STARTED tick={currentTick} encounter={_encounterId} adventurers={_encounterAdventurers.Count} monsters={_encounterMonsters.Count}");
 		EmitBridgeEvent("combat_started", new GDict
 		{
 			{ "source", nameof(AdventurerCombatController) },
 			{ "encounter_id", _encounterId },
 			{ "tick", currentTick },
-			{ "adventurer", _adventurer.AdventurerName },
-			{ "monster", target.MonsterName },
-			{ "adventurer_attack_speed_ticks", _adventurer.AttackSpeed },
-			{ "monster_attack_speed_ticks", target.AttackSpeed },
+			{ "adventurer", _encounterAdventurers[0].AdventurerName },
+			{ "monster", _encounterMonsters[0].MonsterName },
+			{ "adventurers", BuildCombatantNames(_encounterAdventurers) },
+			{ "monsters", BuildCombatantNames(_encounterMonsters) },
+			{ "adventurer_count", _encounterAdventurers.Count },
+			{ "monster_count", _encounterMonsters.Count },
+			{ "adventurer_attack_speed_ticks", _encounterAdventurers[0].AttackSpeed },
+			{ "monster_attack_speed_ticks", _encounterMonsters[0].AttackSpeed },
 			{ "tick_interval_seconds", _tickIntervalSeconds },
 			{ "timing_model", "simulation_ticks" }
 		});
@@ -66,9 +119,8 @@ public partial class AdventurerCombatController : Node
 	public void ProcessSimulationTick(long tick, double tickIntervalSeconds)
 	{
 		_tickIntervalSeconds = tickIntervalSeconds;
-		_adventurer ??= GetParentOrNull<Adventurer>();
 
-		if (_adventurer is null || _target is null || _adventurerRunner is null || _monsterRunner is null)
+		if (!_encounterActive)
 		{
 			return;
 		}
@@ -79,15 +131,22 @@ public partial class AdventurerCombatController : Node
 			{ "source", nameof(AdventurerCombatController) },
 			{ "encounter_id", _encounterId },
 			{ "tick", tick },
-			{ "tick_interval_seconds", tickIntervalSeconds }
+			{ "tick_interval_seconds", tickIntervalSeconds },
+			{ "adventurer_count", _encounterAdventurers.Count },
+			{ "monster_count", _encounterMonsters.Count }
 		});
 
-		_adventurerRunner.AdvanceTickCounters(tick);
-		_monsterRunner.AdvanceTickCounters(tick);
+		foreach (CombatActionRunner runner in _runners)
+		{
+			runner.AdvanceTickCounters(tick);
+		}
 
 		List<QueuedCombatAction> queuedActions = new();
-		AddIfQueued(queuedActions, _adventurerRunner.QueueActionForTick(tick));
-		AddIfQueued(queuedActions, _monsterRunner.QueueActionForTick(tick));
+
+		foreach (CombatActionRunner runner in _runners)
+		{
+			AddIfQueued(queuedActions, runner.QueueActionForTick(tick));
+		}
 
 		foreach (RolledCombatAction rolledAction in RollActionOrder(queuedActions, tick))
 		{
@@ -102,87 +161,89 @@ public partial class AdventurerCombatController : Node
 			{ "encounter_id", _encounterId },
 			{ "tick", tick },
 			{ "queued_action_count", queuedActions.Count },
-			{ "adventurer_alive", _adventurer.IsAlive },
-			{ "monster_alive", _target?.IsAlive ?? false }
+			{ "adventurer_alive", _encounterAdventurers.FirstOrDefault()?.IsAlive ?? false },
+			{ "monster_alive", _encounterMonsters.FirstOrDefault()?.IsAlive ?? false },
+			{ "living_adventurer_count", _encounterAdventurers.Count(adventurer => adventurer.IsAlive) },
+			{ "living_monster_count", _encounterMonsters.Count(monster => monster.IsAlive) }
 		});
 	}
 
 	public void StopCombat()
 	{
-		_adventurerRunner?.Stop();
-
-		if (_target?.IsAlive == true)
+		foreach (CombatActionRunner runner in _runners)
 		{
-			_monsterRunner?.Stop();
+			runner.Stop();
 		}
 
-		_target = null;
-		_adventurerRunner = null;
-		_monsterRunner = null;
+		_encounterActive = false;
 		PublishEncounterState();
+		_runners.Clear();
+		_encounterAdventurers.Clear();
+		_encounterMonsters.Clear();
+	}
+
+	public Monster? GetCurrentMonsterTarget(Adventurer adventurer)
+	{
+		return GetRunner(adventurer)?.Target as Monster
+			?? _encounterMonsters.FirstOrDefault(monster => monster.IsAlive);
 	}
 
 	private bool HandleEndConditions()
 	{
-		if (_adventurer is null)
+		if (!_encounterActive)
 		{
 			return true;
 		}
 
-		if (!_adventurer.IsAlive)
+		foreach (Adventurer adventurer in _encounterAdventurers.Where(adventurer => !adventurer.IsAlive))
 		{
-			if (!_adventurerDiedEmitted)
+			if (_deadAdventurerEventIds.Add(adventurer.CombatantId))
 			{
-				_adventurerDiedEmitted = true;
 				EmitBridgeEvent("adventurer_died", new GDict
 				{
 					{ "source", nameof(AdventurerCombatController) },
 					{ "encounter_id", _encounterId },
-					{ "adventurer", _adventurer.AdventurerName },
-					{ "monster", _target?.MonsterName ?? "none" }
+					{ "adventurer", adventurer.AdventurerName },
+					{ "monster", _encounterMonsters.FirstOrDefault(monster => monster.IsAlive)?.MonsterName ?? "none" },
+					{ "living_adventurer_count", _encounterAdventurers.Count(candidate => candidate.IsAlive) }
 				});
 			}
-
-			_adventurerRunner?.Stop();
-			_monsterRunner?.Stop();
-			_adventurerRunner = null;
-			_monsterRunner = null;
-			_target = null;
-			return true;
 		}
 
-		if (_target is null)
+		foreach (Monster monster in _encounterMonsters.Where(monster => !monster.IsAlive))
 		{
-			return true;
-		}
-
-		if (!_target.IsAlive)
-		{
-			if (!_monsterDefeatedEmitted)
+			if (_defeatedMonsterEventIds.Add(monster.CombatantId))
 			{
-				_monsterDefeatedEmitted = true;
-				GD.Print($"MONSTER_DEFEATED monster={_target.MonsterName}");
+				GD.Print($"MONSTER_DEFEATED monster={monster.MonsterName}");
 				EmitBridgeEvent("monster_defeated", new GDict
 				{
 					{ "source", nameof(AdventurerCombatController) },
 					{ "encounter_id", _encounterId },
-					{ "adventurer", _adventurer.AdventurerName },
-					{ "monster", _target.MonsterName },
-					{ "gold_reward", _target.GoldReward },
-					{ "experience_reward", _target.ExperienceReward }
+					{ "adventurer", _encounterAdventurers.FirstOrDefault(adventurer => adventurer.IsAlive)?.AdventurerName ?? _encounterAdventurers.FirstOrDefault()?.AdventurerName ?? "none" },
+					{ "monster", monster.MonsterName },
+					{ "gold_reward", monster.GoldReward },
+					{ "experience_reward", monster.ExperienceReward },
+					{ "living_monster_count", _encounterMonsters.Count(candidate => candidate.IsAlive) }
 				});
+				monster.PublishState();
 			}
-
-			_adventurerRunner?.Stop();
-			_monsterRunner?.Stop();
-			_target.PublishState();
-			_adventurerRunner = null;
-			_monsterRunner = null;
-			_target = null;
-			return true;
 		}
 
-		return false;
+		bool anyAdventurerAlive = _encounterAdventurers.Any(adventurer => adventurer.IsAlive);
+		bool anyMonsterAlive = _encounterMonsters.Any(monster => monster.IsAlive);
+
+		if (anyAdventurerAlive && anyMonsterAlive)
+		{
+			return false;
+		}
+
+		foreach (CombatActionRunner runner in _runners)
+		{
+			runner.Stop();
+		}
+
+		_encounterActive = false;
+		return true;
 	}
 
 	public static IReadOnlyList<CombatAction> CreateAdventurerActions()
@@ -208,7 +269,7 @@ public partial class AdventurerCombatController : Node
 				CombatActionKind.Spell,
 				160.0,
 				8,
-				12,
+				8,
 				0,
 				true,
 				false,
@@ -227,11 +288,11 @@ public partial class AdventurerCombatController : Node
 		{
 			int randomRoll = _rng.RandiRange(1, 100);
 			CombatStats stats = queuedAction.Actor.Stats;
-				int initiativeScore =
-					randomRoll
-					+ stats.Initiative
-					+ GetAttackSpeedInitiativeBonus(stats.AttackSpeedTicks)
-					- queuedAction.Action.ActionWeight;
+			int initiativeScore =
+				randomRoll
+				+ stats.Initiative
+				+ GetAttackSpeedInitiativeBonus(stats.AttackSpeedTicks)
+				- queuedAction.Action.ActionWeight;
 			RolledCombatAction rolledAction = new(queuedAction, randomRoll, initiativeScore);
 			rolledActions.Add(rolledAction);
 			EmitBridgeEvent("combat_action_order_rolled", new GDict
@@ -256,7 +317,7 @@ public partial class AdventurerCombatController : Node
 			.OrderByDescending(action => action.InitiativeScore)
 			.ThenByDescending(action => action.QueuedAction.Actor.Initiative)
 			.ThenBy(action => action.QueuedAction.Actor.AttackSpeed)
-			.ThenBy(action => action.QueuedAction.Actor.CombatantId, System.StringComparer.Ordinal)
+			.ThenBy(action => action.QueuedAction.Actor.CombatantId, StringComparer.Ordinal)
 			.ToArray();
 	}
 
@@ -281,6 +342,53 @@ public partial class AdventurerCombatController : Node
 		};
 	}
 
+	private Monster? SelectMonsterTarget(Adventurer adventurer)
+	{
+		return FindNearestLivingCombatant(adventurer, _encounterMonsters);
+	}
+
+	private Adventurer? SelectAdventurerTarget(Monster monster)
+	{
+		if (monster.AggroTarget is Adventurer aggroTarget
+			&& aggroTarget.IsAlive
+			&& _encounterAdventurers.Any(adventurer => ReferenceEquals(adventurer, aggroTarget)))
+		{
+			return aggroTarget;
+		}
+
+		return FindNearestLivingCombatant(monster, _encounterAdventurers);
+	}
+
+	private static TCombatant? FindNearestLivingCombatant<TCombatant>(ICombatant actor, IEnumerable<TCombatant> candidates)
+		where TCombatant : class, ICombatant
+	{
+		return candidates
+			.Where(candidate => candidate.IsAlive)
+			.OrderBy(candidate => GetDistanceSquared(actor, candidate))
+			.ThenBy(candidate => candidate.CombatantId, StringComparer.Ordinal)
+			.FirstOrDefault();
+	}
+
+	private static float GetDistanceSquared(ICombatant actor, ICombatant candidate)
+	{
+		if (actor is Node2D actorNode && candidate is Node2D candidateNode)
+		{
+			return actorNode.GlobalPosition.DistanceSquaredTo(candidateNode.GlobalPosition);
+		}
+
+		return 0.0f;
+	}
+
+	private CombatActionRunner? GetRunner(ICombatant? combatant)
+	{
+		if (combatant is null)
+		{
+			return null;
+		}
+
+		return _runners.FirstOrDefault(runner => ReferenceEquals(runner.Owner, combatant));
+	}
+
 	private void PublishEncounterState()
 	{
 		if (TestBridge.Instance?.IsActive != true)
@@ -288,16 +396,41 @@ public partial class AdventurerCombatController : Node
 			return;
 		}
 
+		CombatActionRunner? primaryAdventurerRunner = GetRunner(_adventurer)
+			?? _runners.FirstOrDefault(runner => runner.Owner is Adventurer);
+		CombatActionRunner? primaryMonsterRunner = _runners.FirstOrDefault(runner => runner.Owner is Monster);
+		Adventurer? primaryAdventurer = _adventurer ?? _encounterAdventurers.FirstOrDefault();
+		Monster? primaryMonster = _encounterMonsters.FirstOrDefault();
+
 		TestBridge.Instance.EmitState("combat_encounter", new GDict
 		{
 			{ "source", nameof(AdventurerCombatController) },
 			{ "encounter_id", _encounterId },
-			{ "active", _target is not null && _adventurer?.CombatState != CombatState.OutOfCombat },
+			{ "active", _encounterActive },
 			{ "last_processed_tick", _lastProcessedTick },
 			{ "tick_interval_seconds", _tickIntervalSeconds },
-			{ "adventurer", BuildRunnerState(_adventurerRunner, _adventurer) },
-			{ "monster", BuildRunnerState(_monsterRunner, _monsterRunner?.Owner) }
+			{ "adventurer", BuildRunnerState(primaryAdventurerRunner, primaryAdventurer) },
+			{ "monster", BuildRunnerState(primaryMonsterRunner, primaryMonster) },
+			{ "adventurers", BuildRunnerStates(_encounterAdventurers) },
+			{ "monsters", BuildRunnerStates(_encounterMonsters) },
+			{ "adventurer_count", _encounterAdventurers.Count },
+			{ "monster_count", _encounterMonsters.Count },
+			{ "living_adventurer_count", _encounterAdventurers.Count(adventurer => adventurer.IsAlive) },
+			{ "living_monster_count", _encounterMonsters.Count(monster => monster.IsAlive) }
 		});
+	}
+
+	private GArray BuildRunnerStates<TCombatant>(IEnumerable<TCombatant> combatants)
+		where TCombatant : class, ICombatant
+	{
+		GArray states = new();
+
+		foreach (TCombatant combatant in combatants)
+		{
+			states.Add(BuildRunnerState(GetRunner(combatant), combatant));
+		}
+
+		return states;
 	}
 
 	private static GDict BuildRunnerState(CombatActionRunner? runner, ICombatant? combatant)
@@ -346,6 +479,19 @@ public partial class AdventurerCombatController : Node
 			Monster monster => monster.CombatState.ToString(),
 			_ => CombatState.OutOfCombat.ToString()
 		};
+	}
+
+	private static GArray BuildCombatantNames<TCombatant>(IEnumerable<TCombatant> combatants)
+		where TCombatant : ICombatant
+	{
+		GArray names = new();
+
+		foreach (TCombatant combatant in combatants)
+		{
+			names.Add(combatant.DisplayName);
+		}
+
+		return names;
 	}
 
 	private static void EmitBridgeEvent(string type, GDict payload)

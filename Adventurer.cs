@@ -50,7 +50,7 @@ public partial class Adventurer : Node2D, ICombatant
 	public bool IsAlive => Health > 0;
 	public string IntentionStateName => Controller?.State.ToString() ?? "Unknown";
 	public string CombatStateName => CombatState.ToString();
-	public string CombatantId => "adventurer";
+	public string CombatantId => $"adventurer:{AdventurerName}";
 	public string CombatantKind => "adventurer";
 	public string DisplayName => AdventurerName;
 	public CombatStats Stats => new(Attack, Accuracy, Defense, Evasion, Initiative, AttackSpeed, MaxHealth, Health);

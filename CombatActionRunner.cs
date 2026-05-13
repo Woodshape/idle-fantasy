@@ -17,22 +17,26 @@ public sealed class CombatActionRunner
 	private readonly IReadOnlyList<CombatAction> _actions;
 	private readonly RandomNumberGenerator _rng;
 	private readonly Action<string, GDict> _emitEvent;
+	private readonly Func<ICombatant?>? _selectTarget;
 	private readonly Dictionary<string, int> _skillCooldowns = new(StringComparer.Ordinal);
 	private CombatAction? _queuedAction;
 	private CombatAction? _activeAction;
 	private ICombatant? _target;
+	private ICombatant? _queuedTarget;
 	private long _currentTick;
 
 	public CombatActionRunner(
 		ICombatant owner,
 		IReadOnlyList<CombatAction> actions,
 		RandomNumberGenerator rng,
-		Action<string, GDict> emitEvent)
+		Action<string, GDict> emitEvent,
+		Func<ICombatant?>? selectTarget = null)
 	{
 		_owner = owner;
 		_actions = actions;
 		_rng = rng;
 		_emitEvent = emitEvent;
+		_selectTarget = selectTarget;
 
 		foreach (CombatAction action in _actions.Where(action => action.Kind != CombatActionKind.BasicAttack))
 		{
@@ -58,9 +62,30 @@ public sealed class CombatActionRunner
 		_currentTick = currentTick;
 		_target = target;
 		_queuedAction = null;
+		_queuedTarget = null;
 		_activeAction = null;
 		CastTicksRemaining = 0;
 		RecoveryTicksRemaining = 0;
+		ChangeState(CombatState.Engaging);
+		PublishSnapshot();
+	}
+
+	public void Start(long currentTick)
+	{
+		_currentTick = currentTick;
+		_queuedAction = null;
+		_queuedTarget = null;
+		_activeAction = null;
+		CastTicksRemaining = 0;
+		RecoveryTicksRemaining = 0;
+
+		if (!TrySelectTarget(currentTick, "encounter_started"))
+		{
+			ChangeState(_owner.IsAlive ? CombatState.OutOfCombat : CombatState.Defeated);
+			PublishSnapshot();
+			return;
+		}
+
 		ChangeState(CombatState.Engaging);
 		PublishSnapshot();
 	}
@@ -69,6 +94,7 @@ public sealed class CombatActionRunner
 	{
 		_target = null;
 		_queuedAction = null;
+		_queuedTarget = null;
 		_activeAction = null;
 		BasicAttackCooldownTicksRemaining = 0;
 		GlobalCooldownTicksRemaining = 0;
@@ -104,9 +130,18 @@ public sealed class CombatActionRunner
 
 		if (_target is null || !_target.IsAlive)
 		{
-			_target = null;
 			_queuedAction = null;
+			_queuedTarget = null;
 			_activeAction = null;
+
+			if (TrySelectTarget(tick, "target_unavailable"))
+			{
+				ChangeState(CombatState.Engaging);
+				PublishSnapshot();
+				return;
+			}
+
+			_target = null;
 			ChangeState(CombatState.OutOfCombat);
 			PublishSnapshot();
 			return;
@@ -130,6 +165,8 @@ public sealed class CombatActionRunner
 
 		if (State == CombatState.Queued && _queuedAction is CombatAction queuedAction)
 		{
+			_target = _queuedTarget;
+
 			if (!IsActionInRange(queuedAction, out double queuedDistance))
 			{
 				CancelQueuedAction(queuedAction, tick, "target_out_of_range", queuedDistance);
@@ -177,6 +214,14 @@ public sealed class CombatActionRunner
 			return;
 		}
 
+		ICombatant? actionTarget = queuedAction.Target;
+
+		if (_queuedTarget is null || !ReferenceEquals(_queuedTarget, actionTarget))
+		{
+			CancelQueuedAction(action, tick, "target_no_longer_queued");
+			return;
+		}
+
 		if (!_owner.IsAlive)
 		{
 			CancelQueuedAction(action, tick, "combatant_defeated");
@@ -185,13 +230,23 @@ public sealed class CombatActionRunner
 			return;
 		}
 
-		if (_target is null || !_target.IsAlive)
+		if (actionTarget is null || !actionTarget.IsAlive)
 		{
 			CancelQueuedAction(action, tick, "target_defeated");
-			ChangeState(_owner.IsAlive ? CombatState.Ready : CombatState.Defeated);
+			_queuedTarget = null;
+			if (_owner.IsAlive && TrySelectTarget(tick, "queued_target_defeated"))
+			{
+				ChangeState(CombatState.Engaging);
+			}
+			else
+			{
+				ChangeState(_owner.IsAlive ? CombatState.Ready : CombatState.Defeated);
+			}
 			PublishSnapshot();
 			return;
 		}
+
+		_target = actionTarget;
 
 		if (!IsActionInRange(action, out double distanceToTarget))
 		{
@@ -202,6 +257,7 @@ public sealed class CombatActionRunner
 		}
 
 		_queuedAction = null;
+		_queuedTarget = null;
 		_activeAction = action;
 		_emitEvent("combat_action_started", BuildActionPayload(action, tick));
 
@@ -220,7 +276,7 @@ public sealed class CombatActionRunner
 			{ "damage", resolution.Damage }
 		});
 
-		if (resolution.Hit)
+		if (action.RequiresTarget)
 		{
 			NotifyMonsterAggro(action, tick);
 		}
@@ -350,6 +406,7 @@ public sealed class CombatActionRunner
 		}
 
 		_queuedAction = action;
+		_queuedTarget = _target;
 		ChangeState(CombatState.Queued);
 		GD.Print($"ACTION_QUEUED tick={tick} {_owner.DisplayName} action={action.ActionId} target={_target?.DisplayName ?? "none"} cooldown={GetActionCooldownTicks(action)}");
 		_emitEvent("combat_action_queued", BuildActionPayload(action, tick, new GDict
@@ -358,7 +415,7 @@ public sealed class CombatActionRunner
 			{ "skill_cooldown_ticks_remaining", GetSkillCooldownTicksRemaining(action) }
 		}));
 		PublishSnapshot();
-		return new QueuedCombatAction(this, _owner, _target, action);
+		return new QueuedCombatAction(this, _owner, _queuedTarget, action);
 	}
 
 	private int GetSkillCooldownTicksRemaining(CombatAction action)
@@ -433,8 +490,8 @@ public sealed class CombatActionRunner
 			return new ActionResolution(false, 0);
 		}
 
-			double accuracyAdvantage = Math.Clamp(_owner.Accuracy - _target.Evasion, 0.0, 1.0);
-			double hitChance = Math.Clamp(BaseHitChance + accuracyAdvantage, MinHitChance, MaxHitChance);
+		double accuracyAdvantage = Math.Clamp(_owner.Accuracy - _target.Evasion, 0.0, 1.0);
+		double hitChance = Math.Clamp(BaseHitChance + accuracyAdvantage, MinHitChance, MaxHitChance);
 		double roll = _rng.Randf();
 		bool hit = roll <= hitChance;
 		int rawDamage = (int)Math.Round(_owner.Attack * action.DamageMultiplier, MidpointRounding.AwayFromZero);
@@ -450,7 +507,7 @@ public sealed class CombatActionRunner
 			{ "defender", _target.DisplayName },
 			{ "defender_kind", _target.CombatantKind },
 			{ "action_id", action.ActionId },
-				{ "hit_formula", "clamp(0.5 + clamp(attacker_accuracy - defender_evasion, 0, 1), 0.05, 0.95)" },
+			{ "hit_formula", "clamp(0.5 + clamp(attacker_accuracy - defender_evasion, 0, 1), 0.05, 0.95)" },
 			{ "damage_formula", "max(1, round(attacker_attack * action_multiplier) - defender_defense)" },
 			{ "hit_chance", hitChance },
 			{ "roll", roll },
@@ -517,6 +574,7 @@ public sealed class CombatActionRunner
 	private void CancelQueuedAction(CombatAction action, long tick, string reason, double? distanceToTarget = null)
 	{
 		_queuedAction = null;
+		_queuedTarget = null;
 		_activeAction = null;
 		GDict extras = new()
 		{
@@ -529,6 +587,41 @@ public sealed class CombatActionRunner
 		}
 
 		_emitEvent("combat_action_cancelled", BuildActionPayload(action, tick, extras));
+	}
+
+	private bool TrySelectTarget(long tick, string reason)
+	{
+		if (_selectTarget is null)
+		{
+			return false;
+		}
+
+		ICombatant? previousTarget = _target;
+		ICombatant? nextTarget = _selectTarget();
+
+		if (nextTarget?.IsAlive != true)
+		{
+			return false;
+		}
+
+		_target = nextTarget;
+
+		if (!ReferenceEquals(previousTarget, nextTarget))
+		{
+			_emitEvent("combat_target_changed", new GDict
+			{
+				{ "source", nameof(CombatActionRunner) },
+				{ "tick", tick },
+				{ "combatant", _owner.DisplayName },
+				{ "combatant_kind", _owner.CombatantKind },
+				{ "previous_target", previousTarget?.DisplayName ?? "none" },
+				{ "target", nextTarget.DisplayName },
+				{ "target_kind", nextTarget.CombatantKind },
+				{ "reason", reason }
+			});
+		}
+
+		return true;
 	}
 
 	private void ChangeState(CombatState nextState)

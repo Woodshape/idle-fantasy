@@ -27,6 +27,7 @@ public partial class GameController : Node2D
 
 	private Town? _town;
 	private Adventurer? _adventurer;
+	private readonly List<Adventurer> _adventurers = new();
 	private readonly List<Monster> _monsters = new();
 	private Label? _stateLabel;
 	private Label? _combatLabel;
@@ -38,6 +39,7 @@ public partial class GameController : Node2D
 
 	public Town? Town => _town;
 	public Adventurer? Adventurer => _adventurer;
+	public IReadOnlyList<Adventurer> Adventurers => _adventurers;
 	public int CompletedLoops => _completedLoops;
 	public bool CompletedOnce => _completedLoops > 0;
 	public long SimulationTickCount => _simulationTickCount;
@@ -53,6 +55,23 @@ public partial class GameController : Node2D
 		{
 			_adventurer = SpawnDefaultAdventurer();
 		}
+
+		_adventurers.Clear();
+
+		foreach (Node child in GetChildren())
+		{
+			if (child is Adventurer adventurer && !_adventurers.Contains(adventurer))
+			{
+				_adventurers.Add(adventurer);
+			}
+		}
+
+		if (_adventurer is not null && !_adventurers.Contains(_adventurer))
+		{
+			_adventurers.Insert(0, _adventurer);
+		}
+
+		_adventurer ??= _adventurers.FirstOrDefault();
 
 		foreach (Node child in monsterContainer.GetChildren())
 		{
@@ -160,17 +179,37 @@ public partial class GameController : Node2D
 				{ "interval", SimulationTickInterval },
 				{ "responsibility", "world_and_combat" }
 			});
-			_adventurer?.CombatController?.ProcessSimulationTick(_simulationTickCount, SimulationTickInterval);
+			foreach (Adventurer adventurer in _adventurers)
+			{
+				adventurer.CombatController?.ProcessSimulationTick(_simulationTickCount, SimulationTickInterval);
+			}
+
 			PublishSimulationClockState();
 		}
 	}
 
 	public Monster? FindHuntTarget(Adventurer adventurer)
 	{
+		return FindHuntTargets(adventurer, 1).FirstOrDefault();
+	}
+
+	public IReadOnlyList<Monster> FindHuntTargets(Adventurer adventurer, int maximumTargets)
+	{
 		return _monsters
 			.Where(monster => monster.IsAlive)
 			.OrderBy(monster => monster.GlobalPosition.DistanceSquaredTo(adventurer.GlobalPosition))
-			.FirstOrDefault();
+			.Take(Math.Max(1, maximumTargets))
+			.ToArray();
+	}
+
+	public IReadOnlyList<Adventurer> FindEncounterAdventurers(Adventurer leader, int maximumAdventurers)
+	{
+		return _adventurers
+			.Where(adventurer => adventurer.IsAlive)
+			.OrderBy(adventurer => ReferenceEquals(adventurer, leader) ? 0 : 1)
+			.ThenBy(adventurer => adventurer.GlobalPosition.DistanceSquaredTo(leader.GlobalPosition))
+			.Take(Math.Max(1, maximumAdventurers))
+			.ToArray();
 	}
 
 	public void NotifyLoopCompleted()
@@ -234,6 +273,8 @@ public partial class GameController : Node2D
 			{ "completed_loops", _completedLoops },
 			{ "completed_once", CompletedOnce },
 			{ "loop_stopped", _loopStopped },
+			{ "living_adventurers", _adventurers.Count(adventurer => adventurer.IsAlive) },
+			{ "adventurer_count", _adventurers.Count },
 			{ "living_monsters", _monsters.Count(monster => monster.IsAlive) },
 			{ "monster_count", _monsters.Count }
 		});

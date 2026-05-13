@@ -3,6 +3,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using GDict = Godot.Collections.Dictionary;
 
 public partial class Monster : Node2D, ICombatant
@@ -306,7 +307,12 @@ public partial class Monster : Node2D, ICombatant
 			return;
 		}
 
-		Adventurer? adventurer = (GetTree().CurrentScene as GameController)?.Adventurer;
+		GameController? game = GetTree().CurrentScene as GameController;
+		Adventurer? adventurer = game?.Adventurers
+			.Where(candidate => candidate.IsAlive)
+			.OrderBy(candidate => candidate.GlobalPosition.DistanceSquaredTo(GlobalPosition))
+			.FirstOrDefault()
+			?? game?.Adventurer;
 
 		if (adventurer?.IsAlive != true)
 		{

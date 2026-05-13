@@ -150,26 +150,14 @@ fi
 
 aggro_distance="$(printf '%s\n' "${aggro_line}" | sed -n 's/.*"distance_to_target":\([0-9.]*\).*/\1/p')"
 
-if printf '%s\n' "${spark_resolved_line}" | grep -q '"hit":true'; then
-	if ! printf '%s\n' "${aggro_line}" | grep -q '"aggro_trigger":"ability_resolved"'; then
-		echo "Spark hit, but first combat aggro was not caused by resolved ability/spell impact. Session: ${SESSION_DIR}" >&2
-		exit 1
-	fi
+if ! printf '%s\n' "${aggro_line}" | grep -q '"aggro_trigger":"ability_resolved"'; then
+	echo "Spark resolved, but first combat aggro was not caused by the targeted spell resolution. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
 
-	if ! awk -v distance="${aggro_distance}" 'BEGIN { exit !(distance >= 150) }'; then
-		echo "Ability aggro was not triggered from ranged spark distance. distance=${aggro_distance:-missing}. Session: ${SESSION_DIR}" >&2
-		exit 1
-	fi
-else
-	if ! printf '%s\n' "${aggro_line}" | grep -q '"aggro_trigger":"proximity"'; then
-		echo "Spark missed, but first combat aggro was not caused by proximity. Session: ${SESSION_DIR}" >&2
-		exit 1
-	fi
-
-	if ! awk -v distance="${aggro_distance}" 'BEGIN { exit !(distance <= 48) }'; then
-		echo "Proximity aggro was not triggered inside aggro range. distance=${aggro_distance:-missing}. Session: ${SESSION_DIR}" >&2
-		exit 1
-	fi
+if ! awk -v distance="${aggro_distance}" 'BEGIN { exit !(distance >= 150) }'; then
+	echo "Targeted spell aggro was not triggered from ranged spark distance. distance=${aggro_distance:-missing}. Session: ${SESSION_DIR}" >&2
+	exit 1
 fi
 
 if ! grep -q '"skill_cooldowns"' "${SESSION_DIR}/state.json"; then
