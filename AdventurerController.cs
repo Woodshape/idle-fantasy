@@ -249,8 +249,7 @@ public partial class AdventurerController : Node
 			else if (_adventurer.CombatState is not CombatState.OutOfCombat and not CombatState.Engaging)
 			{
 				_movementPausedForCurrentCast = false;
-				_adventurer.SetMoveTarget(GetCombatApproachPosition(target, GetOpeningApproachDistance()));
-				_adventurer.MoveTowardTarget(delta);
+				MoveIntoCombatRange(target, delta);
 			}
 		}
 
@@ -272,6 +271,26 @@ public partial class AdventurerController : Node
 
 			ChangeState(AdventurerIntentionState.CollectLoot);
 		}
+	}
+
+	private void MoveIntoCombatRange(Monster target, double delta)
+	{
+		if (_adventurer is null)
+		{
+			return;
+		}
+
+		float desiredDistance = GetOpeningApproachDistance();
+		float distanceToTarget = _adventurer.GlobalPosition.DistanceTo(target.GlobalPosition);
+
+		if (distanceToTarget <= desiredDistance)
+		{
+			_adventurer.ClearMoveTarget();
+			return;
+		}
+
+		_adventurer.SetMoveTarget(GetCombatApproachPosition(target, desiredDistance));
+		_adventurer.MoveTowardTarget(delta);
 	}
 
 	private void PauseMovementForCast(Monster target)
