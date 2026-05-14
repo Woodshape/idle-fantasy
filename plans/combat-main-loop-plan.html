@@ -484,6 +484,7 @@
 				<a href="#states">State And Counters</a>
 				<a href="#resolution">Resolution</a>
 				<a href="#bridge">TestBridge</a>
+				<a href="#divergences">Divergences</a>
 				<a href="#remaining">Remaining Work</a>
 				<a href="#criteria">Acceptance</a>
 			</nav>
@@ -494,7 +495,7 @@
 				<p class="kicker">Current Combat Implementation</p>
 				<h1>Combat Main Loop Plan</h1>
 				<p>Combat now runs from one authoritative simulation tick. Movement and the wider idle loop can keep their normal updates, but combat decisions, cooldowns, action order, hit rolls, damage, death, and combat state snapshots happen on discrete ticks.</p>
-				<p>The current implementation is a one-adventurer versus one-monster encounter using shared combat actions, tick counters, bridge events, and deterministic action priority.</p>
+				<p>The current implementation uses shared combat actions, tick counters, bridge events, deterministic action priority, and early multi-combatant encounter containers that still need hardening before they become party-grade systems.</p>
 			</header>
 
 			<section class="summary" aria-label="At a glance">
@@ -503,12 +504,12 @@
 					<span>Simulation tick interval owned by <code>GameController</code>.</span>
 				</div>
 				<div class="metric">
-					<strong>1v1</strong>
-					<span>Current encounter shape: one adventurer against one monster.</span>
+					<strong>Multi</strong>
+					<span>Encounter containers can hold multiple combatants, but the main loop still mostly exercises simple fights.</span>
 				</div>
 				<div class="metric">
-					<strong>3 + 1</strong>
-					<span>Adventurer has <code>heavy_strike</code>, <code>spark</code>, and <code>basic_attack</code>; monster has <code>basic_attack</code>.</span>
+					<strong>2 + 1</strong>
+					<span>Warrior has <code>heavy_strike</code>; mage has <code>spark</code>; both share <code>basic_attack</code>.</span>
 				</div>
 				<div class="metric">
 					<strong>Ticks</strong>
@@ -529,7 +530,7 @@
 							<li>Adventurer and monster runners update once per combat tick.</li>
 							<li>Queued actions resolve in rolled initiative order.</li>
 							<li><code>heavy_strike</code> exists as a cooldown skill.</li>
-							<li><code>spark</code> exists as a medium-range 12-tick cast spell.</li>
+							<li><code>spark</code> exists as a medium-range 8-tick cast spell.</li>
 							<li>Action range is enforced by the runner.</li>
 							<li>Attacked monsters aggro and move into attack distance.</li>
 							<li>A headless bridge verifier covers one full loop.</li>
@@ -541,6 +542,8 @@
 						<h3>Partial</h3>
 						<ul>
 							<li><code>CanUseWhileMoving</code> is stored but not enforced by the runner.</li>
+							<li>Social aggro exists but is action-resolution based, not hit-only.</li>
+							<li>Multi-combatant encounters need hardening around dynamic joins and rewards.</li>
 							<li>Decision logic is list priority, not a separate controller.</li>
 						</ul>
 					</div>
@@ -548,7 +551,7 @@
 						<h3>Not Yet</h3>
 						<ul>
 							<li>Buffs, debuffs, regeneration, damage-over-time, and healing-over-time.</li>
-							<li>Multi-adventurer or multi-monster encounters.</li>
+							<li>A dedicated encounter object for parties, dynamic joins, and rewards.</li>
 							<li>Data-driven skill library.</li>
 							<li>Equipment, inventory, shops, and party composition.</li>
 						</ul>
@@ -664,28 +667,28 @@
 					</thead>
 					<tbody>
 						<tr>
-							<td>Adventurer</td>
+							<td>Warrior</td>
 							<td><code>heavy_strike</code></td>
 							<td>12 ticks</td>
 							<td>0 ticks</td>
-							<td>12 ticks</td>
+							<td>1 tick</td>
 							<td>1.5x attack</td>
 							<td>Skill, action weight 10, starts 4 tick global cooldown.</td>
 						</tr>
 						<tr>
-							<td>Adventurer</td>
+							<td>Warrior / Mage</td>
 							<td><code>basic_attack</code></td>
-							<td><code>AttackSpeed</code>, currently 4 ticks</td>
+							<td><code>AttackSpeed</code>, currently 4-5 ticks</td>
 							<td>0 ticks</td>
 							<td>0 ticks</td>
 							<td>1.0x attack</td>
 							<td>Uses the owner's basic attack cooldown.</td>
 						</tr>
 						<tr>
-							<td>Adventurer</td>
+							<td>Mage</td>
 							<td><code>spark</code></td>
 							<td>8 ticks</td>
-							<td>1 tick</td>
+							<td>8 ticks</td>
 							<td>0 ticks</td>
 							<td>1.2x attack</td>
 							<td>Spell, range 160px, action weight 4, starts 4 tick global cooldown.</td>
@@ -704,7 +707,7 @@
 				<div class="grid-2" style="margin-top: 1rem;">
 					<div class="card green">
 						<h3>Action Priority</h3>
-						<p>The adventurer scans actions in list order, so <code>heavy_strike</code> is preferred whenever ready, then <code>spark</code>, then <code>basic_attack</code>. Monsters currently only have <code>basic_attack</code>.</p>
+						<p>The warrior scans <code>heavy_strike</code> then <code>basic_attack</code>. The mage scans <code>spark</code> then ranged <code>basic_attack</code>. Monsters currently only have <code>basic_attack</code>.</p>
 					</div>
 					<div class="card gold">
 						<h3>Attack Speed Meaning</h3>
@@ -781,7 +784,7 @@
 				</div>
 				<div class="card blue" style="margin-top: 1rem;">
 					<h3>Tie Breakers And Cancellation</h3>
-					<p>Actions sort by higher score, higher initiative, lower <code>AttackSpeed</code> tick value, then stable <code>CombatantId</code>. The runner enforces <code>Range</code> before selection, queueing, and resolution. The opening distance is derived from the longest adventurer action range, which currently means <code>spark</code> range and keeps melee out of range. Mira stops moving while casting. When <code>spark</code> resolves and hits, the affected monster aggros onto the adventurer and moves to attack distance. Monsters can also aggro when an adventurer enters <code>AggroRange</code>. Social aggro is backlog.</p>
+					<p>Actions sort by higher score, higher initiative, lower <code>AttackSpeed</code> tick value, then stable <code>CombatantId</code>. The runner enforces <code>Range</code> before selection, queueing, and resolution. The opening distance is derived from the longest adventurer action range, which lets the mage start at <code>spark</code> range while melee stays out of range. The caster stops moving while casting. When an adventurer action resolves against a living monster, the affected monster aggros onto the adventurer and moves to attack distance. Monsters can also aggro through proximity and social aggro.</p>
 				</div>
 			</section>
 
@@ -839,6 +842,35 @@
 				</div>
 			</section>
 
+			<section class="panel" id="divergences">
+				<div class="section-title">
+					<h2>Current Divergences</h2>
+					<span class="tag">Plan Drift</span>
+				</div>
+				<div class="grid-2">
+					<div class="card gold">
+						<h3>First Slice Drift</h3>
+						<ul>
+							<li>The first slice planned one pre-existing adventurer; the main scene now auto-spawns warrior, mage, and three slimes.</li>
+							<li>The early 1.0s combat interval has been replaced by the 0.25s shared simulation tick.</li>
+							<li>The active verifier now targets autonomous combat-loop events instead of only <code>PlayerController</code> click movement.</li>
+						</ul>
+					</div>
+					<div class="card blue">
+						<h3>Combat Model Drift</h3>
+						<ul>
+							<li><code>spark</code> is an 8-tick cast, not the older 12-tick value.</li>
+							<li>Social aggro exists today and is action-resolution based, so misses can still propagate aggro.</li>
+							<li>Encounter containers can hold multiple combatants, but dynamic join rewards and cross-encounter ownership are incomplete.</li>
+						</ul>
+					</div>
+				</div>
+				<div class="card green" style="margin-top: 1rem;">
+					<h3>Extraction Follow-Up</h3>
+					<p>The separate <code>CombatEncounter</code>, <code>CombatDecisionController</code>, and <code>CombatTickResolver</code> split is still planned. The detailed responsibility plan now lives in <code>plans/combat-architecture-extraction-plan.md</code>.</p>
+				</div>
+			</section>
+
 			<section class="panel" id="remaining">
 				<div class="section-title">
 					<h2>Remaining Work</h2>
@@ -850,7 +882,7 @@
 						<ul>
 							<li><code>AttackSpeed</code> remains basic-attack cooldown ticks.</li>
 							<li>Skills and spells keep the 4-tick global cooldown.</li>
-							<li>Effects and encounter extraction stay deferred.</li>
+							<li>Effects, decision extraction, and encounter extraction stay deferred.</li>
 						</ul>
 					</div>
 					<div class="card gold">
@@ -863,15 +895,15 @@
 					<li>Enforced <code>CombatAction.Range</code> when selecting, keeping, queueing, and resolving actions.</li>
 					<li>Added the <code>spark</code> spell with nonzero <code>CastTicks</code>, cooldown, and modest damage.</li>
 					<li>Removed the unused <code>CombatState.UsingAction</code> state.</li>
-					<li>Re-ran verification on May 13, 2026; artifacts were written to <code>/tmp/idle-fantasy-combat.lob14h</code>.</li>
+					<li>Re-ran verification on May 14, 2026; artifacts were written to <code>/tmp/idle-fantasy-combat.D4xKuO</code>.</li>
 				</ol>
 					<div class="card blue" style="margin-top: 1rem;">
 						<h3>Deferred</h3>
 						<ul class="two-column">
 								<li>Buff, debuff, regeneration, damage-over-time, healing-over-time, and effect ticking.</li>
-								<li>Social aggro for monster groups when a group member is damaged or affected.</li>
+								<li>Social aggro semantics: keep action-resolution aggro or require hit/effect evidence.</li>
 								<li>Accuracy/evasion formula alternatives: symmetric linear, scaled symmetric linear, or diminishing returns.</li>
-								<li><code>CombatEncounter</code> or <code>CombatTickResolver</code> extraction for multi-combatant encounters.</li>
+								<li><code>CombatEncounter</code>, <code>CombatDecisionController</code>, and <code>CombatTickResolver</code> extraction.</li>
 								<li>Attacks-per-second conversion if equipment, class, or stat presentation needs a player-facing speed value.</li>
 						</ul>
 					</div>
@@ -897,7 +929,7 @@ diminishing_returns =
 					<li>Combat actions resolve only on simulation ticks.</li>
 					<li>Adventurer and monster updates process once per combat tick.</li>
 					<li>Basic attacks and <code>heavy_strike</code> use integer tick counters.</li>
-					<li><code>spark</code> uses a 12-tick cast plus integer skill cooldown and global cooldown counters.</li>
+					<li><code>spark</code> uses an 8-tick cast plus integer skill cooldown and global cooldown counters.</li>
 					<li>The game does not run per-combatant per-frame action timers.</li>
 					<li>Basic attack cadence comes from <code>AttackSpeed</code> tick values.</li>
 					<li>At least one cooldown skill exists and matures through tick counters.</li>

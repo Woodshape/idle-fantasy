@@ -12,7 +12,7 @@ The current combat loop is implemented by these main types:
 
 - `GameController`: owns the 0.25 second simulation clock, increments `SimulationTickCount`, emits `simulation_tick`, and calls `AdventurerCombatController.ProcessSimulationTick`.
 - `AdventurerController`: runs the higher-level idle loop: choose target, travel, start combat, collect loot, return to town, recover, and repeat.
-- `AdventurerCombatController`: owns the active one-adventurer versus one-monster encounter, creates the combat runners, starts and stops encounters, processes each simulation tick, rolls action order, resolves queued actions, emits encounter events, and publishes `combat_encounter` state.
+- `AdventurerCombatController`: owns the active encounter container, creates the combat runners, starts and stops encounters, processes each simulation tick, rolls action order, resolves queued actions, emits encounter events, and publishes `combat_encounter` state.
 - `CombatActionRunner`: owns per-combatant combat state, target, queued action, active action, basic attack cooldown, global cooldown, cast ticks, recovery ticks, skill cooldowns, action selection, action resolution, hit/damage formulas, cooldown events, and combatant snapshots.
 - `CombatAction`: describes usable actions with id, name, kind, range, cooldown ticks, cast ticks, recovery ticks, target requirement, movement flag, initiative weight, damage multiplier, and whether the action uses the owner's basic attack cooldown.
 - `ICombatant`, `Adventurer`, and `Monster`: expose shared combat stats and state publishing.
@@ -84,7 +84,7 @@ monster_basic_attack_cooldown = monster.AttackSpeed = 8 ticks
 heavy_strike_cooldown = 12 ticks
 heavy_strike_recovery = 1 tick
 spark_cooldown = 8 ticks
-spark_cast = 12 ticks
+spark_cast = 8 ticks
 global_cooldown_after_skill_or_spell = 4 ticks
 ```
 
@@ -135,11 +135,14 @@ The runner does not currently tick buffs, debuffs, regeneration, damage-over-tim
 
 ## Current Actions
 
-The adventurer action list is:
+The current adventurer action lists are archetype-specific:
 
-- `heavy_strike`: `Skill`, range 48, cooldown 12 ticks, cast 0 ticks, recovery 1 tick, action weight 10, damage multiplier 1.5, does not use the basic attack cooldown.
-- `spark`: `Spell`, range 160, cooldown 8 ticks, cast 12 ticks, recovery 0 ticks, action weight 4, damage multiplier 1.2, does not use the basic attack cooldown.
-- `basic_attack`: `BasicAttack`, range 48, cooldown from `AttackSpeed`, cast 0 ticks, recovery 0 ticks, action weight 0, damage multiplier 1.0, uses the basic attack cooldown.
+- Warrior:
+  - `heavy_strike`: `Skill`, range 48, cooldown 12 ticks, cast 0 ticks, recovery 1 tick, action weight 10, damage multiplier 1.5, does not use the basic attack cooldown.
+  - `basic_attack`: `BasicAttack`, range 48, cooldown from `AttackSpeed`, cast 0 ticks, recovery 0 ticks, action weight 0, damage multiplier 1.0, uses the basic attack cooldown.
+- Mage:
+  - `spark`: `Spell`, range 160, cooldown 8 ticks, cast 8 ticks, recovery 0 ticks, action weight 4, damage multiplier 1.2, does not use the basic attack cooldown.
+  - `basic_attack`: `BasicAttack`, range 160, cooldown from `AttackSpeed`, cast 0 ticks, recovery 0 ticks, action weight 0, damage multiplier 1.0, uses the basic attack cooldown.
 
 The monster action list is:
 
@@ -154,11 +157,12 @@ The runner supports `Spell` and nonzero `CastTicks`; `spark` exercises that path
 Current monster aggro triggers:
 
 1. Proximity aggro: if a living adventurer enters the monster's `AggroRange`, the monster targets that adventurer and starts moving toward `AggroAttackDistance`.
-2. Ability aggro: when an adventurer action resolves and hits a monster, the monster targets that adventurer and starts moving toward `AggroAttackDistance`.
+2. Ability aggro: when an adventurer target-requiring action resolves against a living monster, the monster targets that adventurer and starts moving toward `AggroAttackDistance`. This is resolution-based today, not hit-only.
+3. Social aggro: when an adventurer action resolves against a monster in an encounter, other living encounter monsters and nearby world monsters can target the responsible adventurer with `aggro_trigger = "social_aggro"`.
 
 Deferred aggro work:
 
-- Social aggro: when a member of a monster group is damaged or affected by an ability or spell, nearby/grouped monsters should also aggro the responsible adventurer.
+- Decide whether social aggro should remain action-resolution based or become hit/effect-only.
 
 ## Decision Rules
 
@@ -170,7 +174,7 @@ Current action selection is deterministic and list ordered:
 4. If the action has cast ticks, casting starts and the action queues when the cast completes.
 5. Otherwise the action queues immediately for the current tick.
 
-This means the adventurer prefers `heavy_strike` whenever it is ready, then `spark`, then `basic_attack`. Monsters currently use only `basic_attack`.
+This means the warrior prefers `heavy_strike` whenever it is ready, then `basic_attack`. The mage prefers `spark`, then ranged `basic_attack`. Monsters currently use only `basic_attack`.
 
 ## Action Queue And Order Resolution
 
@@ -285,7 +289,7 @@ Completed:
 - Adventurer and monster runners process once per combat tick.
 - Basic attacks use integer tick cooldowns.
 - `heavy_strike` exists as a cooldown skill.
-- `spark` exists as a medium-range 12-tick cast spell and exercises `combat_cast_started` and `combat_cast_completed`.
+- `spark` exists as a medium-range 8-tick cast spell and exercises `combat_cast_started` and `combat_cast_completed`.
 - Skill cooldown, global cooldown, recovery, and cast counters are integer ticks.
 - `CombatAction.Range` is enforced by the runner for selected, queued, and resolving actions.
 - Queued actions resolve in rolled initiative order.
@@ -299,16 +303,25 @@ Completed:
 Partially complete:
 
 - `CanUseWhileMoving` is stored on actions but not enforced by the runner.
-- Social aggro is tracked as backlog.
-- The encounter model supports only one adventurer and one monster.
+- Social aggro exists, but it is currently resolution-based and should be reviewed before relying on hit-only or effect-only behavior.
+- The encounter model can contain multiple adventurers and monsters, but the main scene still tends to run separate simple encounters; dynamic joins and reward handling need more hardening.
 - Decision logic is deterministic list priority, not a separate controller.
 
 Not implemented:
 
 - Buffs, debuffs, regeneration, damage-over-time, healing-over-time, and effects.
-- A separate encounter object that can handle parties or multiple enemies.
+- A separate encounter object that cleanly owns parties, multiple enemies, dynamic joins, and reward membership.
 - A data-driven skill library.
 - Equipment, inventory, shops, party composition, or progression systems beyond current gold and experience counters.
+
+## Current Divergences From Earlier Plans
+
+- The first playable slice planned one pre-existing adventurer. The current main scene auto-spawns a warrior, a mage, and three slimes so the loop can exercise independent adventurers, ranged casting, and wave respawn behavior.
+- The first slice described a 1.0 second combat interval. The current combat loop uses the later 0.25 second shared simulation tick from `GameController`.
+- The initial TestBridge deliverable focused on `PlayerController` click-move events. `PlayerController` remains as an input prototype, but the active verifier now drives the autonomous loop with `character_selected`, combat, loot, loop-complete, and respawn events.
+- Social aggro is no longer just backlog. It exists as action-resolution-based behavior, which means misses can still propagate aggro while the target monster remains alive.
+- Encounter containers can hold multiple combatants, and test scenes can override encounter sizes, but party-grade ownership, dynamic join reward membership, and cross-encounter conflict checks are still incomplete.
+- The planned `CombatEncounter`, `CombatDecisionController`, and `CombatTickResolver` split is not implemented yet. See `plans/combat-architecture-extraction-plan.md`.
 
 ## Remaining Work
 
@@ -321,17 +334,17 @@ The open implementation decisions for this slice are settled by the current code
 Completed verification for this slice:
 
 1. `scripts/verify_combat_main_loop.sh` launches the world through TestBridge, waits for `game_loop_completed`, and checks representative events: `simulation_tick`, `combat_tick_started`, `combat_action_queued`, `combat_action_order_rolled`, `combat_action_resolved`, `combat_action_cooldown_started`, `combat_action_cooldown_ready`, `combat_cast_started`, `adventurer_cast_movement_paused`, `combat_cast_completed`, `monster_aggro_target_set`, `monster_aggro_moving`, `combat_tick_completed`, `loot_collected`, `game_loop_completed`, and `bridge_stopped`. It also verifies `spark` casts from beyond melee range while still inside its medium range, clears pending adventurer movement during the cast, and only then triggers monster aggro, monster retaliation, and an adventurer melee action after `spark` resolves.
-2. A passing run on May 13, 2026 wrote artifacts to `/tmp/idle-fantasy-combat.lob14h`.
+2. A passing run on May 14, 2026 wrote artifacts to `/tmp/idle-fantasy-combat.D4xKuO`.
 
 Deferred after this slice:
 
 - Add buff, debuff, regeneration, damage-over-time, healing-over-time, and effect ticking.
-- Add social aggro for monster groups when a group member is damaged or affected by an ability or spell.
+- Harden social aggro semantics, especially whether misses should propagate aggro and how dynamic-only joins should be rewarded.
 - Revisit accuracy/evasion formula options:
   - Symmetric linear: `clamp(0.5 + attacker_accuracy - defender_evasion, 0.05, 0.95)`.
   - Scaled symmetric linear: `clamp(0.5 + 0.5 * clamp(attacker_accuracy - defender_evasion, -1, 1), 0.05, 0.95)`.
   - Diminishing returns: `0.05 + 0.90 * attacker_accuracy / (attacker_accuracy + defender_evasion + constant)`.
-- Extract `CombatEncounter` or `CombatTickResolver` when multi-combatant encounters make the current controller too cramped.
+- Extract `CombatEncounter`, `CombatDecisionController`, and `CombatTickResolver` when multi-combatant encounters make the current controller too cramped.
 - Revisit attacks-per-second conversion only when equipment, class, or stat presentation needs a player-facing speed value.
 
 ## Acceptance Criteria For This Slice
@@ -339,7 +352,7 @@ Deferred after this slice:
 - Combat actions resolve only on simulation ticks.
 - Adventurer and monster updates are processed once per combat tick.
 - Basic attacks and `heavy_strike` use integer tick counters.
-- `spark` uses a 12-tick integer cast plus integer skill cooldown and global cooldown counters.
+- `spark` uses an 8-tick integer cast plus integer skill cooldown and global cooldown counters.
 - The game does not run per-combatant per-frame action timers.
 - Basic attack cadence comes from `AttackSpeed` tick values.
 - At least one cooldown skill exists and matures through tick counters.
