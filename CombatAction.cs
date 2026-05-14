@@ -1,5 +1,6 @@
 #nullable enable
 
+using System;
 using System.Collections.Generic;
 
 public enum CombatState
@@ -101,6 +102,7 @@ public sealed class CombatantCombatSnapshot
 	public string LastActionId { get; init; } = string.Empty;
 	public string DefinitionId { get; init; } = string.Empty;
 	public string CombatLoadoutId { get; init; } = string.Empty;
+	public IReadOnlyList<string> ActionIds { get; init; } = Array.Empty<string>();
 	public int BasicAttackCooldownTicksRemaining { get; init; }
 	public int GlobalCooldownTicksRemaining { get; init; }
 	public int CastTicksRemaining { get; init; }

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CombatActionDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://CombatActionDefinition.cs" id="1_action"]
+
+[resource]
+script = ExtResource("1_action")
+ActionId = "heavy_strike"
+DisplayName = "Heavy Strike"
+Kind = 1
+Range = 48.0
+CooldownTicks = 12
+CastTicks = 0
+RecoveryTicks = 1
+RequiresTarget = true
+CanUseWhileMoving = false
+ActionWeight = 10
+DamageMultiplier = 1.5
+UsesGlobalAttackCooldown = false

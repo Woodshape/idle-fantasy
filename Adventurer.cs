@@ -17,6 +17,9 @@ public partial class Adventurer : Node2D, ICombatant
 	public string AdventurerName { get; set; } = "Mira";
 
 	[Export]
+	public AdventurerDefinition? Definition { get; set; }
+
+	[Export]
 	public AdventurerArchetype Archetype { get; set; } = AdventurerArchetype.Warrior;
 
 	[Export]
@@ -70,6 +73,7 @@ public partial class Adventurer : Node2D, ICombatant
 	public string LastActionId { get; private set; } = string.Empty;
 	public string DefinitionId { get; private set; } = string.Empty;
 	public string CombatLoadoutId { get; private set; } = string.Empty;
+	public IReadOnlyList<string> ActionIds => _actionIds;
 	public int BasicAttackCooldownTicksRemaining { get; private set; }
 	public int GlobalCooldownTicksRemaining { get; private set; }
 	public int CastTicksRemaining { get; private set; }
@@ -79,6 +83,7 @@ public partial class Adventurer : Node2D, ICombatant
 	public bool CanAct { get; private set; }
 
 	private readonly Dictionary<string, int> _skillCooldowns = new();
+	private readonly List<string> _actionIds = new();
 	private bool _hasSetup;
 	private ProgressBar? _healthBar;
 
@@ -86,7 +91,14 @@ public partial class Adventurer : Node2D, ICombatant
 	{
 		if (!_hasSetup)
 		{
-			Health = MaxHealth;
+			if (Definition is not null)
+			{
+				SetupFromDefinition(Definition, position: Position);
+			}
+			else
+			{
+				Health = MaxHealth;
+			}
 		}
 
 		Controller = GetNodeOrNull<AdventurerController>("AdventurerController");
@@ -110,7 +122,8 @@ public partial class Adventurer : Node2D, ICombatant
 		float? speed = null,
 		float? stopDistance = null,
 		int experience = 0,
-		int gold = 0)
+		int gold = 0,
+		string definitionId = "")
 	{
 		AdventurerName = adventurerName ?? AdventurerName;
 		Archetype = archetype ?? Archetype;
@@ -148,8 +161,9 @@ public partial class Adventurer : Node2D, ICombatant
 		QueuedActionId = string.Empty;
 		ActiveActionId = string.Empty;
 		LastActionId = string.Empty;
-		DefinitionId = string.Empty;
+		DefinitionId = definitionId;
 		CombatLoadoutId = string.Empty;
+		_actionIds.Clear();
 		BasicAttackCooldownTicksRemaining = 0;
 		GlobalCooldownTicksRemaining = 0;
 		CastTicksRemaining = 0;
@@ -163,6 +177,35 @@ public partial class Adventurer : Node2D, ICombatant
 		if (IsInsideTree())
 		{
 			PublishState();
+		}
+	}
+
+	public void SetupFromDefinition(
+		AdventurerDefinition definition,
+		string? displayNameOverride = null,
+		Vector2? position = null)
+	{
+		if (definition.Stats is null)
+		{
+			throw new InvalidOperationException($"Adventurer definition '{definition.DefinitionId}' is missing stats.");
+		}
+
+		Definition = definition;
+		Setup(
+			adventurerName: string.IsNullOrWhiteSpace(displayNameOverride) ? definition.DisplayName : displayNameOverride,
+			archetype: ParseArchetype(definition.ArchetypeId),
+			level: definition.Level,
+			stats: definition.Stats.ToRuntimeStats(),
+			position: position,
+			speed: definition.MovementSpeed,
+			stopDistance: definition.StopDistance,
+			experience: definition.StartingExperience,
+			gold: definition.StartingGold,
+			definitionId: definition.DefinitionId);
+
+		if (GetNodeOrNull<Sprite2D>("Sprite2D") is Sprite2D sprite)
+		{
+			sprite.Modulate = definition.SpriteModulate;
 		}
 	}
 
@@ -273,6 +316,8 @@ public partial class Adventurer : Node2D, ICombatant
 			: snapshot.LastActionId;
 		DefinitionId = snapshot.DefinitionId;
 		CombatLoadoutId = snapshot.CombatLoadoutId;
+		_actionIds.Clear();
+		_actionIds.AddRange(snapshot.ActionIds);
 		BasicAttackCooldownTicksRemaining = snapshot.BasicAttackCooldownTicksRemaining;
 		GlobalCooldownTicksRemaining = snapshot.GlobalCooldownTicksRemaining;
 		CastTicksRemaining = snapshot.CastTicksRemaining;
@@ -320,6 +365,7 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "last_action", LastActionId },
 			{ "definition_id", DefinitionId },
 			{ "combat_loadout_id", CombatLoadoutId },
+			{ "action_ids", BuildActionIdsState() },
 			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining },
 			{ "global_cooldown_ticks_remaining", GlobalCooldownTicksRemaining },
 			{ "cast_ticks_remaining", CastTicksRemaining },
@@ -365,5 +411,24 @@ public partial class Adventurer : Node2D, ICombatant
 		}
 
 		return cooldowns;
+	}
+
+	private Godot.Collections.Array BuildActionIdsState()
+	{
+		Godot.Collections.Array actionIds = new();
+
+		foreach (string actionId in _actionIds)
+		{
+			actionIds.Add(actionId);
+		}
+
+		return actionIds;
+	}
+
+	private static AdventurerArchetype ParseArchetype(string archetypeId)
+	{
+		return string.Equals(archetypeId, "mage", StringComparison.OrdinalIgnoreCase)
+			? AdventurerArchetype.Mage
+			: AdventurerArchetype.Warrior;
 	}
 }

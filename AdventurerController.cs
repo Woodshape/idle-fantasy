@@ -205,11 +205,7 @@ public partial class AdventurerController : Node
 			return MeleeApproachDistance;
 		}
 
-		double longestActionRange = AdventurerCombatController.CreateAdventurerActions(_adventurer)
-			.Where(action => action.RequiresTarget)
-			.Select(action => action.Range)
-			.DefaultIfEmpty(MeleeApproachDistance)
-			.Max();
+		double longestActionRange = _adventurer.CombatController?.GetLongestTargetActionRange(_adventurer) ?? MeleeApproachDistance;
 
 		return (float)Math.Max(MeleeApproachDistance, longestActionRange);
 	}
@@ -309,8 +305,11 @@ public partial class AdventurerController : Node
 			return;
 		}
 
-		List<Monster> defeatedMonsters = _encounterMonsters.Count > 0
-			? _encounterMonsters
+		IReadOnlyList<Monster> rewardMonsters = _adventurer.CombatController?.EncounterMonsters.Count > 0
+			? _adventurer.CombatController.EncounterMonsters
+			: _encounterMonsters;
+		List<Monster> defeatedMonsters = rewardMonsters.Count > 0
+			? rewardMonsters
 				.Where(monster => !monster.IsAlive && !_lootedMonsterIds.Contains(monster.CombatantId))
 				.ToList()
 			: _adventurer.CurrentMonsterTarget is Monster target

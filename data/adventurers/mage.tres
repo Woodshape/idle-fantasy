@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="AdventurerDefinition" format=3 uid="uid://dandwqty2124s"]
+
+[ext_resource type="Script" uid="uid://cb6m1kowy5u30" path="res://AdventurerDefinition.cs" id="1_adventurer"]
+[ext_resource type="Resource" uid="uid://dqq1msb01u2lr" path="res://data/combat/loadouts/mage_starting.tres" id="2_loadout"]
+[ext_resource type="Script" uid="uid://bv3qr7yw0gw25" path="res://CombatStatsDefinition.cs" id="3_stats_script"]
+
+[sub_resource type="Resource" id="Stats_mage"]
+script = ExtResource("3_stats_script")
+MaxHealth = 32
+Attack = 7
+Accuracy = 0.3
+Defense = 1
+Evasion = 0.18
+Initiative = 5
+AttackSpeedTicks = 5
+
+[resource]
+script = ExtResource("1_adventurer")
+DefinitionId = "mage"
+DisplayName = "Mage"
+ArchetypeId = "mage"
+Stats = SubResource("Stats_mage")
+CombatLoadout = ExtResource("2_loadout")
+SpriteModulate = Color(0.75, 0.45, 1, 1)

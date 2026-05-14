@@ -4,11 +4,13 @@
 [ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://Town.cs" id="2_pkg7o"]
 [ext_resource type="PackedScene" path="res://Adventurer.tscn" id="3_kcv4l"]
 [ext_resource type="PackedScene" path="res://Monster.tscn" id="4_47ur8"]
+[ext_resource type="Resource" path="res://data/spawns/default_world_content.tres" id="5_content"]
 
 [node name="Game" type="Node2D" unique_id=1741732238]
 script = ExtResource("1_dwbse")
 AdventurerScene = ExtResource("3_kcv4l")
 MonsterScene = ExtResource("4_47ur8")
+ContentLibrary = ExtResource("5_content")
 
 [node name="Town" type="Node2D" parent="." unique_id=1017707839]
 position = Vector2(160, 300)

@@ -16,9 +16,7 @@ public sealed class CombatActionRunner
 	private readonly ICombatant _owner;
 	private readonly CombatLoadout _loadout;
 	private readonly RandomNumberGenerator _rng;
-	private readonly ICombatDecisionPolicy _decisionPolicy;
 	private readonly Action<string, GDict> _emitEvent;
-	private readonly Func<ICombatant?>? _selectTarget;
 	private readonly Action<Adventurer, Monster, CombatAction, long>? _notifyMonsterAggro;
 	private readonly Dictionary<string, int> _skillCooldowns = new(StringComparer.Ordinal);
 	private CombatAction? _queuedAction;
@@ -34,16 +32,13 @@ public sealed class CombatActionRunner
 		CombatLoadout loadout,
 		RandomNumberGenerator rng,
 		Action<string, GDict> emitEvent,
-		Func<ICombatant?>? selectTarget = null,
 		Action<Adventurer, Monster, CombatAction, long>? notifyMonsterAggro = null)
 	{
 		_owner = owner;
 		_loadout = loadout;
 		_rng = rng;
 		_emitEvent = emitEvent;
-		_selectTarget = selectTarget;
 		_notifyMonsterAggro = notifyMonsterAggro;
-		_decisionPolicy = new ListPriorityDecisionPolicy();
 
 		foreach (CombatAction action in _loadout.Actions.Where(action => action.Kind != CombatActionKind.BasicAttack))
 		{
@@ -53,8 +48,10 @@ public sealed class CombatActionRunner
 
 	public ICombatant Owner => _owner;
 	public ICombatant? Target => _target;
+	public CombatLoadout Loadout => _loadout;
 	public string DefinitionId => _loadout.DefinitionId;
 	public string CombatLoadoutId => _loadout.LoadoutId;
+	public IReadOnlyList<string> ActionIds => _loadout.Actions.Select(action => action.ActionId).ToArray();
 	public CombatState State { get; private set; } = CombatState.OutOfCombat;
 	public int BasicAttackCooldownTicksRemaining { get; private set; }
 	public int GlobalCooldownTicksRemaining { get; private set; }
@@ -65,6 +62,7 @@ public sealed class CombatActionRunner
 	public string QueuedActionId => _queuedAction?.ActionId ?? string.Empty;
 	public bool IsDisabled => State == CombatState.Disabled;
 	public bool CanAct => State == CombatState.Ready && GlobalCooldownTicksRemaining <= 0 && _owner.IsAlive && _target?.IsAlive == true;
+	public bool CanChooseAction => State == CombatState.Ready && GlobalCooldownTicksRemaining <= 0 && _owner.IsAlive;
 
 	public void Start(ICombatant target, long currentTick)
 	{
@@ -79,7 +77,7 @@ public sealed class CombatActionRunner
 		PublishSnapshot();
 	}
 
-	public void Start(long currentTick)
+	public void Start(long currentTick, ICombatant? target = null)
 	{
 		_currentTick = currentTick;
 		_queuedAction = null;
@@ -88,13 +86,14 @@ public sealed class CombatActionRunner
 		CastTicksRemaining = 0;
 		RecoveryTicksRemaining = 0;
 
-		if (!TrySelectTarget(currentTick, "encounter_started"))
+		if (target?.IsAlive != true)
 		{
 			ChangeState(_owner.IsAlive ? CombatState.OutOfCombat : CombatState.Defeated);
 			PublishSnapshot();
 			return;
 		}
 
+		SetTarget(target, currentTick, "encounter_started");
 		ChangeState(CombatState.Engaging);
 		PublishSnapshot();
 	}
@@ -143,15 +142,8 @@ public sealed class CombatActionRunner
 			_queuedTarget = null;
 			_activeAction = null;
 
-			if (TrySelectTarget(tick, "target_unavailable"))
-			{
-				ChangeState(CombatState.Engaging);
-				PublishSnapshot();
-				return;
-			}
-
-			_target = null;
-			ChangeState(CombatState.OutOfCombat);
+			SetTarget(null, tick, "target_unavailable");
+			ChangeState(_owner.IsAlive ? CombatState.Ready : CombatState.Defeated);
 			PublishSnapshot();
 			return;
 		}
@@ -168,7 +160,7 @@ public sealed class CombatActionRunner
 		PublishSnapshot();
 	}
 
-	public QueuedCombatAction? QueueActionForTick(long tick)
+	public QueuedCombatAction? GetQueuedActionForTick(long tick)
 	{
 		_currentTick = tick;
 
@@ -187,17 +179,25 @@ public sealed class CombatActionRunner
 			return new QueuedCombatAction(this, _owner, _target, queuedAction);
 		}
 
-		if (State != CombatState.Ready || !CanAct)
+		return null;
+	}
+
+	public QueuedCombatAction? QueueDecisionForTick(CombatDecision decision, long tick)
+	{
+		_currentTick = tick;
+
+		if (State != CombatState.Ready || !CanChooseAction || decision.Action is not CombatAction action)
 		{
 			return null;
 		}
 
-		CombatAction? action = SelectAction();
-
-		if (action is null)
+		ICombatant? decisionTarget = decision.Target ?? _target;
+		if (!IsActionReady(action, decisionTarget))
 		{
 			return null;
 		}
+
+		SetTarget(decisionTarget, tick, decision.Reason);
 
 		if (action.CastTicks > 0)
 		{
@@ -210,6 +210,30 @@ public sealed class CombatActionRunner
 		}
 
 		return QueueSelectedAction(action, tick, "ready");
+	}
+
+	public bool IsActionReady(CombatAction action, ICombatant? target)
+	{
+		if (GlobalCooldownTicksRemaining > 0)
+		{
+			return false;
+		}
+
+		if (action.RequiresTarget && target?.IsAlive != true)
+		{
+			return false;
+		}
+
+		if (!IsActionInRange(action, target, out _))
+		{
+			return false;
+		}
+
+		return action.Kind switch
+		{
+			CombatActionKind.BasicAttack => BasicAttackCooldownTicksRemaining <= 0,
+			_ => !_skillCooldowns.TryGetValue(action.ActionId, out int remaining) || remaining <= 0
+		};
 	}
 
 	public void ResolveQueuedAction(QueuedCombatAction queuedAction, long tick)
@@ -243,14 +267,8 @@ public sealed class CombatActionRunner
 		{
 			CancelQueuedAction(action, tick, "target_defeated");
 			_queuedTarget = null;
-			if (_owner.IsAlive && TrySelectTarget(tick, "queued_target_defeated"))
-			{
-				ChangeState(CombatState.Engaging);
-			}
-			else
-			{
-				ChangeState(_owner.IsAlive ? CombatState.Ready : CombatState.Defeated);
-			}
+			SetTarget(null, tick, "queued_target_defeated");
+			ChangeState(_owner.IsAlive ? CombatState.Ready : CombatState.Defeated);
 			PublishSnapshot();
 			return;
 		}
@@ -281,6 +299,7 @@ public sealed class CombatActionRunner
 			{ "target", _target?.DisplayName ?? "none" },
 			{ "definition_id", _loadout.DefinitionId },
 			{ "combat_loadout_id", _loadout.LoadoutId },
+			{ "action_ids", BuildActionIdsState() },
 			{ "action_id", action.ActionId },
 			{ "action_kind", action.Kind.ToString() },
 			{ "hit", resolution.Hit },
@@ -440,69 +459,27 @@ public sealed class CombatActionRunner
 		return action.UsesGlobalAttackCooldown ? GetBasicAttackCooldownTicks() : action.CooldownTicks;
 	}
 
-	private CombatAction? SelectAction()
-	{
-		var targetCandidates = new List<ICombatant>();
-		if (_target?.IsAlive == true)
-		{
-			targetCandidates.Add(_target);
-		}
-
-		CombatLoadout readyLoadout = _loadout with
-		{
-			Actions = _loadout.Actions.Where(IsActionReady).ToArray()
-		};
-		CombatDecision decision = _decisionPolicy.ChooseAction(_owner, readyLoadout, targetCandidates);
-
-		if (decision.Action is not null)
-		{
-			_target = decision.Target ?? _target;
-			return decision.Action;
-		}
-
-		return null;
-	}
-
-	private bool IsActionReady(CombatAction action)
-	{
-		if (GlobalCooldownTicksRemaining > 0)
-		{
-			return false;
-		}
-
-		if (action.RequiresTarget && _target?.IsAlive != true)
-		{
-			return false;
-		}
-
-		if (!IsActionInRange(action, out _))
-		{
-			return false;
-		}
-
-		return action.Kind switch
-		{
-			CombatActionKind.BasicAttack => BasicAttackCooldownTicksRemaining <= 0,
-			_ => !_skillCooldowns.TryGetValue(action.ActionId, out int remaining) || remaining <= 0
-		};
-	}
-
-	private bool IsActionInRange(CombatAction action, out double distance)
+	public bool IsActionInRange(CombatAction action, ICombatant? target, out double distance)
 	{
 		distance = 0.0;
 
-		if (!action.RequiresTarget || _target is null)
+		if (!action.RequiresTarget || target is null)
 		{
 			return true;
 		}
 
-		if (_owner is not Node2D ownerNode || _target is not Node2D targetNode)
+		if (_owner is not Node2D ownerNode || target is not Node2D targetNode)
 		{
 			return true;
 		}
 
 		distance = ownerNode.GlobalPosition.DistanceTo(targetNode.GlobalPosition);
 		return distance <= action.Range;
+	}
+
+	private bool IsActionInRange(CombatAction action, out double distance)
+	{
+		return IsActionInRange(action, _target, out distance);
 	}
 
 	private ActionResolution ResolveAction(CombatAction action, long tick)
@@ -619,39 +596,28 @@ public sealed class CombatActionRunner
 		_emitEvent("combat_action_cancelled", BuildActionPayload(action, tick, extras));
 	}
 
-	private bool TrySelectTarget(long tick, string reason)
+	public void SetTarget(ICombatant? nextTarget, long tick, string reason)
 	{
-		if (_selectTarget is null)
-		{
-			return false;
-		}
-
 		ICombatant? previousTarget = _target;
-		ICombatant? nextTarget = _selectTarget();
 
-		if (nextTarget?.IsAlive != true)
+		if (ReferenceEquals(previousTarget, nextTarget))
 		{
-			return false;
+			return;
 		}
 
 		_target = nextTarget;
 
-		if (!ReferenceEquals(previousTarget, nextTarget))
+		_emitEvent("combat_target_changed", new GDict
 		{
-			_emitEvent("combat_target_changed", new GDict
-			{
-				{ "source", nameof(CombatActionRunner) },
-				{ "tick", tick },
-				{ "combatant", _owner.DisplayName },
-				{ "combatant_kind", _owner.CombatantKind },
-				{ "previous_target", previousTarget?.DisplayName ?? "none" },
-				{ "target", nextTarget.DisplayName },
-				{ "target_kind", nextTarget.CombatantKind },
-				{ "reason", reason }
-			});
-		}
-
-		return true;
+			{ "source", nameof(CombatActionRunner) },
+			{ "tick", tick },
+			{ "combatant", _owner.DisplayName },
+			{ "combatant_kind", _owner.CombatantKind },
+			{ "previous_target", previousTarget?.DisplayName ?? "none" },
+			{ "target", nextTarget?.DisplayName ?? "none" },
+			{ "target_kind", nextTarget?.CombatantKind ?? "none" },
+			{ "reason", reason }
+		});
 	}
 
 	private void ChangeState(CombatState nextState)
@@ -776,6 +742,7 @@ public sealed class CombatActionRunner
 			LastActionId = _lastActionId,
 			DefinitionId = _loadout.DefinitionId,
 			CombatLoadoutId = _loadout.LoadoutId,
+			ActionIds = _loadout.Actions.Select(action => action.ActionId).ToArray(),
 			BasicAttackCooldownTicksRemaining = BasicAttackCooldownTicksRemaining,
 			GlobalCooldownTicksRemaining = GlobalCooldownTicksRemaining,
 			CastTicksRemaining = CastTicksRemaining,
@@ -785,6 +752,18 @@ public sealed class CombatActionRunner
 			CanAct = CanAct
 		});
 		_owner.PublishState();
+	}
+
+	private Godot.Collections.Array BuildActionIdsState()
+	{
+		Godot.Collections.Array actionIds = new();
+
+		foreach (CombatAction action in _loadout.Actions)
+		{
+			actionIds.Add(action.ActionId);
+		}
+
+		return actionIds;
 	}
 
 	private readonly record struct ActionResolution(bool Hit, int Damage);

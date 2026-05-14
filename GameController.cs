@@ -28,6 +28,9 @@ public partial class GameController : Node2D
 	public PackedScene? MonsterScene { get; set; }
 
 	[Export]
+	public GameContentLibrary? ContentLibrary { get; set; }
+
+	[Export]
 	public bool AutoSpawnDefaultAdventurers { get; set; } = true;
 
 	[Export]
@@ -47,6 +50,8 @@ public partial class GameController : Node2D
 	private bool _monsterWaveRespawnPending;
 	private double _monsterWaveRespawnTimer;
 	private ICombatant? _selectedCombatant;
+	private bool _contentLibraryValid;
+	private ICombatLoadoutSource _loadoutSource = new FallbackLoadoutSource();
 
 	public Town? Town => _town;
 	public Adventurer? Adventurer => _adventurer;
@@ -61,6 +66,7 @@ public partial class GameController : Node2D
 		_adventurer = GetNodeOrNull<Adventurer>(AdventurerPath);
 		Node monsterContainer = GetOrCreateMonsterContainer();
 		_monsters.Clear();
+		ValidateContentLibrary();
 
 		_adventurers.Clear();
 
@@ -97,6 +103,8 @@ public partial class GameController : Node2D
 		{
 			SpawnDefaultMonsters(monsterContainer);
 		}
+
+		ConfigureCombatControllers();
 
 		_stateLabel = GetNodeOrNull<Label>("Hud/Panel/VBoxContainer/StateLabel");
 		_combatLabel = GetNodeOrNull<Label>("Hud/Panel/VBoxContainer/CombatLabel");
@@ -146,6 +154,12 @@ public partial class GameController : Node2D
 
 	private void EnsureDefaultAdventurers()
 	{
+		if (_contentLibraryValid && ContentLibrary?.DefaultAdventurerSpawns.Length > 0)
+		{
+			SpawnDefaultAdventurersFromContent();
+			return;
+		}
+
 		bool hasWarrior = _adventurers.Any(adventurer => adventurer.Archetype == AdventurerArchetype.Warrior);
 		bool hasMage = _adventurers.Any(adventurer => adventurer.Archetype == AdventurerArchetype.Mage);
 
@@ -175,6 +189,59 @@ public partial class GameController : Node2D
 				positionOffset: new Vector2(0.0f, 28.0f),
 				spriteModulate: new Color(0.75f, 0.45f, 1.0f));
 		}
+	}
+
+	private void SpawnDefaultAdventurersFromContent()
+	{
+		if (ContentLibrary is null)
+		{
+			return;
+		}
+
+		foreach (AdventurerSpawnDefinition spawn in ContentLibrary.DefaultAdventurerSpawns.Where(spawn => spawn is not null && spawn.Enabled))
+		{
+			AdventurerDefinition? definition = spawn.ActorDefinition;
+
+			if (definition is null || HasAdventurerDefinition(definition.DefinitionId))
+			{
+				continue;
+			}
+
+			Vector2 position = spawn.PositionIsTownRelative
+				? (_town?.ReturnPosition ?? Vector2.Zero) + spawn.Position
+				: spawn.Position;
+			Adventurer? adventurer = SpawnDefaultAdventurer(spawn, definition, position);
+
+			if (adventurer is not null)
+			{
+				_adventurer ??= adventurer;
+			}
+		}
+	}
+
+	private bool HasAdventurerDefinition(string definitionId)
+	{
+		return _adventurers.Any(adventurer => string.Equals(adventurer.DefinitionId, definitionId, StringComparison.Ordinal));
+	}
+
+	private Adventurer? SpawnDefaultAdventurer(
+		AdventurerSpawnDefinition spawn,
+		AdventurerDefinition definition,
+		Vector2 position)
+	{
+		if (AdventurerScene is null)
+		{
+			GD.PushError("AdventurerScene is not assigned; cannot spawn runtime adventurer.");
+			return null;
+		}
+
+		Adventurer adventurer = AdventurerScene.Instantiate<Adventurer>();
+		adventurer.Name = string.IsNullOrWhiteSpace(spawn.NodeName) ? definition.DisplayName : spawn.NodeName;
+		adventurer.SetupFromDefinition(definition, spawn.DisplayNameOverride, position);
+		AddChild(adventurer);
+		_adventurers.Add(adventurer);
+		adventurer.CombatController?.SetLoadoutSource(_loadoutSource);
+		return adventurer;
 	}
 
 	private Adventurer? SpawnDefaultAdventurer(
@@ -215,9 +282,52 @@ public partial class GameController : Node2D
 			return;
 		}
 
+		if (_contentLibraryValid && ContentLibrary?.DefaultMonsterSpawns.Length > 0)
+		{
+			SpawnDefaultMonstersFromContent(monsterContainer);
+			return;
+		}
+
 		SpawnMonster(monsterContainer, "Slime", "Slime", new Vector2(580.0f, 300.0f));
 		SpawnMonster(monsterContainer, "Slime2", "Slime 2", new Vector2(670.0f, 240.0f));
 		SpawnMonster(monsterContainer, "Slime3", "Slime 3", new Vector2(670.0f, 360.0f));
+	}
+
+	private void SpawnDefaultMonstersFromContent(Node monsterContainer)
+	{
+		if (ContentLibrary is null)
+		{
+			return;
+		}
+
+		foreach (MonsterSpawnDefinition spawn in ContentLibrary.DefaultMonsterSpawns.Where(spawn => spawn is not null && spawn.Enabled))
+		{
+			MonsterDefinition? definition = spawn.ActorDefinition;
+
+			if (definition is null)
+			{
+				continue;
+			}
+
+			Vector2 position = spawn.PositionIsTownRelative
+				? (_town?.ReturnPosition ?? Vector2.Zero) + spawn.Position
+				: spawn.Position;
+			SpawnMonster(monsterContainer, spawn, definition, position);
+		}
+	}
+
+	private void SpawnMonster(Node monsterContainer, MonsterSpawnDefinition spawn, MonsterDefinition definition, Vector2 position)
+	{
+		if (MonsterScene is null)
+		{
+			return;
+		}
+
+		Monster monster = MonsterScene.Instantiate<Monster>();
+		monster.Name = string.IsNullOrWhiteSpace(spawn.NodeName) ? definition.DisplayName : spawn.NodeName;
+		monster.SetupFromDefinition(definition, spawn.DisplayNameOverride, position);
+		monsterContainer.AddChild(monster);
+		_monsters.Add(monster);
 	}
 
 	private void SpawnMonster(Node monsterContainer, string nodeName, string monsterName, Vector2 position)
@@ -235,6 +345,65 @@ public partial class GameController : Node2D
 			position: position);
 		monsterContainer.AddChild(monster);
 		_monsters.Add(monster);
+	}
+
+	private void ValidateContentLibrary()
+	{
+		_contentLibraryValid = false;
+		_loadoutSource = new FallbackLoadoutSource();
+
+		if (ContentLibrary is null)
+		{
+			EmitBridgeEvent("content_validation_failed", new GDict
+			{
+				{ "source", nameof(GameController) },
+				{ "reason", "missing_content_library" }
+			});
+			GD.PushError("ContentLibrary is not assigned; falling back to hardcoded combat defaults.");
+			return;
+		}
+
+		IReadOnlyList<string> errors = ContentLibrary.ValidateAndBuild();
+
+		if (errors.Count > 0)
+		{
+			Godot.Collections.Array errorState = new();
+
+			foreach (string error in errors)
+			{
+				errorState.Add(error);
+				GD.PushError(error);
+			}
+
+			EmitBridgeEvent("content_validation_failed", new GDict
+			{
+				{ "source", nameof(GameController) },
+				{ "reason", "invalid_content_library" },
+				{ "errors", errorState }
+			});
+			return;
+		}
+
+		_contentLibraryValid = true;
+		_loadoutSource = new DataBackedLoadoutSource(ContentLibrary, EmitBridgeEvent);
+		EmitBridgeEvent("content_validation_completed", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "combat_action_count", ContentLibrary.CombatActions.Length },
+			{ "combat_loadout_count", ContentLibrary.CombatLoadouts.Length },
+			{ "adventurer_count", ContentLibrary.Adventurers.Length },
+			{ "monster_count", ContentLibrary.Monsters.Length },
+			{ "default_adventurer_spawn_count", ContentLibrary.DefaultAdventurerSpawns.Length },
+			{ "default_monster_spawn_count", ContentLibrary.DefaultMonsterSpawns.Length }
+		});
+	}
+
+	private void ConfigureCombatControllers()
+	{
+		foreach (Adventurer adventurer in _adventurers)
+		{
+			adventurer.CombatController?.SetLoadoutSource(_loadoutSource);
+		}
 	}
 
 	public override void _Process(double delta)

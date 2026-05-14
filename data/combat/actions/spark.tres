@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CombatActionDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://CombatActionDefinition.cs" id="1_action"]
+
+[resource]
+script = ExtResource("1_action")
+ActionId = "spark"
+DisplayName = "Spark"
+Kind = 2
+Range = 160.0
+CooldownTicks = 8
+CastTicks = 8
+RecoveryTicks = 0
+RequiresTarget = true
+CanUseWhileMoving = false
+ActionWeight = 4
+DamageMultiplier = 1.2
+UsesGlobalAttackCooldown = false

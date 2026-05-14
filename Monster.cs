@@ -12,6 +12,9 @@ public partial class Monster : Node2D, ICombatant
 	public string MonsterName { get; set; } = "Slime";
 
 	[Export]
+	public MonsterDefinition? Definition { get; set; }
+
+	[Export]
 	public int Level { get; set; } = 1;
 
 	[Export]
@@ -63,6 +66,7 @@ public partial class Monster : Node2D, ICombatant
 	public string LastActionId { get; private set; } = string.Empty;
 	public string DefinitionId { get; private set; } = string.Empty;
 	public string CombatLoadoutId { get; private set; } = string.Empty;
+	public IReadOnlyList<string> ActionIds => _actionIds;
 	public int BasicAttackCooldownTicksRemaining { get; private set; }
 	public int GlobalCooldownTicksRemaining { get; private set; }
 	public int CastTicksRemaining { get; private set; }
@@ -74,6 +78,7 @@ public partial class Monster : Node2D, ICombatant
 	public bool HasAggroTarget => AggroTarget?.IsAlive == true;
 
 	private readonly Dictionary<string, int> _skillCooldowns = new();
+	private readonly List<string> _actionIds = new();
 	private bool _hasSetup;
 	private ProgressBar? _healthBar;
 	private bool _wasMovingToAggroTarget;
@@ -83,8 +88,15 @@ public partial class Monster : Node2D, ICombatant
 	{
 		if (!_hasSetup)
 		{
-			Health = MaxHealth;
-			_homePosition = Position;
+			if (Definition is not null)
+			{
+				SetupFromDefinition(Definition, position: Position);
+			}
+			else
+			{
+				Health = MaxHealth;
+				_homePosition = Position;
+			}
 		}
 
 		_healthBar = GetNodeOrNull<ProgressBar>("HealthBar");
@@ -114,7 +126,11 @@ public partial class Monster : Node2D, ICombatant
 		CombatStats? stats = null,
 		Vector2? position = null,
 		int? goldReward = null,
-		int? experienceReward = null)
+		int? experienceReward = null,
+		float? speed = null,
+		float? aggroRange = null,
+		float? aggroAttackDistance = null,
+		string definitionId = "")
 	{
 		MonsterName = monsterName ?? MonsterName;
 		Level = level ?? Level;
@@ -147,6 +163,9 @@ public partial class Monster : Node2D, ICombatant
 
 		GoldReward = goldReward ?? GoldReward;
 		ExperienceReward = experienceReward ?? ExperienceReward;
+		Speed = speed ?? Speed;
+		AggroRange = aggroRange ?? AggroRange;
+		AggroAttackDistance = aggroAttackDistance ?? AggroAttackDistance;
 		AggroTarget = null;
 		_wasMovingToAggroTarget = false;
 		CombatState = Health > 0 ? global::CombatState.OutOfCombat : global::CombatState.Defeated;
@@ -154,6 +173,9 @@ public partial class Monster : Node2D, ICombatant
 		QueuedActionId = string.Empty;
 		ActiveActionId = string.Empty;
 		LastActionId = string.Empty;
+		DefinitionId = definitionId;
+		CombatLoadoutId = string.Empty;
+		_actionIds.Clear();
 		BasicAttackCooldownTicksRemaining = 0;
 		GlobalCooldownTicksRemaining = 0;
 		CastTicksRemaining = 0;
@@ -167,6 +189,35 @@ public partial class Monster : Node2D, ICombatant
 		if (IsInsideTree())
 		{
 			PublishState();
+		}
+	}
+
+	public void SetupFromDefinition(
+		MonsterDefinition definition,
+		string? displayNameOverride = null,
+		Vector2? position = null)
+	{
+		if (definition.Stats is null)
+		{
+			throw new InvalidOperationException($"Monster definition '{definition.DefinitionId}' is missing stats.");
+		}
+
+		Definition = definition;
+		Setup(
+			monsterName: string.IsNullOrWhiteSpace(displayNameOverride) ? definition.DisplayName : displayNameOverride,
+			level: definition.Level,
+			stats: definition.Stats.ToRuntimeStats(),
+			position: position,
+			goldReward: definition.GoldReward,
+			experienceReward: definition.ExperienceReward,
+			speed: definition.MovementSpeed,
+			aggroRange: definition.AggroRange,
+			aggroAttackDistance: definition.AggroAttackDistance,
+			definitionId: definition.DefinitionId);
+
+		if (GetNodeOrNull<Sprite2D>("Sprite2D") is Sprite2D sprite)
+		{
+			sprite.Modulate = definition.SpriteModulate;
 		}
 	}
 
@@ -229,6 +280,8 @@ public partial class Monster : Node2D, ICombatant
 		LastActionId = snapshot.LastActionId;
 		DefinitionId = snapshot.DefinitionId;
 		CombatLoadoutId = snapshot.CombatLoadoutId;
+		_actionIds.Clear();
+		_actionIds.AddRange(snapshot.ActionIds);
 		BasicAttackCooldownTicksRemaining = snapshot.BasicAttackCooldownTicksRemaining;
 		GlobalCooldownTicksRemaining = snapshot.GlobalCooldownTicksRemaining;
 		CastTicksRemaining = snapshot.CastTicksRemaining;
@@ -251,7 +304,10 @@ public partial class Monster : Node2D, ICombatant
 		_wasMovingToAggroTarget = false;
 		SetCombatSnapshot(new CombatantCombatSnapshot
 		{
-			State = global::CombatState.OutOfCombat
+			State = global::CombatState.OutOfCombat,
+			DefinitionId = DefinitionId,
+			CombatLoadoutId = CombatLoadoutId,
+			ActionIds = _actionIds.ToArray()
 		});
 		UpdateHealthBar();
 		GD.Print($"MONSTER_RESPAWNED monster={MonsterName}");
@@ -291,6 +347,7 @@ public partial class Monster : Node2D, ICombatant
 			{ "last_action", LastActionId },
 			{ "definition_id", DefinitionId },
 			{ "combat_loadout_id", CombatLoadoutId },
+			{ "action_ids", BuildActionIdsState() },
 			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining },
 			{ "global_cooldown_ticks_remaining", GlobalCooldownTicksRemaining },
 			{ "cast_ticks_remaining", CastTicksRemaining },
@@ -434,5 +491,17 @@ public partial class Monster : Node2D, ICombatant
 		}
 
 		return cooldowns;
+	}
+
+	private Godot.Collections.Array BuildActionIdsState()
+	{
+		Godot.Collections.Array actionIds = new();
+
+		foreach (string actionId in _actionIds)
+		{
+			actionIds.Add(actionId);
+		}
+
+		return actionIds;
 	}
 }

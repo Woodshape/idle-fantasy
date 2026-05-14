@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CombatActionDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://CombatActionDefinition.cs" id="1_action"]
+
+[resource]
+script = ExtResource("1_action")
+ActionId = "basic_attack_ranged"
+DisplayName = "Basic Attack"
+Kind = 0
+Range = 160.0
+CooldownTicks = 0
+CastTicks = 0
+RecoveryTicks = 0
+RequiresTarget = true
+CanUseWhileMoving = false
+ActionWeight = 0
+DamageMultiplier = 1.0
+UsesGlobalAttackCooldown = true
