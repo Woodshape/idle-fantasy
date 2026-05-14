@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Shared Combat Brain Plan</title>
+	<style>
+		:root {
+			--bg: #101914;
+			--panel: #fff8e8;
+			--panel-2: #f1e4c3;
+			--ink: #22180f;
+			--muted: #6b5a46;
+			--line: #d5bd87;
+			--green: #2f6b4f;
+			--gold: #c4872c;
+			--red: #9d3e28;
+			--blue: #405f91;
+			--shadow: 0 22px 60px rgba(16, 25, 20, 0.22);
+			--radius: 20px;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html {
+			scroll-behavior: smooth;
+		}
+
+		body {
+			background:
+				radial-gradient(circle at 14% 7%, rgba(196, 135, 44, 0.32), transparent 24rem),
+				radial-gradient(circle at 92% 18%, rgba(47, 107, 79, 0.34), transparent 28rem),
+				linear-gradient(135deg, #101914 0%, #213a2c 54%, #47321e 100%);
+			color: var(--ink);
+			font-family: "Trebuchet MS", "Gill Sans", Verdana, sans-serif;
+			line-height: 1.55;
+			margin: 0;
+		}
+
+		a {
+			color: inherit;
+			text-decoration: none;
+		}
+
+		code {
+			background: rgba(64, 95, 145, 0.1);
+			border: 1px solid rgba(64, 95, 145, 0.18);
+			border-radius: 8px;
+			color: #273a71;
+			padding: 0.08rem 0.28rem;
+		}
+
+		.layout {
+			display: grid;
+			gap: 1.5rem;
+			grid-template-columns: 280px minmax(0, 1fr);
+			margin: 0 auto;
+			max-width: 1480px;
+			padding: 1.5rem;
+		}
+
+		.sidebar {
+			align-self: start;
+			background: rgba(255, 248, 232, 0.92);
+			border: 1px solid rgba(213, 189, 135, 0.72);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			padding: 1.25rem;
+			position: sticky;
+			top: 1.5rem;
+		}
+
+		.sidebar h2 {
+			color: var(--green);
+			font-size: 0.95rem;
+			letter-spacing: 0.08em;
+			margin: 0 0 1rem;
+			text-transform: uppercase;
+		}
+
+		.sidebar nav {
+			display: grid;
+			gap: 0.55rem;
+		}
+
+		.sidebar a {
+			border-left: 3px solid transparent;
+			color: var(--muted);
+			padding: 0.18rem 0 0.18rem 0.65rem;
+		}
+
+		.sidebar a:hover {
+			border-color: var(--gold);
+			color: var(--ink);
+		}
+
+		main {
+			display: grid;
+			gap: 1.25rem;
+		}
+
+		.hero,
+		section {
+			background: rgba(255, 248, 232, 0.94);
+			border: 1px solid rgba(213, 189, 135, 0.75);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+		}
+
+		.hero {
+			overflow: hidden;
+		}
+
+		.hero-inner {
+			background:
+				linear-gradient(90deg, rgba(47, 107, 79, 0.18), transparent 48%),
+				linear-gradient(135deg, rgba(196, 135, 44, 0.22), rgba(64, 95, 145, 0.12));
+			padding: 2rem;
+		}
+
+		.kicker {
+			color: var(--green);
+			font-size: 0.8rem;
+			font-weight: 700;
+			letter-spacing: 0.12em;
+			margin: 0 0 0.65rem;
+			text-transform: uppercase;
+		}
+
+		h1,
+		h2 {
+			line-height: 1.12;
+			margin: 0;
+		}
+
+		h1 {
+			font-size: clamp(2.1rem, 4vw, 4.8rem);
+			max-width: 980px;
+		}
+
+		h2 {
+			color: var(--green);
+			font-size: 1.55rem;
+		}
+
+		p {
+			margin: 0;
+		}
+
+		.lede {
+			color: var(--muted);
+			font-size: 1.12rem;
+			margin-top: 1rem;
+			max-width: 980px;
+		}
+
+		section {
+			padding: 1.5rem;
+		}
+
+		section > p,
+		section > ul {
+			margin-top: 0.9rem;
+		}
+
+		ul {
+			margin-bottom: 0;
+			padding-left: 1.25rem;
+		}
+
+		li + li {
+			margin-top: 0.45rem;
+		}
+
+		.callout {
+			background: rgba(47, 107, 79, 0.1);
+			border: 1px solid rgba(47, 107, 79, 0.22);
+			border-radius: 14px;
+			margin-top: 1rem;
+			padding: 1rem;
+		}
+
+		.grid {
+			display: grid;
+			gap: 1rem;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			margin-top: 1rem;
+		}
+
+		.card {
+			background: rgba(241, 228, 195, 0.55);
+			border: 1px solid rgba(213, 189, 135, 0.72);
+			border-radius: 14px;
+			padding: 1rem;
+		}
+
+		.card h3 {
+			color: var(--blue);
+			font-size: 1rem;
+			margin: 0 0 0.5rem;
+		}
+
+		@media (max-width: 900px) {
+			.layout {
+				grid-template-columns: 1fr;
+				padding: 1rem;
+			}
+
+			.sidebar {
+				position: static;
+			}
+
+			.grid {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="layout">
+		<aside class="sidebar">
+			<h2>Plan Sections</h2>
+			<nav>
+				<a href="#summary">Summary</a>
+				<a href="#key-changes">Key Changes</a>
+				<a href="#interfaces">Interfaces</a>
+				<a href="#test-plan">Test Plan</a>
+				<a href="#assumptions">Assumptions</a>
+			</nav>
+		</aside>
+
+		<main>
+			<header class="hero">
+				<div class="hero-inner">
+					<p class="kicker">2026-05-14 Plan</p>
+					<h1>Shared Combat Brain And Starter Ranged Balance</h1>
+					<p class="lede">Unify combat action, target, and distance decisions for adventurers and monsters while keeping their world intention state machines separate.</p>
+				</div>
+			</header>
+
+			<section id="summary">
+				<h2>Summary</h2>
+				<p>Current combat action choice is only partially shared. <code>CombatDecisionController</code> is used by both sides, but it embeds monster-specific target logic, while adventurer and monster controllers separately decide combat distance.</p>
+				<p>Refactor this into one shared combat brain for action, target, and desired combat range, while keeping adventurer and monster world intentions separate.</p>
+				<div class="callout">
+					<p>Target behavior: warrior and mage should reliably clear the starter three-slime wave, ranged slimes should visibly use <code>basic_attack_ranged</code>, and town recovery should still be exercised.</p>
+				</div>
+			</section>
+
+			<section id="key-changes">
+				<h2>Key Changes</h2>
+				<ul>
+					<li>Replace the current <code>CombatDecisionController</code> and unused <code>ListPriorityDecisionPolicy</code> split with one shared combat policy used by every <code>CombatActionRunner</code>.</li>
+					<li>Move actor-specific preferences out of action selection. Adventurers provide their current hunt or combat target. Monsters provide their current aggro target. The shared policy applies the same target order for both.</li>
+					<li>Add shared combat-distance calculation from the actor's usable targeted basic attack range minus a small padding, clamped to at least melee distance.</li>
+					<li>Update adventurer and monster movement to consume the same desired combat distance. <code>AggroRange</code> remains a perception and social trigger, not an attack-range substitute.</li>
+					<li>Rebalance starter ranged slimes so the party clears the wave while <code>basic_attack_ranged</code> remains visible and meaningful.</li>
+				</ul>
+
+				<div class="grid">
+					<div class="card">
+						<h3>Combat Brain</h3>
+						<p>Action selection, target selection, and desired combat range become shared combat behavior.</p>
+					</div>
+					<div class="card">
+						<h3>World Intentions</h3>
+						<p>Hunting, aggro, loot, return, recovery, and death remain in adventurer and monster world controllers.</p>
+					</div>
+				</div>
+			</section>
+
+			<section id="interfaces">
+				<h2>Interfaces</h2>
+				<ul>
+					<li>Introduce a small shared combat context type, for example <code>CombatDecisionContext</code>, containing <code>CombatActionRunner Runner</code>, <code>IReadOnlyList&lt;ICombatant&gt; TargetCandidates</code>, and <code>ICombatant? PreferredTarget</code>.</li>
+					<li>Replace or revise <code>ICombatDecisionPolicy</code> so the active implementation can ask runner readiness and range checks instead of reimplementing them.</li>
+					<li>Add a shared helper or service for combat range, for example <code>CombatPositioning.GetDesiredCombatDistance(ICombatant actor, CombatLoadout loadout, float meleeDistance)</code>.</li>
+					<li>Keep <code>AdventurerController</code> responsible for hunt, travel, loot, return, recover, and death.</li>
+					<li>Keep <code>Monster</code> responsible for proximity/social aggro and aggro movement.</li>
+				</ul>
+			</section>
+
+			<section id="test-plan">
+				<h2>Test Plan</h2>
+				<ul>
+					<li>Build with <code>dotnet build "Idle Fantasy.sln"</code>.</li>
+					<li>Verify slimes with <code>slime_starting.tres</code> pointing at <code>basic_attack_ranged.tres</code> queue and resolve <code>basic_attack_ranged</code>.</li>
+					<li>Verify at least one slime ranged hit emits <code>damage_applied</code>.</li>
+					<li>Verify starter wave completes and emits <code>game_loop_completed</code>, <code>loot_collected</code>, and <code>monster_wave_respawned</code>.</li>
+					<li>Update brittle distance assertions so ranged casts and attacks validate <code>distance &lt;= range</code> and not melee-only behavior where appropriate.</li>
+					<li>Update <code>combat_2v2</code> expectations or scene setup so the expected encounter shape is explicit and tested.</li>
+				</ul>
+			</section>
+
+			<section id="assumptions">
+				<h2>Assumptions</h2>
+				<ul>
+					<li>The shared combat brain covers combat action, target, and combat-distance decisions only.</li>
+					<li>Broader future AI differences remain in world/intention controllers, not in duplicated combat action logic.</li>
+					<li>Starter wave balance should favor a reliable first-loop clear, with ranged slimes demonstrating damage but not causing early wipes.</li>
+					<li>The current monster-only range patch should be folded into the shared positioning helper rather than kept as a monster-only special case.</li>
+				</ul>
+			</section>
+		</main>
+	</div>
+</body>
+</html>

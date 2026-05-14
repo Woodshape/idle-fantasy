@@ -8,6 +8,8 @@ using GDict = Godot.Collections.Dictionary;
 
 public partial class Monster : Node2D, ICombatant
 {
+	private const float AttackDistanceRangePadding = 6.0f;
+
 	[Export]
 	public string MonsterName { get; set; } = "Slime";
 
@@ -202,6 +204,15 @@ public partial class Monster : Node2D, ICombatant
 			throw new InvalidOperationException($"Monster definition '{definition.DefinitionId}' is missing stats.");
 		}
 
+		float aggroAttackDistance = definition.AggroAttackDistance;
+
+		if (TryGetLongestTargetedBasicAttackRange(definition, out float actionRange))
+		{
+			aggroAttackDistance = Mathf.Max(
+				aggroAttackDistance,
+				Mathf.Max(0.0f, actionRange - AttackDistanceRangePadding));
+		}
+
 		Definition = definition;
 		Setup(
 			monsterName: string.IsNullOrWhiteSpace(displayNameOverride) ? definition.DisplayName : displayNameOverride,
@@ -212,7 +223,7 @@ public partial class Monster : Node2D, ICombatant
 			experienceReward: definition.ExperienceReward,
 			speed: definition.MovementSpeed,
 			aggroRange: definition.AggroRange,
-			aggroAttackDistance: definition.AggroAttackDistance,
+			aggroAttackDistance: aggroAttackDistance,
 			definitionId: definition.DefinitionId);
 
 		if (GetNodeOrNull<Sprite2D>("Sprite2D") is Sprite2D sprite)
@@ -474,6 +485,28 @@ public partial class Monster : Node2D, ICombatant
 		AggroTarget = null;
 		_wasMovingToAggroTarget = false;
 		PublishState();
+	}
+
+	private static bool TryGetLongestTargetedBasicAttackRange(MonsterDefinition definition, out float range)
+	{
+		range = 0.0f;
+
+		if (definition.CombatLoadout is null)
+		{
+			return false;
+		}
+
+		foreach (CombatActionDefinition? action in definition.CombatLoadout.Actions)
+		{
+			if (action is null || !action.RequiresTarget || action.Kind != CombatActionKind.BasicAttack)
+			{
+				continue;
+			}
+
+			range = Mathf.Max(range, (float)action.Range);
+		}
+
+		return range > 0.0f;
 	}
 
 	private static void EmitBridgeEvent(string type, GDict payload)
