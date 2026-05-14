@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Combat Architecture Extraction Plan</title>
+	<style>
+		:root {
+			--bg: #101914;
+			--panel: #fff8e8;
+			--panel-2: #f1e4c3;
+			--ink: #22180f;
+			--muted: #6b5a46;
+			--line: #d5bd87;
+			--green: #2f6b4f;
+			--gold: #c4872c;
+			--red: #9d3e28;
+			--blue: #405f91;
+			--shadow: 0 22px 60px rgba(16, 25, 20, 0.22);
+			--radius: 20px;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html {
+			scroll-behavior: smooth;
+		}
+
+		body {
+			background:
+				radial-gradient(circle at 12% 8%, rgba(196, 135, 44, 0.32), transparent 24rem),
+				radial-gradient(circle at 88% 16%, rgba(47, 107, 79, 0.34), transparent 28rem),
+				linear-gradient(135deg, #101914 0%, #213a2c 54%, #47321e 100%);
+			color: var(--ink);
+			font-family: "Trebuchet MS", "Gill Sans", Verdana, sans-serif;
+			line-height: 1.55;
+			margin: 0;
+		}
+
+		a {
+			color: inherit;
+		}
+
+		code {
+			background: rgba(64, 95, 145, 0.1);
+			border: 1px solid rgba(64, 95, 145, 0.18);
+			border-radius: 8px;
+			color: #273a71;
+			padding: 0.08rem 0.28rem;
+		}
+
+		pre {
+			background: #1f2b24;
+			border-radius: 14px;
+			color: #fff8e8;
+			overflow-x: auto;
+			padding: 1rem;
+		}
+
+		pre code {
+			background: transparent;
+			border: 0;
+			color: inherit;
+			padding: 0;
+		}
+
+		.layout {
+			display: grid;
+			gap: 1.5rem;
+			grid-template-columns: 280px minmax(0, 1fr);
+			margin: 0 auto;
+			max-width: 1480px;
+			padding: 1.5rem;
+		}
+
+		.sidebar {
+			align-self: start;
+			background: rgba(255, 248, 232, 0.92);
+			border: 1px solid rgba(213, 189, 135, 0.85);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			padding: 1rem;
+			position: sticky;
+			top: 1rem;
+		}
+
+		.sidebar h2 {
+			font-family: Georgia, serif;
+			font-size: 0.95rem;
+			letter-spacing: 0.12em;
+			margin: 0 0 0.8rem;
+			text-transform: uppercase;
+		}
+
+		.sidebar a {
+			border-radius: 999px;
+			color: var(--muted);
+			display: block;
+			padding: 0.42rem 0.65rem;
+			text-decoration: none;
+		}
+
+		.sidebar a:hover {
+			background: var(--panel-2);
+			color: var(--ink);
+		}
+
+		main {
+			display: grid;
+			gap: 1rem;
+			min-width: 0;
+		}
+
+		.hero,
+		.panel,
+		.card,
+		.metric {
+			border: 1px solid rgba(213, 189, 135, 0.78);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+		}
+
+		.hero {
+			background:
+				linear-gradient(135deg, rgba(255, 248, 232, 0.95), rgba(241, 228, 195, 0.93)),
+				linear-gradient(90deg, rgba(47, 107, 79, 0.2), rgba(196, 135, 44, 0.2));
+			overflow: hidden;
+			padding: clamp(1.5rem, 4vw, 3rem);
+			position: relative;
+		}
+
+		.hero:after {
+			background:
+				linear-gradient(90deg, rgba(47, 107, 79, 0.08) 1px, transparent 1px),
+				linear-gradient(rgba(47, 107, 79, 0.08) 1px, transparent 1px);
+			background-size: 34px 34px;
+			content: "";
+			inset: 0;
+			position: absolute;
+		}
+
+		.hero > * {
+			position: relative;
+			z-index: 1;
+		}
+
+		.kicker {
+			color: var(--green);
+			font-weight: 800;
+			letter-spacing: 0.14em;
+			margin: 0 0 0.75rem;
+			text-transform: uppercase;
+		}
+
+		h1,
+		h2,
+		h3 {
+			font-family: Georgia, "Times New Roman", serif;
+			line-height: 1.12;
+		}
+
+		h1 {
+			font-size: clamp(2.35rem, 6vw, 5.1rem);
+			margin: 0 0 1rem;
+			max-width: 13ch;
+		}
+
+		h2 {
+			font-size: clamp(1.45rem, 3vw, 2.25rem);
+			margin: 0;
+		}
+
+		h3 {
+			font-size: 1.14rem;
+			margin: 0 0 0.5rem;
+		}
+
+		p {
+			margin: 0 0 1rem;
+		}
+
+		p:last-child,
+		li:last-child {
+			margin-bottom: 0;
+		}
+
+		.hero p {
+			font-size: clamp(1.05rem, 2vw, 1.24rem);
+			max-width: 78ch;
+		}
+
+		.panel {
+			background: rgba(255, 248, 232, 0.94);
+			padding: clamp(1.1rem, 2.4vw, 1.75rem);
+		}
+
+		.section-title {
+			align-items: end;
+			border-bottom: 2px solid rgba(213, 189, 135, 0.65);
+			display: flex;
+			gap: 1rem;
+			justify-content: space-between;
+			margin-bottom: 1rem;
+			padding-bottom: 0.75rem;
+		}
+
+		.tag {
+			background: rgba(47, 107, 79, 0.12);
+			border: 1px solid rgba(47, 107, 79, 0.25);
+			border-radius: 999px;
+			color: var(--green);
+			font-size: 0.76rem;
+			font-weight: 800;
+			letter-spacing: 0.08em;
+			padding: 0.32rem 0.62rem;
+			text-transform: uppercase;
+			white-space: nowrap;
+		}
+
+		.summary,
+		.grid-2,
+		.grid-3,
+		.grid-5 {
+			display: grid;
+			gap: 1rem;
+		}
+
+		.summary {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+
+		.grid-2 {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.grid-3 {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.grid-5 {
+			grid-template-columns: repeat(5, minmax(0, 1fr));
+		}
+
+		.metric,
+		.card {
+			background: rgba(255, 248, 232, 0.94);
+			padding: 1rem;
+		}
+
+		.metric strong {
+			color: var(--green);
+			display: block;
+			font-family: Georgia, serif;
+			font-size: 1.8rem;
+			line-height: 1;
+			margin-bottom: 0.45rem;
+		}
+
+		.card {
+			background: var(--panel-2);
+			border-radius: 16px;
+			box-shadow: none;
+		}
+
+		.card.green {
+			background: rgba(47, 107, 79, 0.12);
+			border-color: rgba(47, 107, 79, 0.28);
+		}
+
+		.card.gold {
+			background: rgba(196, 135, 44, 0.14);
+			border-color: rgba(196, 135, 44, 0.32);
+		}
+
+		.card.red {
+			background: rgba(157, 62, 40, 0.1);
+			border-color: rgba(157, 62, 40, 0.28);
+		}
+
+		.card.blue {
+			background: rgba(64, 95, 145, 0.12);
+			border-color: rgba(64, 95, 145, 0.28);
+		}
+
+		ul {
+			margin: 0;
+			padding-left: 1.2rem;
+		}
+
+		table {
+			border-collapse: collapse;
+			width: 100%;
+		}
+
+		th,
+		td {
+			border-bottom: 1px solid rgba(213, 189, 135, 0.65);
+			padding: 0.72rem;
+			text-align: left;
+			vertical-align: top;
+		}
+
+		th {
+			color: var(--green);
+			font-size: 0.78rem;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+
+		.flow {
+			counter-reset: step;
+			display: grid;
+			gap: 0.7rem;
+			list-style: none;
+			padding: 0;
+		}
+
+		.flow li {
+			background: var(--panel-2);
+			border: 1px solid rgba(213, 189, 135, 0.8);
+			border-radius: 14px;
+			margin: 0;
+			min-height: 3.5rem;
+			padding: 0.9rem 1rem 0.9rem 3.5rem;
+			position: relative;
+		}
+
+		.flow li:before {
+			align-items: center;
+			background: var(--green);
+			border-radius: 50%;
+			color: #fff8e8;
+			content: counter(step);
+			counter-increment: step;
+			display: inline-flex;
+			font-weight: 800;
+			height: 2rem;
+			justify-content: center;
+			left: 0.85rem;
+			position: absolute;
+			top: 0.75rem;
+			width: 2rem;
+		}
+
+		.footer-note {
+			color: rgba(255, 248, 232, 0.82);
+			font-size: 0.9rem;
+			text-align: center;
+		}
+
+		@media (max-width: 1100px) {
+			.layout {
+				grid-template-columns: 1fr;
+			}
+
+			.sidebar {
+				position: static;
+			}
+
+			.sidebar nav {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.summary,
+			.grid-3,
+			.grid-5 {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+		}
+
+		@media (max-width: 720px) {
+			.layout {
+				padding: 0.8rem;
+			}
+
+			.sidebar nav,
+			.summary,
+			.grid-2,
+			.grid-3,
+			.grid-5 {
+				grid-template-columns: 1fr;
+			}
+
+			.section-title {
+				align-items: start;
+				flex-direction: column;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="layout">
+		<aside class="sidebar" aria-label="Plan navigation">
+			<h2>Combat Split</h2>
+			<nav>
+				<a href="#overview">Overview</a>
+				<a href="#status">Status</a>
+				<a href="#roles">Responsibilities</a>
+				<a href="#old-roles">Current Classes</a>
+				<a href="#new-roles">New Classes</a>
+				<a href="#migration">Migration</a>
+				<a href="#events">Events</a>
+				<a href="#criteria">Acceptance</a>
+			</nav>
+		</aside>
+
+		<main>
+			<header class="hero" id="overview">
+				<p class="kicker">Refactor Plan</p>
+				<h1>Combat Architecture Extraction</h1>
+				<p>This plan defines the future split between the existing <code>AdventurerCombatController</code> and <code>CombatActionRunner</code>, plus the planned <code>CombatEncounter</code>, <code>CombatDecisionController</code>, and <code>CombatTickResolver</code>.</p>
+				<p>The goal is to keep combat behavior stable while moving encounter ownership, action choice, and tick resolution into clearer units as multi-combatant fights become more important.</p>
+			</header>
+
+			<section class="summary" aria-label="At a glance">
+				<div class="metric">
+					<strong>Adapter</strong>
+					<span><code>AdventurerCombatController</code> stays Godot-facing and thin.</span>
+				</div>
+				<div class="metric">
+					<strong>Executor</strong>
+					<span><code>CombatActionRunner</code> keeps legal action lifecycle and counters.</span>
+				</div>
+				<div class="metric">
+					<strong>Policy</strong>
+					<span><code>CombatDecisionController</code> chooses action and target intent.</span>
+				</div>
+				<div class="metric">
+					<strong>Tick</strong>
+					<span><code>CombatTickResolver</code> resolves one authoritative combat tick.</span>
+				</div>
+			</section>
+
+			<section class="panel" id="status">
+				<div class="section-title">
+					<h2>Extraction Status</h2>
+					<span class="tag">Plan Only</span>
+				</div>
+				<div class="grid-3">
+					<div class="card green">
+						<h3>Keep Stable</h3>
+						<ul>
+							<li>Current bridge events.</li>
+							<li>Hit and damage formulas.</li>
+							<li>Tick-authoritative combat.</li>
+							<li>Existing full-loop verifier.</li>
+						</ul>
+					</div>
+					<div class="card gold">
+						<h3>Extract Gradually</h3>
+						<ul>
+							<li>Decision policy first.</li>
+							<li>Tick resolution second.</li>
+							<li>Encounter ownership third.</li>
+							<li>Multi-combatant hardening after that.</li>
+						</ul>
+					</div>
+					<div class="card red">
+						<h3>Avoid In Same Change</h3>
+						<ul>
+							<li>Combat math rewrite.</li>
+							<li>Data-driven skill library.</li>
+							<li>Party reward splitting.</li>
+							<li>Broad framework migration.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="roles">
+				<div class="section-title">
+					<h2>Responsibility Matrix</h2>
+					<span class="tag">Boundaries</span>
+				</div>
+				<table>
+					<thead>
+						<tr>
+							<th>Type</th>
+							<th>Owns</th>
+							<th>Should Not Own</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><code>AdventurerCombatController</code></td>
+							<td>Godot integration, combat entry point, adventurer-facing state, result forwarding.</td>
+							<td>Initiative resolution, action scoring, encounter membership, reward membership.</td>
+						</tr>
+						<tr>
+							<td><code>CombatActionRunner</code></td>
+							<td>One combatant's counters, queued action, active action, range validation, resolve/cancel lifecycle.</td>
+							<td>Encounter lifetime, party membership, high-level AI strategy, global action ordering.</td>
+						</tr>
+						<tr>
+							<td><code>CombatEncounter</code></td>
+							<td>Encounter id, participants, dynamic joins, end conditions, reward membership, encounter state.</td>
+							<td>Godot input, UI labels, action scoring formulas, low-level scene lookup.</td>
+						</tr>
+						<tr>
+							<td><code>CombatDecisionController</code></td>
+							<td>Action and target intent from current state, archetype, range, cooldowns, health, and later tactics.</td>
+							<td>Health mutation, counter decrementing, resolution events, node ownership.</td>
+						</tr>
+						<tr>
+							<td><code>CombatTickResolver</code></td>
+							<td>Advance one tick, queue decisions, roll order, resolve or cancel actions, return tick results.</td>
+							<td>Persistent encounter ownership, long-term AI, scene integration.</td>
+						</tr>
+					</tbody>
+				</table>
+			</section>
+
+			<section class="panel" id="old-roles">
+				<div class="section-title">
+					<h2>Current Classes After Split</h2>
+					<span class="tag">Old Names</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3><code>AdventurerCombatController</code></h3>
+						<p>Becomes a thin adapter: it starts or joins combat for its parent adventurer, wires to the active encounter, publishes adventurer-facing state, and forwards combat end results to the idle loop.</p>
+						<ul>
+							<li>Keep parent adventurer lookup.</li>
+							<li>Keep entry points used by <code>AdventurerController</code>.</li>
+							<li>Move participant lists and tick resolution out.</li>
+						</ul>
+					</div>
+					<div class="card blue">
+						<h3><code>CombatActionRunner</code></h3>
+						<p>Stays the legal executor for one combatant. It knows whether an action can execute and how to execute it, but no longer chooses the strategic action.</p>
+						<ul>
+							<li>Keep counters, queued action, active action, range checks.</li>
+							<li>Keep action resolve/cancel and snapshots.</li>
+							<li>Move list-priority selection and target policy out.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="new-roles">
+				<div class="section-title">
+					<h2>New Extraction Targets</h2>
+					<span class="tag">New Names</span>
+				</div>
+				<div class="grid-3">
+					<div class="card gold">
+						<h3><code>CombatEncounter</code></h3>
+						<p>Owns the fight: participants, runners, dynamic joins, living counts, reward membership, end conditions, and encounter state.</p>
+					</div>
+					<div class="card gold">
+						<h3><code>CombatDecisionController</code></h3>
+						<p>Chooses intent: action, target, and reason. Initial policies can preserve the current warrior, mage, and monster priorities.</p>
+					</div>
+					<div class="card gold">
+						<h3><code>CombatTickResolver</code></h3>
+						<p>Owns one tick: counters, decisions, queueing, order rolls, resolution, cancellation, and tick result output.</p>
+					</div>
+				</div>
+				<div class="grid-2" style="margin-top: 1rem;">
+					<div class="card">
+						<h3>Decision Shape</h3>
+						<pre><code>public sealed record CombatDecision(
+    CombatAction? Action,
+    ICombatant? Target,
+    string Reason);</code></pre>
+					</div>
+					<div class="card">
+						<h3>Encounter Shape</h3>
+						<pre><code>public sealed class CombatEncounter
+{
+    public int EncounterId { get; }
+    public bool TryAddMonster(...);
+    public CombatTickResult ProcessTick(...);
+}</code></pre>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="migration">
+				<div class="section-title">
+					<h2>Migration Plan</h2>
+					<span class="tag">Low Risk Order</span>
+				</div>
+				<ol class="flow">
+					<li>Add passive records such as <code>CombatDecision</code>, <code>CombatTickResult</code>, and <code>CombatEncounterState</code> without changing behavior.</li>
+					<li>Extract <code>CombatDecisionController</code> from runner action selection and controller target callbacks while preserving list-priority behavior.</li>
+					<li>Extract <code>CombatTickResolver</code> from action queue collection, order rolling, and queued action resolution.</li>
+					<li>Extract <code>CombatEncounter</code> from participant lists, runner lists, dynamic joins, end conditions, and encounter state.</li>
+					<li>Harden multi-combatant behavior with dynamic join rewards, cross-encounter ownership checks, and 1v2 or 2v2 bridge verification.</li>
+				</ol>
+			</section>
+
+			<section class="panel" id="events">
+				<div class="section-title">
+					<h2>Events And State</h2>
+					<span class="tag">Compatibility</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Preserve Events</h3>
+						<ul>
+							<li><code>combat_started</code></li>
+							<li><code>combat_tick_started</code> / <code>combat_tick_completed</code></li>
+							<li><code>combat_action_queued</code> / <code>combat_action_resolved</code></li>
+							<li><code>attack_roll_resolved</code> / <code>damage_applied</code></li>
+							<li><code>monster_joined_encounter</code>, <code>monster_defeated</code>, <code>adventurer_died</code></li>
+						</ul>
+					</div>
+					<div class="card blue">
+						<h3>Preserve State</h3>
+						<ul>
+							<li><code>combat_encounter</code> active flag and encounter id.</li>
+							<li>Participant arrays and living counts.</li>
+							<li>Per-combatant cooldown, cast, recovery, target, queued, and active action fields.</li>
+							<li><code>simulation_clock</code> tick count and interval.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="criteria">
+				<div class="section-title">
+					<h2>Acceptance Criteria</h2>
+					<span class="tag">Definition Of Done</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Refactor Gates</h3>
+						<ul>
+							<li><code>scripts/verify_combat_main_loop.sh</code> still passes.</li>
+							<li>Existing bridge events remain available or intentional changes are documented.</li>
+							<li><code>AdventurerCombatController</code> no longer owns tick resolution after resolver extraction.</li>
+							<li><code>CombatActionRunner</code> no longer chooses strategic actions after decision extraction.</li>
+						</ul>
+					</div>
+					<div class="card gold">
+						<h3>Combat Gates</h3>
+						<ul>
+							<li><code>CombatEncounter</code> owns participants, dynamic joins, end conditions, and reward membership.</li>
+							<li>At least one 1v2 or 2v2 verifier covers multi-combatant behavior.</li>
+							<li>Dynamic joins cannot duplicate a monster across active encounters.</li>
+							<li>Reward membership includes monsters added after encounter start.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<p class="footer-note">HTML overview page synced with plans/combat-architecture-extraction-plan.md.</p>
+		</main>
+	</div>
+</body>
+</html>

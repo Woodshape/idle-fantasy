@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Combat Data Unified Workflow Plan</title>
+	<style>
+		:root {
+			--bg: #101914;
+			--panel: #fff8e8;
+			--panel-2: #f1e4c3;
+			--ink: #22180f;
+			--muted: #6b5a46;
+			--line: #d5bd87;
+			--green: #2f6b4f;
+			--gold: #c4872c;
+			--red: #9d3e28;
+			--blue: #405f91;
+			--shadow: 0 22px 60px rgba(16, 25, 20, 0.22);
+			--radius: 20px;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html {
+			scroll-behavior: smooth;
+		}
+
+		body {
+			background:
+				radial-gradient(circle at 14% 8%, rgba(196, 135, 44, 0.32), transparent 23rem),
+				radial-gradient(circle at 88% 18%, rgba(64, 95, 145, 0.28), transparent 27rem),
+				linear-gradient(135deg, #101914 0%, #243b2d 52%, #4a3420 100%);
+			color: var(--ink);
+			font-family: "Trebuchet MS", "Gill Sans", Verdana, sans-serif;
+			line-height: 1.55;
+			margin: 0;
+			overflow-x: hidden;
+		}
+
+		a {
+			color: inherit;
+		}
+
+		code {
+			background: rgba(64, 95, 145, 0.1);
+			border: 1px solid rgba(64, 95, 145, 0.18);
+			border-radius: 8px;
+			color: #273a71;
+			padding: 0.08rem 0.28rem;
+		}
+
+		pre {
+			background: #1f2b24;
+			border-radius: 14px;
+			color: #fff8e8;
+			overflow-x: auto;
+			padding: 1rem;
+		}
+
+		pre code {
+			background: transparent;
+			border: 0;
+			color: inherit;
+			padding: 0;
+		}
+
+		.layout {
+			display: grid;
+			gap: 1.5rem;
+			grid-template-columns: 280px minmax(0, 1fr);
+			margin: 0 auto;
+			max-width: 1480px;
+			overflow: hidden;
+			padding: 1.5rem;
+			width: 100%;
+		}
+
+		.sidebar {
+			align-self: start;
+			background: rgba(255, 248, 232, 0.93);
+			border: 1px solid rgba(213, 189, 135, 0.85);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			padding: 1rem;
+			position: sticky;
+			top: 1rem;
+			width: 100%;
+		}
+
+		.sidebar h2 {
+			font-family: Georgia, serif;
+			font-size: 0.95rem;
+			letter-spacing: 0.12em;
+			margin: 0 0 0.8rem;
+			text-transform: uppercase;
+		}
+
+		.sidebar a {
+			border-radius: 999px;
+			color: var(--muted);
+			display: block;
+			padding: 0.42rem 0.65rem;
+			text-decoration: none;
+		}
+
+		.sidebar a:hover {
+			background: var(--panel-2);
+			color: var(--ink);
+		}
+
+		main {
+			display: grid;
+			gap: 1rem;
+			min-width: 0;
+			overflow: hidden;
+			width: 100%;
+		}
+
+		.hero,
+		.panel,
+		.card,
+		.metric {
+			border: 1px solid rgba(213, 189, 135, 0.78);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			max-width: 100%;
+			min-width: 0;
+			overflow: hidden;
+			width: 100%;
+		}
+
+		.hero {
+			background:
+				linear-gradient(135deg, rgba(255, 248, 232, 0.96), rgba(241, 228, 195, 0.94)),
+				linear-gradient(90deg, rgba(47, 107, 79, 0.22), rgba(196, 135, 44, 0.2));
+			overflow: hidden;
+			padding: clamp(1.5rem, 4vw, 3rem);
+			position: relative;
+		}
+
+		.hero:after {
+			background:
+				linear-gradient(90deg, rgba(47, 107, 79, 0.08) 1px, transparent 1px),
+				linear-gradient(rgba(47, 107, 79, 0.08) 1px, transparent 1px);
+			background-size: 34px 34px;
+			content: "";
+			inset: 0;
+			position: absolute;
+		}
+
+		.hero > * {
+			position: relative;
+			z-index: 1;
+		}
+
+		.kicker {
+			color: var(--green);
+			font-weight: 800;
+			letter-spacing: 0.14em;
+			margin: 0 0 0.75rem;
+			text-transform: uppercase;
+		}
+
+		h1,
+		h2,
+		h3 {
+			font-family: Georgia, "Times New Roman", serif;
+			line-height: 1.12;
+		}
+
+		h1 {
+			font-size: clamp(2.25rem, 5.8vw, 4.85rem);
+			margin: 0 0 1rem;
+			max-width: 14ch;
+		}
+
+		h2 {
+			font-size: clamp(1.45rem, 3vw, 2.25rem);
+			margin: 0;
+		}
+
+		h3 {
+			font-size: 1.08rem;
+			margin: 0 0 0.5rem;
+		}
+
+		p {
+			margin: 0 0 1rem;
+		}
+
+		p:last-child,
+		li:last-child {
+			margin-bottom: 0;
+		}
+
+		.hero p {
+			font-size: clamp(1.05rem, 2vw, 1.22rem);
+			max-width: 82ch;
+		}
+
+		h1,
+		h2,
+		h3,
+		p,
+		li,
+		td,
+		th,
+		code {
+			overflow-wrap: anywhere;
+		}
+
+		.panel {
+			background: rgba(255, 248, 232, 0.94);
+			padding: clamp(1.1rem, 2.4vw, 1.75rem);
+		}
+
+		.section-title {
+			align-items: end;
+			border-bottom: 2px solid rgba(213, 189, 135, 0.65);
+			display: flex;
+			gap: 1rem;
+			justify-content: space-between;
+			margin-bottom: 1rem;
+			padding-bottom: 0.75rem;
+		}
+
+		.tag {
+			background: rgba(47, 107, 79, 0.12);
+			border: 1px solid rgba(47, 107, 79, 0.25);
+			border-radius: 999px;
+			color: var(--green);
+			font-size: 0.76rem;
+			font-weight: 800;
+			letter-spacing: 0.08em;
+			padding: 0.32rem 0.62rem;
+			text-transform: uppercase;
+			white-space: nowrap;
+		}
+
+		.summary,
+		.grid-2,
+		.grid-3,
+		.pipeline {
+			display: grid;
+			gap: 1rem;
+		}
+
+		.summary {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+
+		.grid-2 {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.grid-3 {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.pipeline {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+
+		.metric,
+		.card {
+			background: rgba(255, 248, 232, 0.94);
+			padding: 1rem;
+		}
+
+		.metric strong {
+			color: var(--green);
+			display: block;
+			font-family: Georgia, serif;
+			font-size: 1.75rem;
+			line-height: 1;
+			margin-bottom: 0.45rem;
+		}
+
+		.card h3 {
+			color: var(--green);
+		}
+
+		.card.gold h3 {
+			color: var(--gold);
+		}
+
+		.card.red h3 {
+			color: var(--red);
+		}
+
+		.card.blue h3 {
+			color: var(--blue);
+		}
+
+		.callout {
+			background: rgba(47, 107, 79, 0.11);
+			border: 1px solid rgba(47, 107, 79, 0.28);
+			border-radius: 14px;
+			padding: 1rem;
+		}
+
+		.flow {
+			counter-reset: step;
+			display: grid;
+			gap: 0.7rem;
+			list-style: none;
+			margin: 0;
+			padding: 0;
+		}
+
+		.flow li {
+			background: var(--panel-2);
+			border: 1px solid rgba(213, 189, 135, 0.8);
+			border-radius: 14px;
+			margin: 0;
+			min-height: 3.5rem;
+			padding: 0.9rem 1rem 0.9rem 3.5rem;
+			position: relative;
+		}
+
+		.flow li:before {
+			align-items: center;
+			background: var(--green);
+			border-radius: 50%;
+			color: #fff8e8;
+			content: counter(step);
+			counter-increment: step;
+			display: inline-flex;
+			font-weight: 800;
+			height: 2rem;
+			justify-content: center;
+			left: 0.85rem;
+			position: absolute;
+			top: 0.75rem;
+			width: 2rem;
+		}
+
+		.table-wrap {
+			overflow-x: auto;
+		}
+
+		table {
+			border-collapse: collapse;
+			width: 100%;
+		}
+
+		th,
+		td {
+			border-bottom: 1px solid rgba(213, 189, 135, 0.75);
+			padding: 0.75rem;
+			text-align: left;
+			vertical-align: top;
+		}
+
+		th {
+			color: var(--green);
+			font-size: 0.78rem;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+
+		.footer-note {
+			color: rgba(255, 248, 232, 0.8);
+			font-size: 0.92rem;
+			margin: 0.5rem 0 0;
+			text-align: center;
+		}
+
+		@media (max-width: 980px) {
+			.layout {
+				grid-template-columns: 1fr;
+			}
+
+			.sidebar {
+				position: static;
+			}
+
+			.sidebar nav {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 0.25rem;
+			}
+
+			.summary,
+			.grid-2,
+			.grid-3,
+			.pipeline {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		@media (max-width: 560px) {
+			.layout {
+				max-width: 100vw;
+				padding: 0.8rem;
+			}
+
+			.sidebar,
+			main,
+			.hero,
+			.panel,
+			.card,
+			.metric {
+				width: calc(100vw - 1.6rem);
+			}
+
+			.sidebar nav {
+				grid-template-columns: 1fr;
+			}
+
+			.section-title {
+				align-items: start;
+				flex-direction: column;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="layout">
+		<aside class="sidebar" aria-label="Plan navigation">
+			<h2>Unified Plan</h2>
+			<nav>
+				<a href="#overview">Overview</a>
+				<a href="#why">Why</a>
+				<a href="#contract">Contract</a>
+				<a href="#workflow">Workflow</a>
+				<a href="#split">Parallel Split</a>
+				<a href="#criteria">Acceptance</a>
+			</nav>
+		</aside>
+
+		<main>
+			<header class="hero" id="overview">
+				<p class="kicker">Prerequisite Workflow</p>
+				<h1>Combat Data Unified Workflow</h1>
+				<p>Create a small shared contract before the combat architecture extraction and data-driven skill configuration work split into parallel slices.</p>
+				<p>The goal is to keep behavior stable while separating action creation, ordered loadout priority, decision intent, and future data-backed content loading.</p>
+			</header>
+
+			<section class="summary" aria-label="At a glance">
+				<div class="metric">
+					<strong>1</strong>
+					<span>Short alignment pass before either large slice changes shared combat seams.</span>
+				</div>
+				<div class="metric">
+					<strong>2</strong>
+					<span>Parallel slices afterward: architecture extraction and data-backed configuration.</span>
+				</div>
+				<div class="metric">
+					<strong>0</strong>
+					<span>No Godot resource assets or encounter ownership extraction in this workflow.</span>
+				</div>
+				<div class="metric">
+					<strong>Stable</strong>
+					<span>Existing bridge events and full-loop verification stay compatible.</span>
+				</div>
+			</section>
+
+			<section class="panel" id="why">
+				<div class="section-title">
+					<h2>Why This Exists</h2>
+					<span class="tag">Conflict Reduction</span>
+				</div>
+				<div class="grid-3">
+					<div class="card red">
+						<h3>Shared Hot Paths</h3>
+						<ul>
+							<li><code>CreateAdventurerActions</code></li>
+							<li><code>CreateMonsterActions</code></li>
+							<li><code>CreateHeavyStrike</code> and <code>CreateSpark</code></li>
+							<li><code>CombatActionRunner.SelectAction</code></li>
+						</ul>
+					</div>
+					<div class="card gold">
+						<h3>Plan Mismatch</h3>
+						<p>The architecture plan avoids a data-driven skill library in the same change, while the data plan replaces hardcoded action factories.</p>
+					</div>
+					<div class="card green">
+						<h3>Shared Exit</h3>
+						<p>Both slices can use a resolved ordered loadout of immutable runtime <code>CombatAction</code> objects.</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="contract">
+				<div class="section-title">
+					<h2>Shared Contract</h2>
+					<span class="tag">Behavior First</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Runtime Actions</h3>
+						<p><code>CombatAction</code> remains the immutable object used by execution. Godot <code>Resource</code> definitions do not enter <code>CombatActionRunner</code>.</p>
+					</div>
+					<div class="card blue">
+						<h3>Loadout Source</h3>
+						<p>A loadout source returns an ordered <code>CombatLoadout</code>. It can be hardcoded first and data-backed later.</p>
+					</div>
+					<div class="card gold">
+						<h3>Decision Policy</h3>
+						<p>Decision code consumes a resolved loadout and target candidates. It should not construct action definitions.</p>
+					</div>
+					<div class="card">
+						<h3>Passive Identity</h3>
+						<p><code>DefinitionId</code>, <code>CombatLoadoutId</code>, and stable action ids can be additive bridge/state fields.</p>
+					</div>
+				</div>
+				<div class="grid-2" style="margin-top: 1rem;">
+					<div class="card">
+						<h3>Loadout Shape</h3>
+						<pre><code>public interface ICombatLoadoutSource
+{
+    CombatLoadout ResolveLoadout(ICombatant combatant);
+}
+
+public sealed record CombatLoadout(
+    string LoadoutId,
+    IReadOnlyList&lt;CombatAction&gt; Actions);</code></pre>
+					</div>
+					<div class="card">
+						<h3>Decision Shape</h3>
+						<pre><code>public sealed record CombatDecision(
+    CombatAction? Action,
+    ICombatant? Target,
+    string Reason);</code></pre>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="workflow">
+				<div class="section-title">
+					<h2>Unified Workflow</h2>
+					<span class="tag">Before Split</span>
+				</div>
+				<ol class="flow">
+					<li>Inventory current hardcoded action creation, loadout ordering, selection behavior, and bridge output.</li>
+					<li>Define the runtime action and ordered loadout contract while keeping <code>CombatAction</code> as the execution object.</li>
+					<li>Wrap current warrior, mage, and slime hardcoded factories behind the loadout source without adding resources.</li>
+					<li>Make decision intent consume resolved loadouts and preserve deterministic list-priority behavior.</li>
+					<li>Add optional stable ids only as additive state or bridge fields when they can default to current behavior.</li>
+					<li>Run <code>dotnet build</code> and <code>scripts/verify_combat_main_loop.sh</code> to prove parity.</li>
+					<li>Split into architecture and data-backed configuration slices after the contract is stable.</li>
+				</ol>
+			</section>
+
+			<section class="panel" id="split">
+				<div class="section-title">
+					<h2>Parallel Split</h2>
+					<span class="tag">After Workflow</span>
+				</div>
+				<div class="grid-2">
+					<div class="card blue">
+						<h3>Architecture Slice Owns</h3>
+						<ul>
+							<li><code>CombatDecisionController</code></li>
+							<li><code>CombatTickResolver</code></li>
+							<li><code>CombatEncounter</code></li>
+							<li>encounter membership and end conditions</li>
+							<li>dynamic joins and multi-combatant verification</li>
+						</ul>
+					</div>
+					<div class="card gold">
+						<h3>Data Slice Owns</h3>
+						<ul>
+							<li><code>CombatActionDefinition</code> and <code>CombatLoadoutDefinition</code></li>
+							<li><code>AdventurerDefinition</code> and <code>MonsterDefinition</code></li>
+							<li><code>GameContentLibrary</code></li>
+							<li>default data assets and validation</li>
+							<li>data-backed loadout resolution</li>
+						</ul>
+					</div>
+				</div>
+				<div class="callout" style="margin-top: 1rem;">
+					<p><strong>Recommended order:</strong> unified workflow first, then data-backed loadouts and actor definitions, then architecture extraction. If multi-combatant behavior is the higher priority, architecture can go first after this contract exists.</p>
+				</div>
+			</section>
+
+			<section class="panel" id="criteria">
+				<div class="section-title">
+					<h2>Acceptance Criteria</h2>
+					<span class="tag">Definition Of Done</span>
+				</div>
+				<div class="table-wrap">
+					<table>
+						<thead>
+							<tr>
+								<th>Gate</th>
+								<th>Required Evidence</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>Behavior parity</td>
+								<td>Existing loop behavior, action priority, bridge events, and verification remain stable.</td>
+							</tr>
+							<tr>
+								<td>Build and verifier</td>
+								<td><code>dotnet build</code> and <code>scripts/verify_combat_main_loop.sh</code> pass.</td>
+							</tr>
+							<tr>
+								<td>Loadout seam</td>
+								<td>Current hardcoded action creation is wrapped behind a seam that can become data-backed later.</td>
+							</tr>
+							<tr>
+								<td>Decision seam</td>
+								<td>Decision policy consumes resolved runtime actions instead of constructing them directly.</td>
+							</tr>
+							<tr>
+								<td>Parallel safety</td>
+								<td>The architecture and data-driven plans no longer need incompatible edits to the same action factory surface.</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</section>
+
+			<p class="footer-note">HTML overview generated from plans/combat-data-unified-workflow-plan.md.</p>
+		</main>
+	</div>
+</body>
+</html>

@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>First Game Loop Slice Implementation Plan</title>
+	<style>
+		:root {
+			--bg: #101914;
+			--panel: #fff8e8;
+			--panel-2: #f1e4c3;
+			--ink: #22180f;
+			--muted: #6b5a46;
+			--line: #d5bd87;
+			--green: #2f6b4f;
+			--gold: #c4872c;
+			--red: #9d3e28;
+			--blue: #405f91;
+			--shadow: 0 22px 60px rgba(16, 25, 20, 0.22);
+			--radius: 20px;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html {
+			scroll-behavior: smooth;
+		}
+
+		body {
+			margin: 0;
+			background:
+				radial-gradient(circle at 15% 8%, rgba(196, 135, 44, 0.32), transparent 22rem),
+				radial-gradient(circle at 90% 22%, rgba(47, 107, 79, 0.35), transparent 28rem),
+				linear-gradient(135deg, #101914 0%, #213a2c 54%, #47321e 100%);
+			color: var(--ink);
+			font-family: "Trebuchet MS", "Gill Sans", Verdana, sans-serif;
+			line-height: 1.55;
+		}
+
+		a {
+			color: inherit;
+		}
+
+		code {
+			background: rgba(64, 95, 145, 0.1);
+			border: 1px solid rgba(64, 95, 145, 0.18);
+			border-radius: 8px;
+			padding: 0.08rem 0.28rem;
+		}
+
+		pre {
+			background: #1f2b24;
+			border-radius: 14px;
+			color: #fff8e8;
+			overflow-x: auto;
+			padding: 1rem;
+		}
+
+		pre code {
+			background: transparent;
+			border: 0;
+			padding: 0;
+		}
+
+		.layout {
+			display: grid;
+			gap: 1.5rem;
+			grid-template-columns: 280px minmax(0, 1fr);
+			margin: 0 auto;
+			max-width: 1480px;
+			padding: 1.5rem;
+		}
+
+		.sidebar {
+			align-self: start;
+			background: rgba(255, 248, 232, 0.92);
+			border: 1px solid rgba(213, 189, 135, 0.85);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			padding: 1rem;
+			position: sticky;
+			top: 1rem;
+		}
+
+		.sidebar h2 {
+			font-family: Georgia, serif;
+			font-size: 0.95rem;
+			letter-spacing: 0.12em;
+			margin: 0 0 0.8rem;
+			text-transform: uppercase;
+		}
+
+		.sidebar a {
+			border-radius: 999px;
+			color: var(--muted);
+			display: block;
+			padding: 0.42rem 0.65rem;
+			text-decoration: none;
+		}
+
+		.sidebar a:hover {
+			background: var(--panel-2);
+			color: var(--ink);
+		}
+
+		main {
+			display: grid;
+			gap: 1rem;
+			min-width: 0;
+		}
+
+		.hero,
+		.panel,
+		.card {
+			border: 1px solid rgba(213, 189, 135, 0.78);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+		}
+
+		.hero {
+			background:
+				linear-gradient(135deg, rgba(255, 248, 232, 0.95), rgba(241, 228, 195, 0.93)),
+				linear-gradient(90deg, rgba(47, 107, 79, 0.2), rgba(196, 135, 44, 0.2));
+			overflow: hidden;
+			padding: clamp(1.5rem, 4vw, 3rem);
+			position: relative;
+		}
+
+		.hero:after {
+			background:
+				linear-gradient(90deg, rgba(47, 107, 79, 0.08) 1px, transparent 1px),
+				linear-gradient(rgba(47, 107, 79, 0.08) 1px, transparent 1px);
+			background-size: 34px 34px;
+			content: "";
+			inset: 0;
+			position: absolute;
+		}
+
+		.hero > * {
+			position: relative;
+			z-index: 1;
+		}
+
+		.kicker {
+			color: var(--green);
+			font-weight: 800;
+			letter-spacing: 0.14em;
+			margin: 0 0 0.75rem;
+			text-transform: uppercase;
+		}
+
+		h1,
+		h2,
+		h3 {
+			font-family: Georgia, "Times New Roman", serif;
+			line-height: 1.12;
+		}
+
+		h1 {
+			font-size: clamp(2.3rem, 6vw, 5.1rem);
+			margin: 0 0 1rem;
+			max-width: 13ch;
+		}
+
+		.hero p {
+			font-size: clamp(1.05rem, 2vw, 1.24rem);
+			max-width: 78ch;
+		}
+
+		.panel {
+			background: rgba(255, 248, 232, 0.94);
+			padding: clamp(1.1rem, 2.4vw, 1.75rem);
+		}
+
+		.section-title {
+			align-items: end;
+			border-bottom: 2px solid rgba(213, 189, 135, 0.65);
+			display: flex;
+			gap: 1rem;
+			justify-content: space-between;
+			margin-bottom: 1rem;
+			padding-bottom: 0.75rem;
+		}
+
+		.section-title h2 {
+			font-size: clamp(1.45rem, 3vw, 2.25rem);
+			margin: 0;
+		}
+
+		.tag {
+			background: rgba(47, 107, 79, 0.12);
+			border: 1px solid rgba(47, 107, 79, 0.25);
+			border-radius: 999px;
+			color: var(--green);
+			font-size: 0.76rem;
+			font-weight: 800;
+			letter-spacing: 0.08em;
+			padding: 0.32rem 0.62rem;
+			text-transform: uppercase;
+			white-space: nowrap;
+		}
+
+		.grid,
+		.grid-2,
+		.grid-3,
+		.summary {
+			display: grid;
+			gap: 1rem;
+		}
+
+		.grid-2 {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.grid-3 {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.summary {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+
+		.card {
+			background: rgba(255, 248, 232, 0.92);
+			padding: 1rem;
+		}
+
+		.card h3 {
+			font-size: 1.14rem;
+			margin: 0 0 0.5rem;
+		}
+
+		.card strong {
+			color: var(--green);
+			display: block;
+			font-family: Georgia, serif;
+			font-size: 1.08rem;
+			margin-bottom: 0.25rem;
+		}
+
+		.card span,
+		.muted {
+			color: var(--muted);
+		}
+
+		.green {
+			background: linear-gradient(135deg, rgba(47, 107, 79, 0.13), rgba(255, 248, 232, 0.9));
+			border-color: rgba(47, 107, 79, 0.28);
+		}
+
+		.gold {
+			background: linear-gradient(135deg, rgba(196, 135, 44, 0.16), rgba(255, 248, 232, 0.9));
+			border-color: rgba(196, 135, 44, 0.3);
+		}
+
+		.red {
+			background: linear-gradient(135deg, rgba(157, 62, 40, 0.13), rgba(255, 248, 232, 0.9));
+			border-color: rgba(157, 62, 40, 0.28);
+		}
+
+		ul,
+		ol {
+			margin: 0;
+			padding-left: 1.15rem;
+		}
+
+		li + li {
+			margin-top: 0.36rem;
+		}
+
+		p {
+			margin: 0 0 1rem;
+		}
+
+		p:last-child {
+			margin-bottom: 0;
+		}
+
+		.flow {
+			counter-reset: step;
+			display: grid;
+			gap: 0.7rem;
+			list-style: none;
+			padding: 0;
+		}
+
+		.flow li {
+			background: var(--panel-2);
+			border: 1px solid rgba(213, 189, 135, 0.8);
+			border-radius: 14px;
+			margin: 0;
+			min-height: 3.5rem;
+			padding: 0.9rem 1rem 0.9rem 3.5rem;
+			position: relative;
+		}
+
+		.flow li:before {
+			align-items: center;
+			background: var(--green);
+			border-radius: 50%;
+			color: #fff8e8;
+			content: counter(step);
+			counter-increment: step;
+			display: inline-flex;
+			font-weight: 800;
+			height: 2rem;
+			justify-content: center;
+			left: 0.85rem;
+			position: absolute;
+			top: 0.75rem;
+			width: 2rem;
+		}
+
+		.state-list {
+			display: grid;
+			gap: 0.65rem;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			list-style: none;
+			padding: 0;
+		}
+
+		.state-list li {
+			background: #fffdf5;
+			border: 1px solid rgba(213, 189, 135, 0.72);
+			border-radius: 13px;
+			margin: 0;
+			padding: 0.7rem;
+		}
+
+		.state-list strong {
+			color: var(--blue);
+			display: block;
+		}
+
+		.two-column {
+			columns: 2 18rem;
+			column-gap: 2rem;
+		}
+
+		.two-column li {
+			break-inside: avoid;
+			margin-bottom: 0.35rem;
+		}
+
+		.formula {
+			display: grid;
+			gap: 0.8rem;
+		}
+
+		.footer-note {
+			color: rgba(255, 248, 232, 0.82);
+			font-size: 0.9rem;
+			text-align: center;
+		}
+
+		@media (max-width: 1100px) {
+			.layout {
+				grid-template-columns: 1fr;
+			}
+
+			.sidebar {
+				position: static;
+			}
+
+			.sidebar nav {
+				display: grid;
+				gap: 0.25rem;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.summary,
+			.grid-3 {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+		}
+
+		@media (max-width: 760px) {
+			.layout {
+				padding: 1rem;
+			}
+
+			.summary,
+			.grid-2,
+			.grid-3,
+			.state-list,
+			.sidebar nav {
+				grid-template-columns: 1fr;
+			}
+
+			.section-title {
+				align-items: start;
+				flex-direction: column;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="layout">
+		<aside class="sidebar" aria-label="Plan navigation">
+			<h2>Slice Plan</h2>
+			<nav>
+				<a href="#goal">Goal</a>
+				<a href="#scope">Scope</a>
+				<a href="#decisions">Design Decisions</a>
+				<a href="#runtime">Runtime Model</a>
+				<a href="#states">AI State Machines</a>
+				<a href="#stats">Stats And Formulas</a>
+				<a href="#bridge">TestBridge</a>
+				<a href="#steps">Implementation Steps</a>
+				<a href="#acceptance">Acceptance Criteria</a>
+				<a href="#risks">Risks</a>
+				<a href="#next">Next Slices</a>
+			</nav>
+		</aside>
+
+		<main>
+			<header class="hero" id="goal">
+				<p class="kicker">First Playable Loop</p>
+				<h1>First Game Loop Slice</h1>
+				<p>An adventurer leaves the town, hunts a nearby monster, resolves probability-based combat, collects rewards, returns to the town, and becomes ready to repeat.</p>
+				<p>This validates the core simulation direction before adding shops, equipment, classes, dungeons, procedural world generation, or settlement upgrades.</p>
+			</header>
+
+			<section class="summary" aria-label="Plan summary">
+				<div class="card">
+					<strong>Home</strong>
+					<span>Town marker, not a village or full settlement system.</span>
+				</div>
+				<div class="card">
+					<strong>Actor</strong>
+					<span>One pre-placed adventurer with separate intention and combat states.</span>
+				</div>
+				<div class="card">
+					<strong>Threat</strong>
+					<span>At least one simple monster target.</span>
+				</div>
+				<div class="card">
+					<strong>Combat</strong>
+					<span>Tick-based timing with explicit probability rolls.</span>
+				</div>
+			</section>
+
+			<section class="panel" id="scope">
+				<div class="section-title">
+					<h2>Slice Scope</h2>
+					<span class="tag">Small And Observable</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Included</h3>
+						<ul>
+							<li>One town/home marker.</li>
+							<li>One autonomous adventurer.</li>
+							<li>One or more simple monsters.</li>
+							<li>A small top-down arena-style test scene, not a real world map.</li>
+							<li>Adventurer intention state machine.</li>
+							<li>Adventurer combat state machine.</li>
+							<li>Continuous movement.</li>
+							<li>Tick-based combat timing.</li>
+							<li>Probability-based combat rolls.</li>
+							<li>Basic travel, combat, rewards, death, and return-to-town.</li>
+							<li>Runtime-visible state through labels, console logs, and TestBridge events.</li>
+						</ul>
+					</div>
+					<div class="card red">
+						<h3>Excluded</h3>
+						<ul>
+							<li>Hiring UI.</li>
+							<li>Multiple settlements.</li>
+							<li>Classes.</li>
+							<li>Equipment.</li>
+							<li>Shops.</li>
+							<li>Potions.</li>
+							<li>Player spells.</li>
+							<li>Direct possession/control of adventurers.</li>
+							<li>Parties.</li>
+							<li>Dungeons.</li>
+							<li>Procedural world generation.</li>
+							<li>Real world map or biome layout.</li>
+							<li>Save/load.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="decisions">
+				<div class="section-title">
+					<h2>Design Decisions Applied</h2>
+					<span class="tag">From Design Doc</span>
+				</div>
+				<ul class="two-column">
+					<li>The first slice uses a town, not a village, as the home point.</li>
+					<li>Adventurer hiring is manual and costs player gold in the full design, but hiring UI is out of scope for this slice.</li>
+					<li>The slice starts with one pre-existing adventurer so the loop can be validated before adding recruitment.</li>
+					<li>Time is hybrid: movement is continuous, while combat and similar mechanics resolve on ticks.</li>
+					<li>There is no pause assumption for now; the slice should keep running.</li>
+					<li>Combat is random and should use explicit probability formulas followed by rolls.</li>
+					<li>The player is abstract and has no world avatar.</li>
+					<li>No real world map is needed yet. The slice only needs town, adventurer, and monster positions.</li>
+					<li>Far-away adventurer simulation is irrelevant for this slice.</li>
+				</ul>
+			</section>
+
+			<section class="panel" id="runtime">
+				<div class="section-title">
+					<h2>Proposed Runtime Model</h2>
+					<span class="tag">Simple Nodes First</span>
+				</div>
+				<div class="grid-3">
+					<div class="card">
+						<h3><code>Town</code></h3>
+						<p><code>Node2D</code> marker with service radius, display name, and return position.</p>
+					</div>
+					<div class="card">
+						<h3><code>Adventurer</code></h3>
+						<p><code>Node2D</code> or <code>CharacterBody2D</code> actor that owns identity, stats, inventory, position, and references to its controllers.</p>
+					</div>
+					<div class="card">
+						<h3><code>AdventurerController</code></h3>
+						<p>Child <code>Node</code> or companion script that owns the high-level intention state machine, movement decisions, target selection requests, and return-to-town behavior.</p>
+					</div>
+					<div class="card">
+						<h3><code>AdventurerCombatController</code></h3>
+						<p>Child <code>Node</code> or companion script that tracks detailed combat status, cooldowns, attack rolls, skills, spells, and conditions.</p>
+					</div>
+					<div class="card">
+						<h3><code>Monster</code></h3>
+						<p><code>Node2D</code> or <code>Area2D</code> with stats, reward values, and alive/dead state.</p>
+					</div>
+					<div class="card">
+						<h3><code>GameController</code></h3>
+						<p>Owns high-level references, spawns initial actors, and provides target lookup.</p>
+					</div>
+					<div class="card">
+						<h3><code>Hud</code></h3>
+						<p>Lightweight labels for adventurer state, gold, experience, and combat status.</p>
+					</div>
+					<div class="card gold">
+						<h3>Future Constraint</h3>
+						<p>Expose movement and targeting through methods such as <code>SetMoveTarget</code>, <code>SetCombatTarget</code>, or <code>RequestAction</code>. <code>AdventurerController</code> can call those methods for AI behavior, while party leadership or a possession spell can later drive the same adventurer through the same action interface.</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="states">
+				<div class="section-title">
+					<h2>Adventurer AI State Machines</h2>
+					<span class="tag">Two Layers</span>
+				</div>
+				<p>Use two distinct state machines so world decisions do not become tangled with combat details.</p>
+				<h3>Intention State Machine</h3>
+				<p>This high-level state machine lives in <code>AdventurerController</code> and tracks what the adventurer is trying to do in the game world.</p>
+				<ul class="state-list">
+					<li><strong>IdleInTown</strong>Wait briefly, then look for a target.</li>
+					<li><strong>ChooseTarget</strong>Ask <code>GameController</code> for the nearest living monster appropriate for level.</li>
+					<li><strong>TravelToTarget</strong>Move toward the monster.</li>
+					<li><strong>FightMonster</strong>Hand detailed combat execution to the combat state machine until combat resolves.</li>
+					<li><strong>CollectLoot</strong>Add gold and experience from the monster.</li>
+					<li><strong>ReturnToTown</strong>Move back to the town.</li>
+					<li><strong>RecoverInTown</strong>Restore health and prepare to loop again.</li>
+					<li><strong>Dead</strong>Stop acting and emit death event.</li>
+				</ul>
+				<div class="card gold" style="margin-top: 1rem;">
+					<h3>Reserved For Later</h3>
+					<p><code>Possessed</code> for player spell control, <code>FindParty</code> for seeking allies, and <code>InParty</code> for following party-level decisions.</p>
+				</div>
+				<h3 style="margin-top: 1.25rem;">Combat State Machine</h3>
+				<p>This lower-level state machine lives in <code>AdventurerCombatController</code> and tracks detailed combat status while the intention state is <code>FightMonster</code>.</p>
+				<ul class="state-list">
+					<li><strong>OutOfCombat</strong>No active combat target.</li>
+					<li><strong>Engaging</strong>Combat target selected, entering attack range or preparing first action.</li>
+					<li><strong>Ready</strong>Can choose the next combat action.</li>
+					<li><strong>AttackCooldown</strong>Waiting for the next basic attack tick.</li>
+					<li><strong>SkillCooldown</strong>Waiting for a skill cooldown before it can be used again.</li>
+					<li><strong>Casting</strong>Preparing a spell or ability that resolves after a cast time.</li>
+					<li><strong>Recovering</strong>Short post-action recovery window.</li>
+					<li><strong>Disabled</strong>Stunned, rooted, feared, silenced, or otherwise unable to act.</li>
+					<li><strong>Defeated</strong>Combatant has reached zero health.</li>
+				</ul>
+				<div class="card green" style="margin-top: 1rem;">
+					<h3>First Slice Combat Detail</h3>
+					<p>The first slice only needs basic attack cooldowns, hit rolls, misses, damage, and death. Skills, spells, and conditions should be represented by the model shape but can remain stubbed until later.</p>
+				</div>
+			</section>
+
+			<section class="panel" id="stats">
+				<div class="section-title">
+					<h2>Stats And Formulas</h2>
+					<span class="tag">Probability-Based</span>
+				</div>
+				<div class="grid-2">
+					<div class="card">
+						<h3>Adventurer Stats</h3>
+						<ul class="two-column">
+							<li><code>Name</code></li>
+							<li><code>Level</code></li>
+							<li><code>Experience</code></li>
+							<li><code>Gold</code></li>
+							<li><code>Health</code></li>
+							<li><code>MaxHealth</code></li>
+							<li><code>Attack</code></li>
+							<li><code>Accuracy</code></li>
+							<li><code>Defense</code></li>
+							<li><code>Evasion</code></li>
+							<li><code>Speed</code></li>
+							<li><code>IntentionState</code></li>
+							<li><code>CombatState</code></li>
+							<li><code>AttackCooldownRemaining</code></li>
+						</ul>
+					</div>
+					<div class="card">
+						<h3>Monster Stats</h3>
+						<ul class="two-column">
+							<li><code>MonsterName</code></li>
+							<li><code>Level</code></li>
+							<li><code>Health</code></li>
+							<li><code>MaxHealth</code></li>
+							<li><code>Attack</code></li>
+							<li><code>Accuracy</code></li>
+							<li><code>Defense</code></li>
+							<li><code>Evasion</code></li>
+							<li><code>GoldReward</code></li>
+							<li><code>ExperienceReward</code></li>
+							<li><code>IsAlive</code></li>
+							<li><code>CombatState</code></li>
+						</ul>
+					</div>
+				</div>
+				<div class="formula" style="margin-top: 1rem;">
+					<div class="card green">
+						<h3>Combat Timing</h3>
+						<pre><code>combat_tick_interval = 1.0 seconds</code></pre>
+					</div>
+					<div class="card">
+						<h3>Hit Formula Shape</h3>
+						<pre><code>hit_chance = clamp(base_hit_chance + attacker_accuracy - defender_evasion, min_hit_chance, max_hit_chance)
+attack_hits = rng_roll_0_to_1 &lt;= hit_chance</code></pre>
+					</div>
+					<div class="card">
+						<h3>Damage On Successful Hit</h3>
+						<pre><code>damage = max(1, attacker_attack - defender_defense)</code></pre>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="bridge">
+				<div class="section-title">
+					<h2>TestBridge Events</h2>
+					<span class="tag">Headless Verification</span>
+				</div>
+				<div class="grid-2">
+					<div class="card">
+						<h3>Events</h3>
+						<ul class="two-column">
+							<li><code>adventurer_state_changed</code></li>
+							<li><code>adventurer_target_selected</code></li>
+							<li><code>adventurer_arrived_at_target</code></li>
+							<li><code>combat_started</code></li>
+							<li><code>combat_state_changed</code></li>
+							<li><code>attack_roll_resolved</code></li>
+							<li><code>damage_applied</code></li>
+							<li><code>monster_defeated</code></li>
+							<li><code>loot_collected</code></li>
+							<li><code>adventurer_returned_to_town</code></li>
+							<li><code>adventurer_died</code></li>
+						</ul>
+					</div>
+					<div class="card">
+						<h3>Named States</h3>
+						<ul>
+							<li><code>adventurer</code></li>
+							<li><code>monster</code></li>
+							<li><code>game_loop</code></li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="steps">
+				<div class="section-title">
+					<h2>Implementation Steps</h2>
+					<span class="tag">Build Order</span>
+				</div>
+				<ol class="flow">
+					<li>Create a simple game scene with root <code>Node2D</code>, town marker, one adventurer, one monster, and lightweight labels.</li>
+					<li>Add <code>Monster.cs</code> with basic stats, <code>ApplyDamage</code>, and death/reward data.</li>
+					<li>Add <code>Town.cs</code> with service radius, recovery behavior, and known return position.</li>
+					<li>Add <code>Adventurer.cs</code> with identity, stats, gold, experience, current target references, controller references, shared action methods such as <code>SetMoveTarget</code>, <code>SetCombatTarget</code>, and <code>ApplyDamage</code>, plus shared TestBridge state publishing.</li>
+					<li>Add <code>AdventurerController.cs</code> with high-level intention state machine, movement toward target positions, hunt target requests, combat delegation, bridge events, and state publishing.</li>
+					<li>Add <code>AdventurerCombatController.cs</code> with combat state, attack cooldowns, hit chance rolls, successful-hit damage, and explicit future extension points for skills, spells, and conditions.</li>
+					<li>Add <code>GameController.cs</code> with references to town, adventurer, and monsters, plus <code>FindHuntTarget</code> and loop completion detection.</li>
+					<li>Wire the scene as the main scene or add a dedicated test scene. Prefer making the slice the main scene while the project is still early.</li>
+					<li>Build both existing C# project files as required by the project workflow.</li>
+					<li>Run a live TestBridge verification and observe event/state output until one loop completes.</li>
+				</ol>
+			</section>
+
+			<section class="panel" id="acceptance">
+				<div class="section-title">
+					<h2>Acceptance Criteria</h2>
+					<span class="tag">Definition Of Done</span>
+				</div>
+				<ul class="two-column">
+					<li>The game starts into a visible top-down slice scene.</li>
+					<li>The scene contains a town marker, one adventurer, and at least one monster.</li>
+					<li>The adventurer autonomously leaves the town without player input.</li>
+					<li>The adventurer reaches a monster.</li>
+					<li>Combat starts on tick intervals.</li>
+					<li>The adventurer has a high-level intention state and a separate detailed combat state.</li>
+					<li>Each attack computes a hit chance and rolls against it.</li>
+					<li>Combat produces visible/logged hits, misses, and damage.</li>
+					<li>If the adventurer wins, the monster dies and rewards are added.</li>
+					<li>The adventurer returns to the town.</li>
+					<li>The adventurer recovers and can begin another hunt.</li>
+					<li>If the adventurer dies, the state becomes <code>Dead</code> and the loop stops for that adventurer.</li>
+					<li>TestBridge emits enough events/state to verify the loop without relying only on visuals.</li>
+				</ul>
+			</section>
+
+			<section class="panel" id="risks">
+				<div class="section-title">
+					<h2>Risks And Constraints</h2>
+					<span class="tag">Keep It Tight</span>
+				</div>
+				<ul class="two-column">
+					<li>Avoid overbuilding the architecture before the loop is fun to watch.</li>
+					<li>Keep the boundary clear: intention state decides goals, combat state resolves moment-to-moment combat.</li>
+					<li>Keep combat formulas explicit and log rolled values so failures are diagnosable.</li>
+					<li>Do not introduce inventory, shops, or procedural generation in this slice.</li>
+					<li>Do not build a real world map yet; simple positioned nodes are enough.</li>
+					<li>Do not add hiring UI yet; start with one pre-placed adventurer.</li>
+					<li>The current <code>PlayerController</code> may become obsolete or should be treated as an input/movement prototype.</li>
+					<li>Avoid coupling click-to-move directly to the old <code>PlayerController</code>; future possession should drive adventurer actions through the same action interface used by AI.</li>
+					<li>Party logic should not be added until the solo loop has clean target selection, rewards, and return behavior.</li>
+					<li>The scene structure should stay simple enough to inspect manually in Godot.</li>
+				</ul>
+			</section>
+
+			<section class="panel" id="next">
+				<div class="section-title">
+					<h2>Next Slice Candidates</h2>
+					<span class="tag">After Loop Works</span>
+				</div>
+				<ul class="two-column">
+					<li>Add multiple adventurers with independent decisions.</li>
+					<li>Add parties with shared targeting, combat, and split rewards.</li>
+					<li>Add a player spell bar and a possession spell prototype.</li>
+					<li>Add a tavern hiring flow.</li>
+					<li>Add the no-money downtrodden adventurer fallback.</li>
+					<li>Add a shop and potion resupply.</li>
+					<li>Add monster respawning and danger scaling.</li>
+					<li>Add procedural arena/world generation.</li>
+					<li>Add a basic dungeon entrance as a higher-risk target.</li>
+					<li>Add adventurer leveling and stat growth.</li>
+				</ul>
+			</section>
+
+			<p class="footer-note">HTML review page generated from plans/first-game-loop-slice.md.</p>
+		</main>
+	</div>
+</body>
+</html>

@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Idle Fantasy Basic Combat Loop</title>
+	<style>
+		:root {
+			--bg: #f2ead8;
+			--paper: #fffaf0;
+			--paper-strong: #fff1cf;
+			--ink: #241a11;
+			--muted: #6c5a46;
+			--line: #d5bd88;
+			--accent: #8e3f1f;
+			--accent-2: #2f6650;
+			--accent-3: #4c6094;
+			--danger: #9d2f2f;
+			--shadow: 0 16px 44px rgba(48, 34, 18, 0.14);
+			--radius: 14px;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html {
+			scroll-behavior: smooth;
+		}
+
+		body {
+			background:
+				linear-gradient(135deg, rgba(255, 250, 240, 0.7), rgba(239, 221, 180, 0.74)),
+				#f2ead8;
+			color: var(--ink);
+			font-family: "Trebuchet MS", "Gill Sans", Verdana, sans-serif;
+			line-height: 1.55;
+			margin: 0;
+		}
+
+		a {
+			color: var(--accent);
+		}
+
+		.page {
+			display: grid;
+			gap: 1.5rem;
+			grid-template-columns: 260px minmax(0, 1fr);
+			margin: 0 auto;
+			max-width: 1400px;
+			padding: 1.5rem;
+		}
+
+		.sidebar {
+			align-self: start;
+			background: rgba(255, 250, 240, 0.92);
+			border: 1px solid rgba(213, 189, 136, 0.78);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			padding: 1rem;
+			position: sticky;
+			top: 1rem;
+		}
+
+		.sidebar h2 {
+			font-family: Georgia, serif;
+			font-size: 1rem;
+			letter-spacing: 0.08em;
+			margin: 0 0 0.75rem;
+			text-transform: uppercase;
+		}
+
+		.sidebar a {
+			border-radius: 999px;
+			color: var(--muted);
+			display: block;
+			padding: 0.4rem 0.6rem;
+			text-decoration: none;
+		}
+
+		.sidebar a:hover {
+			background: var(--paper-strong);
+			color: var(--ink);
+		}
+
+		main {
+			display: grid;
+			gap: 1rem;
+			min-width: 0;
+		}
+
+		.hero,
+		.panel {
+			background: rgba(255, 250, 240, 0.94);
+			border: 1px solid rgba(213, 189, 136, 0.78);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+		}
+
+		.hero {
+			background:
+				linear-gradient(135deg, rgba(36, 26, 17, 0.94), rgba(86, 47, 27, 0.88)),
+				#241a11;
+			color: #fffaf0;
+			padding: clamp(1.35rem, 4vw, 3rem);
+		}
+
+		.hero p {
+			font-size: 1.1rem;
+			max-width: 78ch;
+		}
+
+		.kicker {
+			color: #f0cf91;
+			font-size: 0.8rem;
+			font-weight: 700;
+			letter-spacing: 0.14em;
+			margin: 0 0 0.5rem;
+			text-transform: uppercase;
+		}
+
+		h1,
+		h2,
+		h3 {
+			font-family: Georgia, "Times New Roman", serif;
+			line-height: 1.12;
+		}
+
+		h1 {
+			font-size: clamp(2.35rem, 6vw, 4.8rem);
+			margin: 0 0 1rem;
+		}
+
+		h2 {
+			font-size: clamp(1.5rem, 3vw, 2.2rem);
+			margin: 0;
+		}
+
+		h3 {
+			color: var(--accent);
+			font-size: 1.18rem;
+			margin: 0 0 0.5rem;
+		}
+
+		.panel {
+			padding: clamp(1rem, 2.3vw, 1.6rem);
+		}
+
+		.section-title {
+			border-bottom: 2px solid rgba(213, 189, 136, 0.62);
+			margin-bottom: 1rem;
+			padding-bottom: 0.75rem;
+		}
+
+		.grid {
+			display: grid;
+			gap: 1rem;
+		}
+
+		.grid.two {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.grid.three {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.card {
+			background: rgba(255, 241, 207, 0.58);
+			border: 1px solid rgba(213, 189, 136, 0.62);
+			border-radius: 8px;
+			padding: 1rem;
+		}
+
+		.card p:last-child,
+		.panel p:last-child,
+		li:last-child {
+			margin-bottom: 0;
+		}
+
+		code {
+			background: rgba(76, 96, 148, 0.12);
+			border: 1px solid rgba(76, 96, 148, 0.18);
+			border-radius: 6px;
+			color: #273a71;
+			padding: 0.08rem 0.28rem;
+		}
+
+		table {
+			border-collapse: collapse;
+			width: 100%;
+		}
+
+		th,
+		td {
+			border-bottom: 1px solid rgba(213, 189, 136, 0.72);
+			padding: 0.62rem 0.5rem;
+			text-align: left;
+			vertical-align: top;
+		}
+
+		th {
+			color: var(--accent);
+			font-family: Georgia, serif;
+			font-size: 0.96rem;
+		}
+
+		.timeline {
+			display: grid;
+			gap: 0.75rem;
+		}
+
+		.tick {
+			background: #fffaf0;
+			border: 1px solid rgba(213, 189, 136, 0.72);
+			border-left: 5px solid var(--accent-2);
+			border-radius: 8px;
+			padding: 0.85rem 1rem;
+		}
+
+		.tick strong {
+			color: var(--accent-2);
+			display: block;
+			font-family: Georgia, serif;
+			margin-bottom: 0.25rem;
+		}
+
+		.diagram {
+			background: #fffaf0;
+			border: 1px solid rgba(213, 189, 136, 0.72);
+			border-radius: 8px;
+			overflow-x: auto;
+			padding: 1rem;
+		}
+
+		svg {
+			display: block;
+			min-width: 900px;
+			width: 100%;
+		}
+
+		.state {
+			fill: #fff1cf;
+			stroke: #8e3f1f;
+			stroke-width: 2;
+		}
+
+		.state.alt {
+			fill: #e8f0e7;
+			stroke: #2f6650;
+		}
+
+		.state.end {
+			fill: #f4dddd;
+			stroke: #9d2f2f;
+		}
+
+		.arrow {
+			fill: none;
+			marker-end: url(#arrow);
+			stroke: #695744;
+			stroke-width: 2;
+		}
+
+		.svg-label {
+			fill: #241a11;
+			font-family: "Trebuchet MS", Verdana, sans-serif;
+			font-size: 14px;
+			font-weight: 700;
+			text-anchor: middle;
+		}
+
+		.svg-note {
+			fill: #695744;
+			font-family: "Trebuchet MS", Verdana, sans-serif;
+			font-size: 12px;
+			text-anchor: middle;
+		}
+
+		.callout {
+			background: rgba(47, 102, 80, 0.1);
+			border: 1px solid rgba(47, 102, 80, 0.22);
+			border-radius: 8px;
+			color: #254d3d;
+			padding: 0.9rem 1rem;
+		}
+
+		@media (max-width: 900px) {
+			.page {
+				grid-template-columns: 1fr;
+			}
+
+			.sidebar {
+				position: static;
+			}
+
+			.grid.two,
+			.grid.three {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="page">
+		<aside class="sidebar">
+			<h2>Combat Notes</h2>
+			<a href="#overview">Overview</a>
+			<a href="#state-machine">State Machine</a>
+			<a href="#tick-flow">Tick Flow</a>
+			<a href="#entity-stats">Entity Stats</a>
+			<a href="#ability-stats">Ability Stats</a>
+			<a href="#example">Example</a>
+			<a href="#debugging">Debugging</a>
+		</aside>
+
+		<main>
+			<header class="hero" id="overview">
+				<p class="kicker">Idle Fantasy Combat</p>
+				<h1>Basic Combat Loop</h1>
+				<p>
+					Combat is a discrete tick simulation. Movement can remain smooth, but combat decisions, cooldowns,
+					recovery, casts, action ordering, hit rolls, damage, and defeat checks happen only on simulation ticks.
+				</p>
+				<p>
+					The first implementation supports one adventurer against one monster, one basic attack, one adventurer
+					skill, per-action cooldowns, and a global cooldown after skills and spells.
+				</p>
+			</header>
+
+			<section class="panel">
+				<div class="section-title">
+					<h2>Core Rules</h2>
+				</div>
+				<div class="grid three">
+					<div class="card">
+						<h3>Tick Authority</h3>
+						<p>Combat advances on <code>simulation_tick</code>. No combatant attacks between ticks.</p>
+					</div>
+					<div class="card">
+						<h3>Action Queue</h3>
+						<p>Ready combatants choose an available action, enter <code>Queued</code>, then wait for ordering.</p>
+					</div>
+					<div class="card">
+						<h3>Cooldown Gates</h3>
+						<p>Basic attack, skills, spells, casts, recovery, and global cooldowns are integer tick counters.</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="state-machine">
+				<div class="section-title">
+					<h2>State Machine</h2>
+				</div>
+				<div class="diagram" aria-label="Combat state machine diagram">
+					<svg viewBox="0 0 1040 540" role="img">
+						<defs>
+							<marker id="arrow" markerHeight="10" markerWidth="10" orient="auto" refX="8" refY="3">
+								<path d="M0,0 L0,6 L9,3 z" fill="#695744"></path>
+							</marker>
+						</defs>
+
+						<rect class="state" x="40" y="70" width="150" height="58" rx="8"></rect>
+						<text class="svg-label" x="115" y="103">OutOfCombat</text>
+
+						<rect class="state" x="250" y="70" width="130" height="58" rx="8"></rect>
+						<text class="svg-label" x="315" y="103">Engaging</text>
+
+						<rect class="state alt" x="450" y="70" width="130" height="58" rx="8"></rect>
+						<text class="svg-label" x="515" y="103">Ready</text>
+
+						<rect class="state alt" x="660" y="70" width="130" height="58" rx="8"></rect>
+						<text class="svg-label" x="725" y="103">Queued</text>
+
+						<rect class="state" x="660" y="225" width="130" height="58" rx="8"></rect>
+						<text class="svg-label" x="725" y="258">Casting</text>
+
+						<rect class="state" x="450" y="225" width="130" height="58" rx="8"></rect>
+						<text class="svg-label" x="515" y="258">Recovering</text>
+
+						<rect class="state" x="250" y="225" width="130" height="58" rx="8"></rect>
+						<text class="svg-label" x="315" y="258">Disabled</text>
+
+						<rect class="state end" x="850" y="70" width="130" height="58" rx="8"></rect>
+						<text class="svg-label" x="915" y="103">Defeated</text>
+
+						<path class="arrow" d="M190 99 H250"></path>
+						<text class="svg-note" x="220" y="88">target set</text>
+
+						<path class="arrow" d="M380 99 H450"></path>
+						<text class="svg-note" x="415" y="88">valid target</text>
+
+						<path class="arrow" d="M580 99 H660"></path>
+						<text class="svg-note" x="620" y="88">choose action</text>
+
+						<path class="arrow" d="M725 128 V225"></path>
+						<text class="svg-note" x="780" y="178">cast action</text>
+
+						<path class="arrow" d="M660 254 H580"></path>
+						<text class="svg-note" x="620" y="243">cast complete</text>
+
+						<path class="arrow" d="M660 116 C610 176, 600 215, 580 238"></path>
+						<text class="svg-note" x="604" y="184">resolve action</text>
+
+						<path class="arrow" d="M515 225 V128"></path>
+						<text class="svg-note" x="555" y="178">recovery done</text>
+
+						<path class="arrow" d="M450 254 H380"></path>
+						<text class="svg-note" x="415" y="243">condition</text>
+
+						<path class="arrow" d="M315 225 C340 170, 400 135, 450 114"></path>
+						<text class="svg-note" x="355" y="170">condition ends</text>
+
+						<path class="arrow" d="M790 99 H850"></path>
+						<text class="svg-note" x="820" y="88">health 0</text>
+
+						<path class="arrow" d="M515 70 C490 20, 165 20, 115 70"></path>
+						<text class="svg-note" x="315" y="38">target gone or encounter ends</text>
+
+						<text class="svg-note" x="520" y="365">Queued is an internal resolver state: selected action, waiting for tick order resolution.</text>
+						<text class="svg-note" x="520" y="390">Cooldowns are not states. They are counters that decide whether Ready can queue an action.</text>
+					</svg>
+				</div>
+			</section>
+
+			<section class="panel" id="tick-flow">
+				<div class="section-title">
+					<h2>Tick Flow</h2>
+				</div>
+				<ol>
+					<li>The game emits <code>simulation_tick</code>.</li>
+					<li>Each active encounter emits <code>combat_tick_started</code>.</li>
+					<li>Combatants reduce cooldown, cast, recovery, and global cooldown counters.</li>
+					<li>Finished casts queue their completed action.</li>
+					<li>Ready combatants choose the first available action by priority.</li>
+					<li>Queued actions roll initiative scores and sort by action order.</li>
+					<li>Actions resolve in sorted order. A dead target cancels later queued actions.</li>
+					<li>Damage, death, rewards, encounter end checks, and bridge state updates are published.</li>
+					<li>The encounter emits <code>combat_tick_completed</code>.</li>
+				</ol>
+				<div class="callout">
+					Current tick interval is <code>0.25</code> seconds. A 4 tick cooldown is 1 second of simulation time.
+				</div>
+			</section>
+
+			<section class="panel" id="entity-stats">
+				<div class="section-title">
+					<h2>Entity Stats</h2>
+				</div>
+				<table>
+					<thead>
+						<tr>
+							<th>Stat</th>
+							<th>Meaning</th>
+							<th>Current Example</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><code>Health</code> / <code>MaxHealth</code></td>
+							<td>Current and maximum hit points. A combatant at 0 health becomes <code>Defeated</code>.</td>
+							<td>Mira 28 HP, Slime 18 HP.</td>
+						</tr>
+						<tr>
+							<td><code>Attack</code></td>
+							<td>Base damage before action multiplier and defender defense.</td>
+							<td>Mira 7, Slime 3.</td>
+						</tr>
+						<tr>
+							<td><code>Defense</code></td>
+							<td>Flat reduction from successful incoming damage.</td>
+							<td>Mira 1, Slime 1.</td>
+						</tr>
+						<tr>
+							<td><code>Accuracy</code></td>
+							<td>Flat probability modifier added to the attacker's hit chance. <code>0.20</code> means +20 percentage points.</td>
+							<td>Mira 0.20, Slime 0.00.</td>
+						</tr>
+						<tr>
+							<td><code>Evasion</code></td>
+							<td>Flat probability modifier subtracted from incoming hit chance. <code>0.15</code> means -15 percentage points for attackers.</td>
+							<td>Mira 0.15, Slime 0.00.</td>
+						</tr>
+						<tr>
+							<td><code>Initiative</code></td>
+							<td>Flat bonus to action ordering when multiple combatants queue on the same tick.</td>
+							<td>Mira 4, Slime 1.</td>
+						</tr>
+						<tr>
+							<td><code>AttackSpeed</code></td>
+							<td>Basic attack cooldown in ticks. Lower values attack more often and win tie breakers.</td>
+							<td>Mira 4 ticks, Slime 8 ticks.</td>
+						</tr>
+					</tbody>
+				</table>
+				<div class="callout" style="margin-top: 1rem;">
+					Hit chance is currently <code>clamp(0.75 + attacker_accuracy - defender_evasion, 0.05, 0.95)</code>.
+					For example, Mira attacking Slime is <code>0.75 + 0.20 - 0.00 = 0.95</code>, or 95%.
+					Slime attacking Mira is <code>0.75 + 0.00 - 0.15 = 0.60</code>, or 60%.
+				</div>
+			</section>
+
+			<section class="panel" id="ability-stats">
+				<div class="section-title">
+					<h2>Ability Stats</h2>
+				</div>
+				<table>
+					<thead>
+						<tr>
+							<th>Field</th>
+							<th>Meaning</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><code>ActionId</code></td>
+							<td>Stable id used by logs, bridge events, cooldown maps, and tests.</td>
+						</tr>
+						<tr>
+							<td><code>ActionKind</code></td>
+							<td><code>BasicAttack</code>, <code>Skill</code>, or <code>Spell</code>. Skills and spells start global cooldown.</td>
+						</tr>
+						<tr>
+							<td><code>CooldownTicks</code></td>
+							<td>Per-action cooldown for skills and spells. Basic attack uses the owner's <code>AttackSpeed</code> tick value.</td>
+						</tr>
+						<tr>
+							<td><code>CastTicks</code></td>
+							<td>Ticks spent casting before the action queues. Zero means instant.</td>
+						</tr>
+						<tr>
+							<td><code>RecoveryTicks</code></td>
+							<td>Post-action lockout before returning to <code>Ready</code>.</td>
+						</tr>
+						<tr>
+							<td><code>ActionWeight</code></td>
+							<td>Penalty or bonus in action ordering. Higher weights act later; negative weights act earlier.</td>
+						</tr>
+						<tr>
+							<td><code>DamageMultiplier</code></td>
+							<td>Multiplies the attacker's <code>Attack</code> before defense is subtracted.</td>
+						</tr>
+						<tr>
+							<td><code>UsesGlobalAttackCooldown</code></td>
+							<td>Starts the owner's basic attack cooldown after resolving.</td>
+						</tr>
+					</tbody>
+				</table>
+
+				<div class="grid two" style="margin-top: 1rem;">
+					<div class="card">
+						<h3>Basic Attack</h3>
+						<p>
+							Instant action. Its cooldown is the combatant's <code>AttackSpeed</code> tick value.
+							Mira's basic attack cooldown is 4 ticks. Slime's is 8 ticks.
+						</p>
+					</div>
+					<div class="card">
+						<h3>Heavy Strike</h3>
+						<p>
+							Adventurer skill. It is instant, has a 4 tick skill cooldown, 1 tick recovery,
+							1.5x damage, and starts the 4 tick global cooldown after it resolves.
+						</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="example">
+				<div class="section-title">
+					<h2>Combat Example</h2>
+				</div>
+				<p>
+					This example shows why a skill no longer immediately chains into a basic attack after the global
+					cooldown change.
+				</p>
+				<div class="timeline">
+					<div class="tick">
+						<strong>Tick 14</strong>
+						Mira and Slime are <code>Ready</code>. Mira queues <code>heavy_strike</code>; Slime queues
+						<code>basic_attack</code>. Both roll initiative order. After Heavy Strike resolves, Mira starts
+						<code>heavy_strike</code> cooldown for 4 ticks, recovery for 1 tick, and global cooldown for 4 ticks.
+					</div>
+					<div class="tick">
+						<strong>Tick 15</strong>
+						Mira's 1 tick recovery completes, so her state returns to <code>Ready</code>. She still cannot act
+						because global cooldown has 3 ticks remaining.
+					</div>
+					<div class="tick">
+						<strong>Ticks 16 and 17</strong>
+						Mira remains <code>Ready</code> but waits. Her global cooldown and Heavy Strike cooldown continue
+						counting down.
+					</div>
+					<div class="tick">
+						<strong>Tick 18</strong>
+						Global cooldown and Heavy Strike cooldown reach zero. Mira can choose an action again. Since Heavy
+						Strike has priority over basic attack and is ready, she queues Heavy Strike.
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="debugging">
+				<div class="section-title">
+					<h2>Debugging Quick Reference</h2>
+				</div>
+				<table>
+					<thead>
+						<tr>
+							<th>Log or Event</th>
+							<th>Use</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><code>COMBAT_STATE tick=...</code></td>
+							<td>Shows visible state transitions. Internal <code>Queued</code> transitions are suppressed in console output.</td>
+						</tr>
+						<tr>
+							<td><code>ACTION_QUEUED tick=...</code></td>
+							<td>Shows selected action, configured cooldown, current basic cooldown, current global cooldown, cast ticks, and recovery ticks.</td>
+						</tr>
+						<tr>
+							<td><code>combat_action_order_rolled</code></td>
+							<td>Bridge event with random roll, initiative bonus, attack speed bonus, action weight, and final score.</td>
+						</tr>
+						<tr>
+							<td><code>combat_action_cooldown_started</code></td>
+							<td>Bridge event for basic attack, skill, spell, and global cooldown start.</td>
+						</tr>
+						<tr>
+							<td><code>combat_action_cooldown_ready</code></td>
+							<td>Bridge event emitted when a cooldown counter reaches zero.</td>
+						</tr>
+					</tbody>
+				</table>
+			</section>
+		</main>
+	</div>
+</body>
+</html>
