@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="CombatLoadoutDefinition" format=3 uid="uid://cjjmgmrwp6dyd"]
 
-[ext_resource type="Script" uid="uid://bje3drdi4brxg" path="res://CombatLoadoutDefinition.cs" id="1_loadout"]
+[ext_resource type="Script" uid="uid://bje3drdi4brxg" path="res://scripts/CombatLoadoutDefinition.cs" id="1_loadout"]
 [ext_resource type="Resource" path="res://data/combat/actions/heavy_strike.tres" id="2_heavy"]
 [ext_resource type="Resource" path="res://data/combat/actions/basic_attack.tres" id="3_basic"]
 
@@ -8,4 +8,4 @@
 script = ExtResource("1_loadout")
 LoadoutId = "warrior_starting"
 DisplayName = "Warrior Starting"
-Actions = [ExtResource("3_basic"), ExtResource("2_heavy")]
+Actions = [ExtResource("2_heavy"), ExtResource("3_basic")]

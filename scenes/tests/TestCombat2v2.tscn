@@ -1,23 +1,23 @@
 [gd_scene format=3 uid="uid://q2snsjl1v8ey"]
 
-[ext_resource type="Script" uid="uid://crvc53pr1gid8" path="res://GameController.cs" id="1_game"]
-[ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://Town.cs" id="2_town"]
-[ext_resource type="PackedScene" path="res://Adventurer.tscn" id="3_adventurer"]
-[ext_resource type="PackedScene" uid="uid://hqsfpal0jyrh" path="res://Monster.tscn" id="4_monster"]
+[ext_resource type="Script" uid="uid://crvc53pr1gid8" path="res://scripts/GameController.cs" id="1_813nc"]
+[ext_resource type="PackedScene" uid="uid://6co0kxkbg3h2" path="res://scenes/Adventurer.tscn" id="2_8vplc"]
+[ext_resource type="PackedScene" uid="uid://hqsfpal0jyrh" path="res://scenes/Monster.tscn" id="3_c3io6"]
+[ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://scripts/Town.cs" id="4_noivq"]
 
 [node name="TestCombat2v2" type="Node2D" unique_id=1843572492]
-script = ExtResource("1_game")
+script = ExtResource("1_813nc")
 AdventurerPath = NodePath("Warrior")
-AdventurerScene = ExtResource("3_adventurer")
-MonsterScene = ExtResource("4_monster")
+AdventurerScene = ExtResource("2_8vplc")
+MonsterScene = ExtResource("3_c3io6")
 AutoSpawnDefaultAdventurers = false
 AutoSpawnDefaultMonsters = false
 
 [node name="Town" type="Node2D" parent="." unique_id=593411800]
 position = Vector2(160, 300)
-script = ExtResource("2_town")
+script = ExtResource("4_noivq")
 
-[node name="Warrior" parent="." unique_id=633862980 instance=ExtResource("3_adventurer")]
+[node name="Warrior" parent="." unique_id=633862980 instance=ExtResource("2_8vplc")]
 position = Vector2(430, 270)
 AdventurerName = "Warrior"
 MaxHealth = 36
@@ -27,7 +27,7 @@ Defense = 2
 Evasion = 0.12
 Initiative = 3
 
-[node name="Mage" parent="." unique_id=1374036619 instance=ExtResource("3_adventurer")]
+[node name="Mage" parent="." unique_id=1374036619 instance=ExtResource("2_8vplc")]
 position = Vector2(430, 330)
 AdventurerName = "Mage"
 Archetype = 1
@@ -39,10 +39,10 @@ AttackSpeed = 5
 
 [node name="Monsters" type="Node2D" parent="." unique_id=1641391484]
 
-[node name="Slime" parent="Monsters" unique_id=2046450583 instance=ExtResource("4_monster")]
+[node name="Slime" parent="Monsters" unique_id=2046450583 instance=ExtResource("3_c3io6")]
 position = Vector2(560, 260)
 
-[node name="Slime2" parent="Monsters" unique_id=911282931 instance=ExtResource("4_monster")]
+[node name="Slime2" parent="Monsters" unique_id=911282931 instance=ExtResource("3_c3io6")]
 position = Vector2(560, 340)
 MonsterName = "Slime 2"
 

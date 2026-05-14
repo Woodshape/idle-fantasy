@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="CombatLoadoutDefinition" format=3 uid="uid://dqq1msb01u2lr"]
 
-[ext_resource type="Script" uid="uid://bje3drdi4brxg" path="res://CombatLoadoutDefinition.cs" id="1_loadout"]
+[ext_resource type="Script" uid="uid://bje3drdi4brxg" path="res://scripts/CombatLoadoutDefinition.cs" id="1_loadout"]
 [ext_resource type="Resource" path="res://data/combat/actions/spark.tres" id="2_spark"]
 [ext_resource type="Resource" path="res://data/combat/actions/basic_attack_ranged.tres" id="3_basic"]
 
@@ -8,4 +8,4 @@
 script = ExtResource("1_loadout")
 LoadoutId = "mage_starting"
 DisplayName = "Mage Starting"
-Actions = [ExtResource("3_basic"), ExtResource("2_spark")]
+Actions = [ExtResource("2_spark"), ExtResource("3_basic")]

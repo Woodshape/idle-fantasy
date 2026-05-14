@@ -10,6 +10,7 @@ run_scene() {
 	local scene_tag="$2"
 	local expected_adventurers="$3"
 	local expected_monsters="$4"
+	local expected_started_count="$5"
 	local session_dir="${SESSION_DIR:-$(mktemp -d "/tmp/idle-fantasy-${scene_tag}.XXXXXX")}"
 	local home_dir="${IDLE_FANTASY_TEST_HOME:-/tmp/idle-fantasy-home}"
 	local xdg_dir="${IDLE_FANTASY_TEST_XDG:-/tmp/idle-fantasy-xdg}"
@@ -88,8 +89,8 @@ JSONL
 
 	local started_count
 	started_count="$(grep -c '"type":"combat_started"' "${events_file}")"
-	if [[ "${started_count}" != "1" ]]; then
-		echo "Expected one active encounter start in ${scene_tag}, got ${started_count}. Session: ${session_dir}" >&2
+	if [[ "${started_count}" != "${expected_started_count}" ]]; then
+		echo "Expected ${expected_started_count} active encounter start(s) in ${scene_tag}, got ${started_count}. Session: ${session_dir}" >&2
 		return 1
 	fi
 
@@ -97,9 +98,9 @@ JSONL
 }
 
 dotnet build "${PROJECT_ROOT}/Idle Fantasy.csproj" >/tmp/idle-fantasy-combat-architecture-build.log
-run_scene "res://TestCombat1v1.tscn" "combat_1v1" 1 1
-run_scene "res://TestCombat1v2.tscn" "combat_1v2" 1 2
-run_scene "res://TestCombat2v1.tscn" "combat_2v1" 2 1
-run_scene "res://TestCombat2v2.tscn" "combat_2v2" 2 2
+run_scene "res://scenes/tests/TestCombat1v1.tscn" "combat_1v1" 1 1 1
+run_scene "res://scenes/tests/TestCombat1v2.tscn" "combat_1v2" 1 1 1
+run_scene "res://scenes/tests/TestCombat2v1.tscn" "combat_2v1" 1 1 1
+run_scene "res://scenes/tests/TestCombat2v2.tscn" "combat_2v2" 1 1 2
 
 echo "Combat architecture verification passed."

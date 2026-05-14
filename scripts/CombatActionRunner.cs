@@ -489,7 +489,7 @@ public sealed class CombatActionRunner
 			return new ActionResolution(false, 0);
 		}
 
-		double accuracyAdvantage = Math.Clamp(_owner.Accuracy - _target.Evasion, 0.0, 1.0);
+		double accuracyAdvantage = _owner.Accuracy - _target.Evasion;
 		double hitChance = Math.Clamp(BaseHitChance + accuracyAdvantage, MinHitChance, MaxHitChance);
 		double roll = _rng.Randf();
 		bool hit = roll <= hitChance;
@@ -506,7 +506,7 @@ public sealed class CombatActionRunner
 			{ "defender", _target.DisplayName },
 			{ "defender_kind", _target.CombatantKind },
 			{ "action_id", action.ActionId },
-			{ "hit_formula", "clamp(0.5 + clamp(attacker_accuracy - defender_evasion, 0, 1), 0.05, 0.95)" },
+			{ "hit_formula", "clamp(0.5 + attacker_accuracy - defender_evasion, 0.05, 0.95)" },
 			{ "damage_formula", "max(1, round(attacker_attack * action_multiplier) - defender_defense)" },
 			{ "hit_chance", hitChance },
 			{ "roll", roll },

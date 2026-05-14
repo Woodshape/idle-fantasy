@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="GameContentLibrary" format=3 uid="uid://qt5dpl7yredi"]
 
-[ext_resource type="Script" uid="uid://de3wfbk3ehp0i" path="res://GameContentLibrary.cs" id="1_library"]
+[ext_resource type="Script" uid="uid://de3wfbk3ehp0i" path="res://scripts/GameContentLibrary.cs" id="1_library"]
 [ext_resource type="Resource" path="res://data/combat/actions/basic_attack.tres" id="2_basic"]
 [ext_resource type="Resource" path="res://data/combat/actions/basic_attack_ranged.tres" id="3_basic_ranged"]
 [ext_resource type="Resource" path="res://data/combat/actions/heavy_strike.tres" id="4_heavy"]
@@ -11,8 +11,8 @@
 [ext_resource type="Resource" uid="uid://d10cahnm4y3to" path="res://data/adventurers/warrior.tres" id="9_warrior"]
 [ext_resource type="Resource" uid="uid://dandwqty2124s" path="res://data/adventurers/mage.tres" id="10_mage"]
 [ext_resource type="Resource" uid="uid://daobxg1dsx6md" path="res://data/monsters/slime.tres" id="11_slime"]
-[ext_resource type="Script" uid="uid://bshiwqvpv5c7l" path="res://AdventurerSpawnDefinition.cs" id="12_adventurer_spawn_script"]
-[ext_resource type="Script" uid="uid://ru0xkmibods7" path="res://MonsterSpawnDefinition.cs" id="13_monster_spawn_script"]
+[ext_resource type="Script" uid="uid://bshiwqvpv5c7l" path="res://scripts/AdventurerSpawnDefinition.cs" id="12_adventurer_spawn_script"]
+[ext_resource type="Script" uid="uid://ru0xkmibods7" path="res://scripts/MonsterSpawnDefinition.cs" id="13_monster_spawn_script"]
 
 [sub_resource type="Resource" id="AdventurerSpawn_warrior"]
 script = ExtResource("12_adventurer_spawn_script")

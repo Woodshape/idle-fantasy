@@ -8,6 +8,8 @@ using GDict = Godot.Collections.Dictionary;
 
 public partial class AdventurerCombatController : Node
 {
+	private static int NextEncounterId;
+
 	private readonly RandomNumberGenerator _rng = new();
 	private ICombatLoadoutSource _loadoutSource = new FallbackLoadoutSource();
 	private Adventurer? _adventurer;
@@ -57,8 +59,9 @@ public partial class AdventurerCombatController : Node
 		_adventurer ??= GetParentOrNull<Adventurer>();
 
 		StopCombat();
+		_encounterId = ++NextEncounterId;
 		CombatEncounter encounter = new(
-			++_encounterId,
+			_encounterId,
 			adventurers,
 			monsters,
 			_loadoutSource,

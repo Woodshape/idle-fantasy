@@ -1,0 +1,56 @@
+[gd_scene format=3 uid="uid://cl5ijkt38kwr3"]
+
+[ext_resource type="Script" uid="uid://crvc53pr1gid8" path="res://scripts/GameController.cs" id="1_b7urs"]
+[ext_resource type="PackedScene" uid="uid://6co0kxkbg3h2" path="res://scenes/Adventurer.tscn" id="2_naw2q"]
+[ext_resource type="PackedScene" uid="uid://hqsfpal0jyrh" path="res://scenes/Monster.tscn" id="3_5uja7"]
+[ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://scripts/Town.cs" id="4_mqsm7"]
+
+[node name="TestCombat1v1" type="Node2D" unique_id=370065387]
+script = ExtResource("1_b7urs")
+AdventurerPath = NodePath("Warrior")
+AdventurerScene = ExtResource("2_naw2q")
+MonsterScene = ExtResource("3_5uja7")
+AutoSpawnDefaultAdventurers = false
+AutoSpawnDefaultMonsters = false
+
+[node name="Town" type="Node2D" parent="." unique_id=1393969580]
+position = Vector2(160, 300)
+script = ExtResource("4_mqsm7")
+
+[node name="Warrior" parent="." unique_id=534549237 instance=ExtResource("2_naw2q")]
+position = Vector2(300, 300)
+AdventurerName = "Warrior"
+MaxHealth = 36
+Attack = 8
+Accuracy = 0.22
+Defense = 2
+Evasion = 0.12
+Initiative = 3
+
+[node name="Monsters" type="Node2D" parent="." unique_id=1050059431]
+
+[node name="Slime" parent="Monsters" unique_id=773344853 instance=ExtResource("3_5uja7")]
+position = Vector2(560, 300)
+
+[node name="Hud" type="CanvasLayer" parent="." unique_id=1201677361]
+
+[node name="Panel" type="PanelContainer" parent="Hud" unique_id=286938143]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 430.0
+offset_bottom = 118.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Hud/Panel" unique_id=2091413287]
+layout_mode = 2
+
+[node name="StateLabel" type="Label" parent="Hud/Panel/VBoxContainer" unique_id=197369770]
+layout_mode = 2
+text = "1 Adventurer vs 1 Monster"
+
+[node name="CombatLabel" type="Label" parent="Hud/Panel/VBoxContainer" unique_id=706613162]
+layout_mode = 2
+text = "Combat"
+
+[node name="RewardLabel" type="Label" parent="Hud/Panel/VBoxContainer" unique_id=2073634596]
+layout_mode = 2
+text = "Rewards"

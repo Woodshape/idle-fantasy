@@ -134,23 +134,23 @@ if [[ "${monster_action_resolution_count}" == "0" ]]; then
 	exit 1
 fi
 
-slime_ranged_queue_count="$(grep '"type":"combat_action_queued"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep -c '"action_id":"basic_attack_ranged"' || true)"
-slime_ranged_resolution_count="$(grep '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep -c '"action_id":"basic_attack_ranged"' || true)"
-slime_ranged_damage_count="$(grep '"type":"damage_applied"' "${EVENTS_FILE}" | grep '"defender_kind":"adventurer"' | grep -c '"action_id":"basic_attack_ranged"' || true)"
-slime_ranged_distance_line="$(grep '"type":"combat_action_queued"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep '"action_id":"basic_attack_ranged"' | awk '/"distance_to_target":(1[0-5][0-9]|[5-9][0-9])/{ print; exit }' || true)"
+slime_basic_queue_count="$(grep '"type":"combat_action_queued"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep -c '"action_id":"basic_attack"' || true)"
+slime_basic_resolution_count="$(grep '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep -c '"action_id":"basic_attack"' || true)"
+slime_basic_attack_roll_count="$(grep '"type":"attack_roll_resolved"' "${EVENTS_FILE}" | grep '"attacker_kind":"monster"' | grep '"defender_kind":"adventurer"' | grep -c '"action_id":"basic_attack"' || true)"
+slime_basic_distance_line="$(grep '"type":"combat_action_queued"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep '"action_id":"basic_attack"' | awk '/"distance_to_target":([0-9]|[1-3][0-9]|4[0-8])(\.[0-9]*)?/{ print; exit }' || true)"
 
-if [[ "${slime_ranged_queue_count}" == "0" || "${slime_ranged_resolution_count}" == "0" ]]; then
-	echo "Missing slime basic_attack_ranged queue/resolution evidence. Session: ${SESSION_DIR}" >&2
+if [[ "${slime_basic_queue_count}" == "0" || "${slime_basic_resolution_count}" == "0" ]]; then
+	echo "Missing slime basic_attack queue/resolution evidence. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
-if [[ "${slime_ranged_damage_count}" == "0" ]]; then
-	echo "Missing slime ranged damage_applied evidence. Session: ${SESSION_DIR}" >&2
+if [[ "${slime_basic_attack_roll_count}" == "0" ]]; then
+	echo "Missing slime basic_attack attack-roll evidence. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
-if [[ -z "${slime_ranged_distance_line}" ]]; then
-	echo "Missing slime ranged attack queued from beyond melee distance. Session: ${SESSION_DIR}" >&2
+if [[ -z "${slime_basic_distance_line}" ]]; then
+	echo "Missing slime melee attack queued within melee distance. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
@@ -173,8 +173,8 @@ if ! printf '%s\n' "${aggro_line}" | grep -q '"aggro_range":48.0'; then
 	exit 1
 fi
 
-if ! printf '%s\n' "${aggro_line}" | grep -q '"desired_combat_distance":154.0'; then
-	echo "Monster aggro event did not expose shared ranged combat distance. Session: ${SESSION_DIR}" >&2
+if ! printf '%s\n' "${aggro_line}" | grep -q '"desired_combat_distance":42.0'; then
+	echo "Monster aggro event did not expose shared melee combat distance. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 

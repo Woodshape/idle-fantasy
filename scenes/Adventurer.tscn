@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://6co0kxkbg3h2"]
+
+[ext_resource type="Script" uid="uid://coayya7pcwfic" path="res://scripts/Adventurer.cs" id="1_1smsq"]
+[ext_resource type="Texture2D" uid="uid://nv01a6tbu2gc" path="res://icon.svg" id="2_04uff"]
+[ext_resource type="Script" uid="uid://c66ov47jswk43" path="res://scripts/AdventurerController.cs" id="3_ur0ol"]
+[ext_resource type="Script" uid="uid://diwyeoq4xci1f" path="res://scripts/AdventurerCombatController.cs" id="4_7bqsy"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_n3bty"]
+bg_color = Color(0.08, 0.08, 0.09, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vj1hb"]
+bg_color = Color(0.22, 0.78, 0.34, 1)
+
+[node name="Adventurer" type="Node2D" unique_id=274944752]
+script = ExtResource("1_1smsq")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=759966157]
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("2_04uff")
+
+[node name="HealthBar" type="ProgressBar" parent="." unique_id=569801760]
+offset_left = -24.0
+offset_top = -34.0
+offset_right = 24.0
+offset_bottom = -27.0
+theme_override_styles/background = SubResource("StyleBoxFlat_n3bty")
+theme_override_styles/fill = SubResource("StyleBoxFlat_vj1hb")
+value = 100.0
+show_percentage = false
+
+[node name="AdventurerController" type="Node" parent="." unique_id=920863156]
+script = ExtResource("3_ur0ol")
+
+[node name="AdventurerCombatController" type="Node" parent="." unique_id=1864066373]
+script = ExtResource("4_7bqsy")

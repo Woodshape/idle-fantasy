@@ -1,0 +1,66 @@
+[gd_scene format=3 uid="uid://ddmoxfesqnpiu"]
+
+[ext_resource type="Script" uid="uid://crvc53pr1gid8" path="res://scripts/GameController.cs" id="1_xo1yv"]
+[ext_resource type="PackedScene" uid="uid://6co0kxkbg3h2" path="res://scenes/Adventurer.tscn" id="2_1wm3o"]
+[ext_resource type="PackedScene" uid="uid://hqsfpal0jyrh" path="res://scenes/Monster.tscn" id="3_1aybq"]
+[ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://scripts/Town.cs" id="4_v871i"]
+
+[node name="TestCombat2v1" type="Node2D" unique_id=766809739]
+script = ExtResource("1_xo1yv")
+AdventurerPath = NodePath("Warrior")
+AdventurerScene = ExtResource("2_1wm3o")
+MonsterScene = ExtResource("3_1aybq")
+AutoSpawnDefaultAdventurers = false
+AutoSpawnDefaultMonsters = false
+
+[node name="Town" type="Node2D" parent="." unique_id=462206121]
+position = Vector2(160, 300)
+script = ExtResource("4_v871i")
+
+[node name="Warrior" parent="." unique_id=637766807 instance=ExtResource("2_1wm3o")]
+position = Vector2(430, 270)
+AdventurerName = "Warrior"
+MaxHealth = 36
+Attack = 8
+Accuracy = 0.22
+Defense = 2
+Evasion = 0.12
+Initiative = 3
+
+[node name="Mage" parent="." unique_id=1931397600 instance=ExtResource("2_1wm3o")]
+position = Vector2(430, 330)
+AdventurerName = "Mage"
+Archetype = 1
+MaxHealth = 32
+Accuracy = 0.3
+Evasion = 0.18
+Initiative = 5
+AttackSpeed = 5
+
+[node name="Monsters" type="Node2D" parent="." unique_id=156686184]
+
+[node name="Slime" parent="Monsters" unique_id=203811153 instance=ExtResource("3_1aybq")]
+position = Vector2(560, 300)
+
+[node name="Hud" type="CanvasLayer" parent="." unique_id=450777919]
+
+[node name="Panel" type="PanelContainer" parent="Hud" unique_id=2105721014]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 430.0
+offset_bottom = 118.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Hud/Panel" unique_id=441785675]
+layout_mode = 2
+
+[node name="StateLabel" type="Label" parent="Hud/Panel/VBoxContainer" unique_id=409484378]
+layout_mode = 2
+text = "2 Adventurers vs 1 Monster"
+
+[node name="CombatLabel" type="Label" parent="Hud/Panel/VBoxContainer" unique_id=195274347]
+layout_mode = 2
+text = "Combat"
+
+[node name="RewardLabel" type="Label" parent="Hud/Panel/VBoxContainer" unique_id=280423280]
+layout_mode = 2
+text = "Rewards"

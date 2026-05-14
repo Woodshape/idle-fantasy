@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://beuowij2e2uvg" path="res://extensions/TestBridge.cs" id="1_t9v2q"]
+
+[node name="TestBridge" type="Node"]
+script = ExtResource("1_t9v2q")

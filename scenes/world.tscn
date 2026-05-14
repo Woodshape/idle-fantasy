@@ -1,20 +1,20 @@
 [gd_scene format=3 uid="uid://egstoxsb7pm0"]
 
-[ext_resource type="Script" uid="uid://crvc53pr1gid8" path="res://GameController.cs" id="1_dwbse"]
-[ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://Town.cs" id="2_pkg7o"]
-[ext_resource type="PackedScene" path="res://Adventurer.tscn" id="3_kcv4l"]
-[ext_resource type="PackedScene" path="res://Monster.tscn" id="4_47ur8"]
-[ext_resource type="Resource" path="res://data/spawns/default_world_content.tres" id="5_content"]
+[ext_resource type="Script" uid="uid://crvc53pr1gid8" path="res://scripts/GameController.cs" id="1_71j4m"]
+[ext_resource type="PackedScene" uid="uid://6co0kxkbg3h2" path="res://scenes/Adventurer.tscn" id="2_qfnet"]
+[ext_resource type="PackedScene" uid="uid://hqsfpal0jyrh" path="res://scenes/Monster.tscn" id="3_i7141"]
+[ext_resource type="Resource" uid="uid://qt5dpl7yredi" path="res://data/spawns/default_world_content.tres" id="4_4mrxx"]
+[ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://scripts/Town.cs" id="5_7r4gi"]
 
 [node name="Game" type="Node2D" unique_id=1741732238]
-script = ExtResource("1_dwbse")
-AdventurerScene = ExtResource("3_kcv4l")
-MonsterScene = ExtResource("4_47ur8")
-ContentLibrary = ExtResource("5_content")
+script = ExtResource("1_71j4m")
+AdventurerScene = ExtResource("2_qfnet")
+MonsterScene = ExtResource("3_i7141")
+ContentLibrary = ExtResource("4_4mrxx")
 
 [node name="Town" type="Node2D" parent="." unique_id=1017707839]
 position = Vector2(160, 300)
-script = ExtResource("2_pkg7o")
+script = ExtResource("5_7r4gi")
 
 [node name="Monsters" type="Node2D" parent="." unique_id=1825137319]
 
