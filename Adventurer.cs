@@ -68,6 +68,8 @@ public partial class Adventurer : Node2D, ICombatant
 	public string QueuedActionId { get; private set; } = string.Empty;
 	public string ActiveActionId { get; private set; } = string.Empty;
 	public string LastActionId { get; private set; } = string.Empty;
+	public string DefinitionId { get; private set; } = string.Empty;
+	public string CombatLoadoutId { get; private set; } = string.Empty;
 	public int BasicAttackCooldownTicksRemaining { get; private set; }
 	public int GlobalCooldownTicksRemaining { get; private set; }
 	public int CastTicksRemaining { get; private set; }
@@ -146,6 +148,8 @@ public partial class Adventurer : Node2D, ICombatant
 		QueuedActionId = string.Empty;
 		ActiveActionId = string.Empty;
 		LastActionId = string.Empty;
+		DefinitionId = string.Empty;
+		CombatLoadoutId = string.Empty;
 		BasicAttackCooldownTicksRemaining = 0;
 		GlobalCooldownTicksRemaining = 0;
 		CastTicksRemaining = 0;
@@ -267,6 +271,8 @@ public partial class Adventurer : Node2D, ICombatant
 		LastActionId = snapshot.State == global::CombatState.OutOfCombat
 			? string.Empty
 			: snapshot.LastActionId;
+		DefinitionId = snapshot.DefinitionId;
+		CombatLoadoutId = snapshot.CombatLoadoutId;
 		BasicAttackCooldownTicksRemaining = snapshot.BasicAttackCooldownTicksRemaining;
 		GlobalCooldownTicksRemaining = snapshot.GlobalCooldownTicksRemaining;
 		CastTicksRemaining = snapshot.CastTicksRemaining;
@@ -312,6 +318,8 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "queued_action", QueuedActionId },
 			{ "active_action", ActiveActionId },
 			{ "last_action", LastActionId },
+			{ "definition_id", DefinitionId },
+			{ "combat_loadout_id", CombatLoadoutId },
 			{ "basic_attack_cooldown_ticks_remaining", BasicAttackCooldownTicksRemaining },
 			{ "global_cooldown_ticks_remaining", GlobalCooldownTicksRemaining },
 			{ "cast_ticks_remaining", CastTicksRemaining },

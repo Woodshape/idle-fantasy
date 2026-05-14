@@ -128,7 +128,9 @@ if [[ -z "${spark_resolved_line_number}" ]]; then
 	exit 1
 fi
 
-if ! grep '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep -q '"combatant_kind":"monster"'; then
+monster_action_resolution_count="$(grep '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep -c '"combatant_kind":"monster"' || true)"
+
+if [[ "${monster_action_resolution_count}" == "0" ]]; then
 	echo "Missing monster attack resolution after ranged opener. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
@@ -138,7 +140,9 @@ if [[ -n "${first_spark_target_attack_line_number}" ]] && (( first_spark_target_
 	exit 1
 fi
 
-if ! grep '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"adventurer"' | grep -q '"action_id":"heavy_strike"'; then
+heavy_strike_resolution_count="$(grep '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"adventurer"' | grep -c '"action_id":"heavy_strike"' || true)"
+
+if [[ "${heavy_strike_resolution_count}" == "0" ]]; then
 	echo "Missing adventurer melee action after ranged opener. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi

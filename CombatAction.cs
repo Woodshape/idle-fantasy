@@ -64,10 +64,10 @@ public sealed class CombatAction
 	public double DamageMultiplier { get; }
 	public bool UsesGlobalAttackCooldown { get; }
 
-	public static CombatAction BasicAttack(double range = 48.0)
+	public static CombatAction BasicAttack(double range = 48.0, string actionId = "basic_attack")
 	{
 		return new CombatAction(
-			"basic_attack",
+			actionId,
 			"Basic Attack",
 			CombatActionKind.BasicAttack,
 			range,
@@ -99,6 +99,8 @@ public sealed class CombatantCombatSnapshot
 	public string QueuedActionId { get; init; } = string.Empty;
 	public string ActiveActionId { get; init; } = string.Empty;
 	public string LastActionId { get; init; } = string.Empty;
+	public string DefinitionId { get; init; } = string.Empty;
+	public string CombatLoadoutId { get; init; } = string.Empty;
 	public int BasicAttackCooldownTicksRemaining { get; init; }
 	public int GlobalCooldownTicksRemaining { get; init; }
 	public int CastTicksRemaining { get; init; }

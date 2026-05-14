@@ -23,6 +23,19 @@ Today, `AdventurerCombatController` and `CombatActionRunner` carry most responsi
 
 This works for the current slice, but the responsibilities will become cramped once parties, dynamic joins, smarter class AI, flee/heal/buff logic, status effects, and reward ownership all need to cooperate.
 
+## Prerequisite
+
+The shared workflow in `plans/2026-05-14-combat-data-unified-workflow-plan.md` must be in place before this extraction continues.
+
+That workflow establishes:
+
+- `CombatLoadout` as the ordered runtime action contract.
+- `ICombatLoadoutSource` as the seam for current hardcoded and future data-backed loadouts.
+- `ICombatDecisionPolicy` / `CombatDecision` as the first decision boundary.
+- additive `definition_id` and `combat_loadout_id` bridge/state fields.
+
+Start this architecture slice from the existing decision policy boundary instead of reworking action factory creation.
+
 ## Target Responsibilities
 
 | Type | Owns | Should Not Own |
@@ -168,11 +181,12 @@ This keeps "one tick of combat math" separate from both scene integration and en
 ## Migration Plan
 
 1. Add passive data shapes.
-   - Add `CombatDecision`, `CombatTickResult`, and `CombatEncounterState` records.
+   - Reuse the existing `CombatDecision` and `ICombatDecisionPolicy` from the unified workflow.
+   - Add `CombatTickResult` and `CombatEncounterState` records.
    - Keep behavior unchanged.
 
 2. Extract decision policy.
-   - Move `CombatActionRunner.SelectAction` and target callbacks into `CombatDecisionController`.
+   - Move the existing list-priority decision policy into `CombatDecisionController`.
    - Keep the same list-priority behavior first.
    - Verify events remain unchanged.
 

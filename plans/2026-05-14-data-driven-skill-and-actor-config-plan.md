@@ -12,20 +12,17 @@ The project already has a playable combat loop:
 
 - `GameController` owns the authoritative `0.25` second simulation tick.
 - `AdventurerController` owns high-level intent: choose target, travel, fight, collect loot, return, recover.
-- `AdventurerCombatController` owns active encounters, action selection, action order rolls, combat tick events, and current hardcoded action factories.
-- `CombatActionRunner` consumes an ordered `IReadOnlyList<CombatAction>` and already supports basic attacks, skills, spells, cooldown ticks, cast ticks, recovery ticks, range, action weight, damage multiplier, and global cooldown behavior.
+- `AdventurerCombatController` owns active encounters, action order rolls, combat tick events, and runner creation.
+- `CombatActionRunner` consumes a resolved `CombatLoadout` of immutable runtime `CombatAction` objects and already supports basic attacks, skills, spells, cooldown ticks, cast ticks, recovery ticks, range, action weight, damage multiplier, and global cooldown behavior.
 - `Adventurer` and `Monster` expose mutable runtime combat state and currently use exported scalar fields for starting stats.
 - `GameController.EnsureDefaultAdventurers` and `GameController.SpawnDefaultMonsters` currently hardcode the default roster, monster wave, stats, positions, names, and sprite colors.
 - TestBridge already publishes combat/action/state events that can verify this migration headlessly.
 
 The main non-data-driven seams are:
 
-- `AdventurerCombatController.CreateAdventurerActions`.
-- `AdventurerCombatController.CreateMonsterActions`.
-- `AdventurerCombatController.CreateHeavyStrike`.
-- `AdventurerCombatController.CreateSpark`.
+- `HardcodedLoadoutSource.ResolveLoadout` and its fallback runtime action constructors.
 - `CombatAction.BasicAttack`.
-- `AdventurerArchetype` branching in action selection.
+- `AdventurerArchetype` branching in the hardcoded loadout source.
 - Runtime default spawn setup in `GameController`.
 - Exported default stat fields on `Adventurer` and `Monster` scenes.
 
@@ -259,6 +256,8 @@ The file path and id should usually match. Validation should warn when they do n
 
 ## Migration Plan
 
+Prerequisite: the shared workflow in `plans/2026-05-14-combat-data-unified-workflow-plan.md` should already be complete. This data slice should replace the `ICombatLoadoutSource` implementation with a data-backed source instead of changing `CombatActionRunner` to consume resources directly.
+
 1. Add data definition resource classes.
    - Add `CombatActionDefinition`.
    - Add `CombatLoadoutDefinition`.
@@ -294,11 +293,11 @@ The file path and id should usually match. Validation should warn when they do n
    - Preserve `AutoSpawnDefaultAdventurers` and `AutoSpawnDefaultMonsters`.
    - Preserve test scenes that explicitly place actors by allowing scene-local actors to keep their assigned definitions or fallback scalar values.
 
-6. Replace hardcoded action factories.
-   - `AdventurerCombatController.CreateAdventurerActions(adventurer)` should resolve `adventurer.CombatLoadout`.
-   - `CreateMonsterActions` should resolve the monster loadout.
+6. Replace the hardcoded loadout source.
+   - Add a data-backed `ICombatLoadoutSource` implementation that resolves actor definitions to `CombatLoadout`.
+   - Keep `CombatActionRunner` receiving immutable runtime `CombatAction` objects through `CombatLoadout`.
+   - Leave the controller fallback static factory methods in place only as compatibility wrappers until data parity is verified.
    - Keep a small fallback path that returns basic attack if content loading fails, but emit a clear error and bridge event.
-   - Prefer changing `CombatActionRunner` inputs as little as possible: it should still receive immutable `CombatAction` runtime objects.
 
 7. Publish content ids through TestBridge.
    - Add `definition_id` to `adventurer` and `monster` states.

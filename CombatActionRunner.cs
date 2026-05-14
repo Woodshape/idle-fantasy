@@ -14,8 +14,9 @@ public sealed class CombatActionRunner
 	private const int GlobalCooldownTicks = 4;
 
 	private readonly ICombatant _owner;
-	private readonly IReadOnlyList<CombatAction> _actions;
+	private readonly CombatLoadout _loadout;
 	private readonly RandomNumberGenerator _rng;
+	private readonly ICombatDecisionPolicy _decisionPolicy;
 	private readonly Action<string, GDict> _emitEvent;
 	private readonly Func<ICombatant?>? _selectTarget;
 	private readonly Action<Adventurer, Monster, CombatAction, long>? _notifyMonsterAggro;
@@ -25,24 +26,26 @@ public sealed class CombatActionRunner
 	private ICombatant? _target;
 	private ICombatant? _queuedTarget;
 	private string _lastActionId = string.Empty;
+	private string _basicAttackCooldownActionId = "basic_attack";
 	private long _currentTick;
 
 	public CombatActionRunner(
 		ICombatant owner,
-		IReadOnlyList<CombatAction> actions,
+		CombatLoadout loadout,
 		RandomNumberGenerator rng,
 		Action<string, GDict> emitEvent,
 		Func<ICombatant?>? selectTarget = null,
 		Action<Adventurer, Monster, CombatAction, long>? notifyMonsterAggro = null)
 	{
 		_owner = owner;
-		_actions = actions;
+		_loadout = loadout;
 		_rng = rng;
 		_emitEvent = emitEvent;
 		_selectTarget = selectTarget;
 		_notifyMonsterAggro = notifyMonsterAggro;
+		_decisionPolicy = new ListPriorityDecisionPolicy();
 
-		foreach (CombatAction action in _actions.Where(action => action.Kind != CombatActionKind.BasicAttack))
+		foreach (CombatAction action in _loadout.Actions.Where(action => action.Kind != CombatActionKind.BasicAttack))
 		{
 			_skillCooldowns[action.ActionId] = 0;
 		}
@@ -50,6 +53,8 @@ public sealed class CombatActionRunner
 
 	public ICombatant Owner => _owner;
 	public ICombatant? Target => _target;
+	public string DefinitionId => _loadout.DefinitionId;
+	public string CombatLoadoutId => _loadout.LoadoutId;
 	public CombatState State { get; private set; } = CombatState.OutOfCombat;
 	public int BasicAttackCooldownTicksRemaining { get; private set; }
 	public int GlobalCooldownTicksRemaining { get; private set; }
@@ -274,6 +279,8 @@ public sealed class CombatActionRunner
 			{ "combatant", _owner.DisplayName },
 			{ "combatant_kind", _owner.CombatantKind },
 			{ "target", _target?.DisplayName ?? "none" },
+			{ "definition_id", _loadout.DefinitionId },
+			{ "combat_loadout_id", _loadout.LoadoutId },
 			{ "action_id", action.ActionId },
 			{ "action_kind", action.Kind.ToString() },
 			{ "hit", resolution.Hit },
@@ -322,7 +329,7 @@ public sealed class CombatActionRunner
 
 			if (BasicAttackCooldownTicksRemaining == 0)
 			{
-				EmitCooldownReady("basic_attack", "basic_attack", tick);
+				EmitCooldownReady(_basicAttackCooldownActionId, "basic_attack", tick);
 			}
 		}
 
@@ -435,12 +442,22 @@ public sealed class CombatActionRunner
 
 	private CombatAction? SelectAction()
 	{
-		foreach (CombatAction action in _actions)
+		var targetCandidates = new List<ICombatant>();
+		if (_target?.IsAlive == true)
 		{
-			if (IsActionReady(action))
-			{
-				return action;
-			}
+			targetCandidates.Add(_target);
+		}
+
+		CombatLoadout readyLoadout = _loadout with
+		{
+			Actions = _loadout.Actions.Where(IsActionReady).ToArray()
+		};
+		CombatDecision decision = _decisionPolicy.ChooseAction(_owner, readyLoadout, targetCandidates);
+
+		if (decision.Action is not null)
+		{
+			_target = decision.Target ?? _target;
+			return decision.Action;
 		}
 
 		return null;
@@ -561,6 +578,7 @@ public sealed class CombatActionRunner
 		if (action.UsesGlobalAttackCooldown)
 		{
 			int durationTicks = GetBasicAttackCooldownTicks();
+			_basicAttackCooldownActionId = action.ActionId;
 			BasicAttackCooldownTicksRemaining = durationTicks;
 			EmitCooldownStarted(action.ActionId, "basic_attack", durationTicks, tick);
 		}
@@ -756,6 +774,8 @@ public sealed class CombatActionRunner
 			QueuedActionId = _queuedAction?.ActionId ?? string.Empty,
 			ActiveActionId = _activeAction?.ActionId ?? string.Empty,
 			LastActionId = _lastActionId,
+			DefinitionId = _loadout.DefinitionId,
+			CombatLoadoutId = _loadout.LoadoutId,
 			BasicAttackCooldownTicksRemaining = BasicAttackCooldownTicksRemaining,
 			GlobalCooldownTicksRemaining = GlobalCooldownTicksRemaining,
 			CastTicksRemaining = CastTicksRemaining,

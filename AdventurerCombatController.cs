@@ -15,6 +15,7 @@ public partial class AdventurerCombatController : Node
 	private readonly List<CombatActionRunner> _runners = new();
 	private readonly HashSet<string> _defeatedMonsterEventIds = new(StringComparer.Ordinal);
 	private readonly HashSet<string> _deadAdventurerEventIds = new(StringComparer.Ordinal);
+	private readonly ICombatLoadoutSource _loadoutSource = new HardcodedLoadoutSource();
 	private Adventurer? _adventurer;
 	private int _encounterId;
 	private long _lastProcessedTick;
@@ -76,7 +77,7 @@ public partial class AdventurerCombatController : Node
 		{
 			CombatActionRunner runner = new(
 				adventurer,
-				CreateAdventurerActions(adventurer),
+				_loadoutSource.ResolveLoadout(adventurer),
 				_rng,
 				EmitBridgeEvent,
 				() => SelectMonsterTarget(adventurer),
@@ -89,7 +90,7 @@ public partial class AdventurerCombatController : Node
 		{
 			CombatActionRunner runner = new(
 				monster,
-				CreateMonsterActions(),
+				_loadoutSource.ResolveLoadout(monster),
 				_rng,
 				EmitBridgeEvent,
 				() => SelectAdventurerTarget(monster));
@@ -156,7 +157,7 @@ public partial class AdventurerCombatController : Node
 
 		CombatActionRunner runner = new(
 			monster,
-			CreateMonsterActions(),
+			_loadoutSource.ResolveLoadout(monster),
 			_rng,
 			EmitBridgeEvent,
 			() => SelectAdventurerTarget(monster));
@@ -312,63 +313,27 @@ public partial class AdventurerCombatController : Node
 
 	public static IReadOnlyList<CombatAction> CreateAdventurerActions()
 	{
-		return new[]
-		{
-			CreateHeavyStrike(),
-			CreateSpark(),
-			CombatAction.BasicAttack()
-		};
+		return HardcodedLoadoutSource.CreateLegacyAdventurerActions();
 	}
 
 	public static IReadOnlyList<CombatAction> CreateAdventurerActions(Adventurer adventurer)
 	{
-		return adventurer.Archetype switch
-		{
-			AdventurerArchetype.Mage => new[]
-			{
-				CreateSpark(),
-				CombatAction.BasicAttack(160.0)
-			},
-			_ => new[]
-			{
-				CreateHeavyStrike(),
-				CombatAction.BasicAttack()
-			}
-		};
+		return HardcodedLoadoutSource.CreateAdventurerActions(adventurer);
 	}
 
-	private static CombatAction CreateHeavyStrike()
+	public static IReadOnlyList<CombatAction> CreateMonsterActions()
 	{
-		return new CombatAction(
-			"heavy_strike",
-			"Heavy Strike",
-			CombatActionKind.Skill,
-			48.0,
-			12,
-			0,
-			1,
-			true,
-			false,
-			10,
-			1.5,
-			false);
+		return HardcodedLoadoutSource.CreateMonsterActions();
 	}
 
-	private static CombatAction CreateSpark()
+	public static CombatAction CreateHeavyStrike()
 	{
-		return new CombatAction(
-			"spark",
-			"Spark",
-			CombatActionKind.Spell,
-			160.0,
-			8,
-			8,
-			0,
-			true,
-			false,
-			4,
-			1.2,
-			false);
+		return HardcodedLoadoutSource.CreateHeavyStrike();
+	}
+
+	public static CombatAction CreateSpark()
+	{
+		return HardcodedLoadoutSource.CreateSpark();
 	}
 
 	private IEnumerable<RolledCombatAction> RollActionOrder(IReadOnlyList<QueuedCombatAction> queuedActions, long tick)
@@ -423,14 +388,6 @@ public partial class AdventurerCombatController : Node
 		{
 			queuedActions.Add(queuedAction);
 		}
-	}
-
-	private static IReadOnlyList<CombatAction> CreateMonsterActions()
-	{
-		return new[]
-		{
-			CombatAction.BasicAttack()
-		};
 	}
 
 	private Monster? SelectMonsterTarget(Adventurer adventurer)
@@ -545,6 +502,8 @@ public partial class AdventurerCombatController : Node
 			{ "active_action", runner?.ActiveActionId ?? string.Empty },
 			{ "queued_action", runner?.QueuedActionId ?? string.Empty },
 			{ "last_action", combatant is Adventurer adventurer4 ? adventurer4.LastActionId : combatant is Monster monster4 ? monster4.LastActionId : string.Empty },
+			{ "definition_id", runner?.DefinitionId ?? string.Empty },
+			{ "combat_loadout_id", runner?.CombatLoadoutId ?? string.Empty },
 			{ "basic_attack_cooldown_ticks_remaining", runner?.BasicAttackCooldownTicksRemaining ?? 0 },
 			{ "global_cooldown_ticks_remaining", combatant is Adventurer adventurer3 ? adventurer3.GlobalCooldownTicksRemaining : combatant is Monster monster3 ? monster3.GlobalCooldownTicksRemaining : 0 },
 			{ "cast_ticks_remaining", combatant is Adventurer adventurer ? adventurer.CastTicksRemaining : combatant is Monster monster ? monster.CastTicksRemaining : 0 },
