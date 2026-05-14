@@ -32,15 +32,12 @@ public partial class AdventurerCombatController : Node
 		_loadoutSource = loadoutSource;
 	}
 
-	public double GetLongestTargetActionRange(ICombatant combatant)
+	public float GetDesiredCombatDistance(ICombatant combatant, float meleeDistance)
 	{
-		return _loadoutSource
-			.ResolveLoadout(combatant)
-			.Actions
-			.Where(action => action.RequiresTarget)
-			.Select(action => action.Range)
-			.DefaultIfEmpty(0.0)
-			.Max();
+		return CombatPositioning.GetDesiredCombatDistance(
+			combatant,
+			_loadoutSource.ResolveLoadout(combatant),
+			meleeDistance);
 	}
 
 	public void StartCombat(Monster target, long currentTick)

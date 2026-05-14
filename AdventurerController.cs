@@ -144,7 +144,7 @@ public partial class AdventurerController : Node
 			{ "target_position", BridgePayload.VectorToArray(approachPosition) },
 			{ "monster_position", BridgePayload.VectorToArray(target.GlobalPosition) },
 			{ "combat_approach_distance", approachDistance },
-			{ "combat_approach_source", "longest_adventurer_action_range" }
+			{ "combat_approach_source", "shared_combat_positioning" }
 		});
 		ChangeState(AdventurerIntentionState.TravelToTarget);
 	}
@@ -205,9 +205,8 @@ public partial class AdventurerController : Node
 			return MeleeApproachDistance;
 		}
 
-		double longestActionRange = _adventurer.CombatController?.GetLongestTargetActionRange(_adventurer) ?? MeleeApproachDistance;
-
-		return (float)Math.Max(MeleeApproachDistance, longestActionRange);
+		return _adventurer.CombatController?.GetDesiredCombatDistance(_adventurer, MeleeApproachDistance)
+			?? MeleeApproachDistance;
 	}
 
 	private void UpdateFight(double delta)
@@ -250,7 +249,7 @@ public partial class AdventurerController : Node
 			else if (_adventurer.CombatState is not CombatState.OutOfCombat and not CombatState.Engaging)
 			{
 				_movementPausedForCurrentCast = false;
-				_adventurer.SetMoveTarget(GetCombatApproachPosition(target, MeleeApproachDistance));
+				_adventurer.SetMoveTarget(GetCombatApproachPosition(target, GetOpeningApproachDistance()));
 				_adventurer.MoveTowardTarget(delta);
 			}
 		}

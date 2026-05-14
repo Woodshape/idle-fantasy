@@ -167,6 +167,7 @@ public sealed class CombatEncounter
 			_monsters,
 			_runners,
 			GetTargetCandidates,
+			GetPreferredTarget,
 			HandleEndConditions);
 	}
 
@@ -237,6 +238,16 @@ public sealed class CombatEncounter
 			.Where(adventurer => adventurer.IsAlive)
 			.Cast<ICombatant>()
 			.ToArray();
+	}
+
+	private ICombatant? GetPreferredTarget(CombatActionRunner runner)
+	{
+		return runner.Owner switch
+		{
+			Adventurer adventurer => adventurer.CurrentMonsterTarget,
+			Monster monster => monster.AggroTarget,
+			_ => null
+		};
 	}
 
 	private bool HandleEndConditions()

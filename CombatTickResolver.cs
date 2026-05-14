@@ -9,18 +9,18 @@ using GDict = Godot.Collections.Dictionary;
 public sealed class CombatTickResolver
 {
 	private readonly RandomNumberGenerator _rng;
-	private readonly CombatDecisionController _decisionController;
+	private readonly ICombatDecisionPolicy _decisionPolicy;
 	private readonly Action<string, GDict> _emitEvent;
 	private readonly string _eventSource;
 
 	public CombatTickResolver(
 		RandomNumberGenerator rng,
-		CombatDecisionController decisionController,
+		ICombatDecisionPolicy decisionPolicy,
 		Action<string, GDict> emitEvent,
 		string eventSource)
 	{
 		_rng = rng;
-		_decisionController = decisionController;
+		_decisionPolicy = decisionPolicy;
 		_emitEvent = emitEvent;
 		_eventSource = eventSource;
 	}
@@ -33,6 +33,7 @@ public sealed class CombatTickResolver
 		IReadOnlyList<Monster> monsters,
 		IReadOnlyList<CombatActionRunner> runners,
 		Func<CombatActionRunner, IReadOnlyList<ICombatant>> getTargetCandidates,
+		Func<CombatActionRunner, ICombatant?> getPreferredTarget,
 		Func<bool> handleEndConditions)
 	{
 		_emitEvent("combat_tick_started", new GDict
@@ -58,7 +59,10 @@ public sealed class CombatTickResolver
 
 			if (runner.CanChooseAction)
 			{
-				CombatDecision decision = _decisionController.ChooseDecision(runner, getTargetCandidates(runner));
+				CombatDecision decision = _decisionPolicy.ChooseDecision(new CombatDecisionContext(
+					runner,
+					getTargetCandidates(runner),
+					getPreferredTarget(runner)));
 				AddIfQueued(queuedActions, runner.QueueDecisionForTick(decision, tick));
 			}
 		}

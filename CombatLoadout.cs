@@ -18,10 +18,12 @@ public sealed record CombatDecision(
 	ICombatant? Target,
 	string Reason);
 
+public sealed record CombatDecisionContext(
+	CombatActionRunner Runner,
+	IReadOnlyList<ICombatant> TargetCandidates,
+	ICombatant? PreferredTarget);
+
 public interface ICombatDecisionPolicy
 {
-	CombatDecision ChooseAction(
-		ICombatant actor,
-		CombatLoadout loadout,
-		IReadOnlyList<ICombatant> targetCandidates);
+	CombatDecision ChooseDecision(CombatDecisionContext context);
 }

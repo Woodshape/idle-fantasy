@@ -27,6 +27,10 @@ Defense = 2
 Evasion = 0.12
 Initiative = 3
 
+[node name="AdventurerController" parent="Warrior"]
+MaxEncounterMonsters = 2
+MaxEncounterAdventurers = 2
+
 [node name="Mage" parent="." unique_id=1374036619 instance=ExtResource("3_adventurer")]
 position = Vector2(430, 330)
 AdventurerName = "Mage"
@@ -36,6 +40,11 @@ Accuracy = 0.3
 Evasion = 0.18
 Initiative = 5
 AttackSpeed = 5
+
+[node name="AdventurerController" parent="Mage"]
+process_mode = 4
+MaxEncounterMonsters = 2
+MaxEncounterAdventurers = 2
 
 [node name="Monsters" type="Node2D" parent="." unique_id=1641391484]
 

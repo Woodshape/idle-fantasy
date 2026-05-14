@@ -8,8 +8,6 @@ using GDict = Godot.Collections.Dictionary;
 
 public partial class Monster : Node2D, ICombatant
 {
-	private const float AttackDistanceRangePadding = 6.0f;
-
 	[Export]
 	public string MonsterName { get; set; } = "Slime";
 
@@ -85,6 +83,7 @@ public partial class Monster : Node2D, ICombatant
 	private ProgressBar? _healthBar;
 	private bool _wasMovingToAggroTarget;
 	private Vector2 _homePosition;
+	private CombatLoadout? _loadout;
 
 	public override void _Ready()
 	{
@@ -185,6 +184,7 @@ public partial class Monster : Node2D, ICombatant
 		IsDisabled = false;
 		CanAct = false;
 		_skillCooldowns.Clear();
+		_loadout = null;
 		_hasSetup = true;
 		UpdateHealthBar();
 
@@ -204,16 +204,8 @@ public partial class Monster : Node2D, ICombatant
 			throw new InvalidOperationException($"Monster definition '{definition.DefinitionId}' is missing stats.");
 		}
 
-		float aggroAttackDistance = definition.AggroAttackDistance;
-
-		if (TryGetLongestTargetedBasicAttackRange(definition, out float actionRange))
-		{
-			aggroAttackDistance = Mathf.Max(
-				aggroAttackDistance,
-				Mathf.Max(0.0f, actionRange - AttackDistanceRangePadding));
-		}
-
 		Definition = definition;
+		_loadout = definition.CombatLoadout?.ToRuntimeLoadout(definition.DefinitionId);
 		Setup(
 			monsterName: string.IsNullOrWhiteSpace(displayNameOverride) ? definition.DisplayName : displayNameOverride,
 			level: definition.Level,
@@ -223,8 +215,9 @@ public partial class Monster : Node2D, ICombatant
 			experienceReward: definition.ExperienceReward,
 			speed: definition.MovementSpeed,
 			aggroRange: definition.AggroRange,
-			aggroAttackDistance: aggroAttackDistance,
+			aggroAttackDistance: definition.AggroAttackDistance,
 			definitionId: definition.DefinitionId);
+		_loadout = definition.CombatLoadout?.ToRuntimeLoadout(definition.DefinitionId);
 
 		if (GetNodeOrNull<Sprite2D>("Sprite2D") is Sprite2D sprite)
 		{
@@ -275,7 +268,8 @@ public partial class Monster : Node2D, ICombatant
 				{ "aggro_trigger", aggroTrigger },
 				{ "distance_to_target", GlobalPosition.DistanceTo(attacker.GlobalPosition) },
 				{ "aggro_range", AggroRange },
-				{ "aggro_attack_distance", AggroAttackDistance }
+				{ "aggro_attack_distance", AggroAttackDistance },
+				{ "desired_combat_distance", GetDesiredCombatDistance() }
 			});
 		}
 
@@ -435,8 +429,9 @@ public partial class Monster : Node2D, ICombatant
 
 		Vector2 toTarget = target.GlobalPosition - GlobalPosition;
 		float distance = toTarget.Length();
+		float desiredCombatDistance = GetDesiredCombatDistance();
 
-		if (distance <= AggroAttackDistance)
+		if (distance <= desiredCombatDistance)
 		{
 			if (_wasMovingToAggroTarget)
 			{
@@ -447,7 +442,8 @@ public partial class Monster : Node2D, ICombatant
 					{ "monster", MonsterName },
 					{ "target", target.AdventurerName },
 					{ "distance_to_target", distance },
-					{ "aggro_attack_distance", AggroAttackDistance }
+					{ "aggro_attack_distance", AggroAttackDistance },
+					{ "desired_combat_distance", desiredCombatDistance }
 				});
 			}
 
@@ -464,13 +460,14 @@ public partial class Monster : Node2D, ICombatant
 				{ "monster", MonsterName },
 				{ "target", target.AdventurerName },
 				{ "distance_to_target", distance },
-				{ "aggro_attack_distance", AggroAttackDistance }
+				{ "aggro_attack_distance", AggroAttackDistance },
+				{ "desired_combat_distance", desiredCombatDistance }
 			});
 		}
 
 		Vector2 movement = toTarget.Normalized() * Speed * (float)delta;
-		GlobalPosition += movement.Length() >= distance - AggroAttackDistance
-			? toTarget.Normalized() * Mathf.Max(0.0f, distance - AggroAttackDistance)
+		GlobalPosition += movement.Length() >= distance - desiredCombatDistance
+			? toTarget.Normalized() * Mathf.Max(0.0f, distance - desiredCombatDistance)
 			: movement;
 		PublishState();
 	}
@@ -487,26 +484,11 @@ public partial class Monster : Node2D, ICombatant
 		PublishState();
 	}
 
-	private static bool TryGetLongestTargetedBasicAttackRange(MonsterDefinition definition, out float range)
+	private float GetDesiredCombatDistance()
 	{
-		range = 0.0f;
-
-		if (definition.CombatLoadout is null)
-		{
-			return false;
-		}
-
-		foreach (CombatActionDefinition? action in definition.CombatLoadout.Actions)
-		{
-			if (action is null || !action.RequiresTarget || action.Kind != CombatActionKind.BasicAttack)
-			{
-				continue;
-			}
-
-			range = Mathf.Max(range, (float)action.Range);
-		}
-
-		return range > 0.0f;
+		return _loadout is CombatLoadout loadout
+			? CombatPositioning.GetDesiredCombatDistance(this, loadout, AggroAttackDistance)
+			: AggroAttackDistance;
 	}
 
 	private static void EmitBridgeEvent(string type, GDict payload)

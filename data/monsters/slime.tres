@@ -7,7 +7,7 @@
 [sub_resource type="Resource" id="Stats_slime"]
 script = ExtResource("3_stats_script")
 MaxHealth = 23
-Attack = 6
+Attack = 5
 Accuracy = 0.35
 Defense = 1
 Initiative = 1

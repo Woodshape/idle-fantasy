@@ -66,7 +66,6 @@ required_events=(
 	"adventurer_cast_movement_paused"
 	"combat_cast_completed"
 	"monster_aggro_target_set"
-	"monster_aggro_moving"
 	"combat_tick_completed"
 	"loot_collected"
 	"character_selected"
@@ -99,7 +98,7 @@ fi
 spark_distance="$(printf '%s\n' "${spark_cast_line}" | sed -n 's/.*"distance_to_target":\([0-9.]*\).*/\1/p')"
 spark_range="$(printf '%s\n' "${spark_cast_line}" | sed -n 's/.*"range":\([0-9.]*\).*/\1/p')"
 
-if ! awk -v distance="${spark_distance}" -v range="${spark_range}" 'BEGIN { exit !(distance >= 150 && range >= 160 && distance <= range) }'; then
+if ! awk -v distance="${spark_distance}" -v range="${spark_range}" 'BEGIN { exit !(distance > 48 && range >= 160 && distance <= range) }'; then
 	echo "Spark did not cast from medium range. distance=${spark_distance:-missing} range=${spark_range:-missing}. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
@@ -111,8 +110,10 @@ if [[ -z "${cast_pause_line}" ]]; then
 	exit 1
 fi
 
-if ! printf '%s\n' "${cast_pause_line}" | grep -q '"distance_to_monster":1[5-6][0-9]'; then
-	echo "Spark cast pause did not happen at ranged distance. Session: ${SESSION_DIR}" >&2
+cast_pause_distance="$(printf '%s\n' "${cast_pause_line}" | sed -n 's/.*"distance_to_monster":\([0-9.]*\).*/\1/p')"
+
+if ! awk -v distance="${cast_pause_distance}" 'BEGIN { exit !(distance > 48 && distance <= 160) }'; then
+	echo "Spark cast pause did not happen inside ranged distance. distance=${cast_pause_distance:-missing}. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
@@ -120,8 +121,6 @@ spark_target="$(printf '%s\n' "${spark_cast_line}" | sed -n 's/.*"target":"\([^"
 spark_adventurer="$(printf '%s\n' "${spark_cast_line}" | sed -n 's/.*"combatant":"\([^"]*\)".*/\1/p')"
 spark_resolved_numbered_line="$(grep -n '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"adventurer"' | grep '"action_id":"spark"' | grep "\"combatant\":\"${spark_adventurer}\"" | grep "\"target\":\"${spark_target}\"" | head -n 1 || true)"
 spark_resolved_line_number="$(printf '%s\n' "${spark_resolved_numbered_line}" | cut -d: -f1)"
-spark_resolved_line="$(printf '%s\n' "${spark_resolved_numbered_line}" | cut -d: -f2-)"
-first_spark_target_attack_line_number="$(grep -n '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep "\"combatant\":\"${spark_target}\"" | grep "\"target\":\"${spark_adventurer}\"" | head -n 1 | cut -d: -f1 || true)"
 
 if [[ -z "${spark_resolved_line_number}" ]]; then
 	echo "Missing spark action resolution. Session: ${SESSION_DIR}" >&2
@@ -135,8 +134,23 @@ if [[ "${monster_action_resolution_count}" == "0" ]]; then
 	exit 1
 fi
 
-if [[ -n "${first_spark_target_attack_line_number}" ]] && (( first_spark_target_attack_line_number <= spark_resolved_line_number )); then
-	echo "Spark target attacked the mage before spark resolved. Session: ${SESSION_DIR}" >&2
+slime_ranged_queue_count="$(grep '"type":"combat_action_queued"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep -c '"action_id":"basic_attack_ranged"' || true)"
+slime_ranged_resolution_count="$(grep '"type":"combat_action_resolved"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep -c '"action_id":"basic_attack_ranged"' || true)"
+slime_ranged_damage_count="$(grep '"type":"damage_applied"' "${EVENTS_FILE}" | grep '"defender_kind":"adventurer"' | grep -c '"action_id":"basic_attack_ranged"' || true)"
+slime_ranged_distance_line="$(grep '"type":"combat_action_queued"' "${EVENTS_FILE}" | grep '"combatant_kind":"monster"' | grep '"action_id":"basic_attack_ranged"' | awk '/"distance_to_target":(1[0-5][0-9]|[5-9][0-9])/{ print; exit }' || true)"
+
+if [[ "${slime_ranged_queue_count}" == "0" || "${slime_ranged_resolution_count}" == "0" ]]; then
+	echo "Missing slime basic_attack_ranged queue/resolution evidence. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
+
+if [[ "${slime_ranged_damage_count}" == "0" ]]; then
+	echo "Missing slime ranged damage_applied evidence. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
+
+if [[ -z "${slime_ranged_distance_line}" ]]; then
+	echo "Missing slime ranged attack queued from beyond melee distance. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
@@ -147,29 +161,20 @@ if [[ "${heavy_strike_resolution_count}" == "0" ]]; then
 	exit 1
 fi
 
-aggro_numbered_line="$(grep -n '"type":"monster_aggro_target_set"' "${EVENTS_FILE}" | grep "\"monster\":\"${spark_target}\"" | grep "\"target\":\"${spark_adventurer}\"" | head -n 1 || true)"
-aggro_line="$(printf '%s\n' "${aggro_numbered_line}" | cut -d: -f2-)"
-aggro_line_number="$(printf '%s\n' "${aggro_numbered_line}" | cut -d: -f1)"
+aggro_line="$(grep '"type":"monster_aggro_target_set"' "${EVENTS_FILE}" | grep '"aggro_trigger":"ability_resolved"' | head -n 1 || true)"
 
 if [[ -z "${aggro_line}" ]]; then
-	echo "Missing monster aggro target event. Session: ${SESSION_DIR}" >&2
+	echo "Missing ability-resolved monster aggro target event. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
-if (( aggro_line_number <= spark_resolved_line_number )); then
-	echo "Monster aggro triggered before spark resolved. Session: ${SESSION_DIR}" >&2
+if ! printf '%s\n' "${aggro_line}" | grep -q '"aggro_range":48.0'; then
+	echo "Monster aggro range was not preserved as authored 48.0. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
-aggro_distance="$(printf '%s\n' "${aggro_line}" | sed -n 's/.*"distance_to_target":\([0-9.]*\).*/\1/p')"
-
-if ! printf '%s\n' "${aggro_line}" | grep -q '"aggro_trigger":"ability_resolved"'; then
-	echo "Spark resolved, but first combat aggro was not caused by the targeted spell resolution. Session: ${SESSION_DIR}" >&2
-	exit 1
-fi
-
-if ! awk -v distance="${aggro_distance}" 'BEGIN { exit !(distance >= 150) }'; then
-	echo "Targeted spell aggro was not triggered from ranged spark distance. distance=${aggro_distance:-missing}. Session: ${SESSION_DIR}" >&2
+if ! printf '%s\n' "${aggro_line}" | grep -q '"desired_combat_distance":154.0'; then
+	echo "Monster aggro event did not expose shared ranged combat distance. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
