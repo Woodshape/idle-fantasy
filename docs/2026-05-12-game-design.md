@@ -116,7 +116,7 @@ Core stats:
 - Name and class.
 - Level and experience.
 - Health and max health.
-- Attack, defense, speed, and perception.
+- Attack, defense, speed, crit chance, crit damage, and perception.
 - Gold, inventory, equipment, and potion count.
 - Current task and target.
 - Risk tolerance and personality traits.
@@ -223,8 +223,12 @@ Example:
 
 ```text
 hit_chance = f(attacker_accuracy, defender_evasion, level_delta, status_effects)
-roll = random 0..1
-attack_hits = roll <= hit_chance
+hit_roll = random 0..1
+attack_hits = hit_roll <= hit_chance
+
+crit_chance = clamp(0.10 + attacker_crit_chance, 0.0, 1.0)
+crit_roll = random 0..1 after a hit
+attack_crits = attack_hits && crit_roll <= crit_chance
 ```
 
 This keeps formulas inspectable and tunable while still making combat unpredictable.
@@ -234,9 +238,11 @@ Minimal combat loop:
 1. Adventurer and monster enter combat.
 2. Combatants exchange attacks at fixed intervals.
 3. Each attack computes a success probability and rolls against it.
-4. Successful attacks apply damage, mitigation, effects, or spell outcomes.
-5. Health reaches zero.
-6. Winner receives rewards or enters a post-combat state.
+4. Successful attacks roll separately for critical hits.
+5. Critical hits multiply attack, ability, or spell damage before defense by the attacker's crit damage.
+6. Successful attacks apply damage, mitigation, effects, or spell outcomes.
+7. Health reaches zero.
+8. Winner receives rewards or enters a post-combat state.
 
 Later combat can add abilities, status effects, formations, party tactics, fleeing, potions, and class-specific logic.
 

@@ -86,6 +86,8 @@ public sealed class CombatAction
 public readonly record struct CombatStats(
 	int Attack,
 	double Accuracy,
+	double CritChance,
+	double CritDamage,
 	int Defense,
 	double Evasion,
 	int Initiative,

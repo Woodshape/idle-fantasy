@@ -14,6 +14,7 @@ public partial class TestBridge : Node
 	public static TestBridge? Instance { get; private set; }
 
 	public bool IsActive { get; private set; }
+	public string SceneTag => _sceneTag;
 
 	private string _sessionDir = string.Empty;
 	private string _commandsPath = string.Empty;

@@ -11,6 +11,16 @@ public partial class GameController : Node2D
 	private const double SimulationTickInterval = 0.25;
 	private const double MonsterWaveRespawnDelaySeconds = 5.0;
 	private const float CharacterSelectionRadius = 34.0f;
+	private const double TargetScoreDistanceDivisor = 80.0;
+	private const double TargetScoreLevelDangerWeight = 10.0;
+	private const double TargetScoreWoundedDangerWeight = 12.0;
+	private const double TargetScoreWoundedSafeBonus = 8.0;
+	private const double TargetScoreHealthGapDivisor = 25.0;
+	private const double TargetScoreCombatDeficitDivisor = 4.0;
+	private const double TargetScoreBaseHitChance = 0.50;
+	private const double TargetScoreBaseCritChance = 0.10;
+	private const double MinimumViableTargetScore = 0.0;
+	private const string TargetChoiceRiskSceneTag = "target_choice_risk";
 
 	[Export]
 	public NodePath TownPath { get; set; } = new("Town");
@@ -184,17 +194,16 @@ public partial class GameController : Node2D
 			return;
 		}
 
-		bool hasWarrior = _adventurers.Any(adventurer => adventurer.Archetype == AdventurerArchetype.Warrior);
-		bool hasMage = _adventurers.Any(adventurer => adventurer.Archetype == AdventurerArchetype.Mage);
+		bool hasWarrior = _adventurers.Any(adventurer => adventurer.DefinitionId == "warrior");
+		bool hasMage = _adventurers.Any(adventurer => adventurer.DefinitionId == "mage");
 
 		if (!hasWarrior)
 		{
 			Adventurer? warrior = SpawnDefaultAdventurer(
 				nodeName: "Warrior",
 				adventurerName: "Warrior",
-				archetype: AdventurerArchetype.Warrior,
 				role: CombatantRole.Tank,
-				stats: new CombatStats(8, 0.24, 3, 0.18, 3, 4, 46, 46),
+				stats: new CombatStats(8, 0.24, 0.0, 2.0, 3, 0.18, 3, 4, 46, 46),
 				positionOffset: new Vector2(0.0f, -28.0f),
 				spriteModulate: new Color(0.25f, 0.55f, 1.0f));
 
@@ -209,9 +218,8 @@ public partial class GameController : Node2D
 			SpawnDefaultAdventurer(
 				nodeName: "Mage",
 				adventurerName: "Mage",
-				archetype: AdventurerArchetype.Mage,
 				role: CombatantRole.DamageDealer,
-				stats: new CombatStats(13, 0.42, 2, 0.00, 5, 5, 30, 30),
+				stats: new CombatStats(13, 0.42, 0.0, 2.0, 2, 0.00, 5, 5, 30, 30),
 				positionOffset: new Vector2(0.0f, 28.0f),
 				spriteModulate: new Color(0.75f, 0.45f, 1.0f));
 		}
@@ -284,7 +292,6 @@ public partial class GameController : Node2D
 	private Adventurer? SpawnDefaultAdventurer(
 		string nodeName,
 		string adventurerName,
-		AdventurerArchetype archetype,
 		CombatantRole role,
 		CombatStats stats,
 		Vector2 positionOffset,
@@ -300,7 +307,6 @@ public partial class GameController : Node2D
 		adventurer.Name = nodeName;
 		adventurer.Setup(
 			adventurerName: adventurerName,
-			archetype: archetype,
 			role: role,
 			stats: stats,
 			position: (_town?.ReturnPosition ?? adventurer.Position) + positionOffset);
@@ -339,7 +345,7 @@ public partial class GameController : Node2D
 			return;
 		}
 
-		foreach (MonsterSpawnDefinition spawn in ContentLibrary.DefaultMonsterSpawns.Where(spawn => spawn is not null && spawn.Enabled))
+		foreach (MonsterSpawnDefinition spawn in ContentLibrary.DefaultMonsterSpawns.Where(ShouldSpawnDefaultMonster))
 		{
 			MonsterDefinition? definition = spawn.ActorDefinition;
 
@@ -353,6 +359,21 @@ public partial class GameController : Node2D
 				: spawn.Position;
 			SpawnMonster(monsterContainer, spawn, definition, position);
 		}
+	}
+
+	private static bool ShouldSpawnDefaultMonster(MonsterSpawnDefinition? spawn)
+	{
+		if (spawn is null)
+		{
+			return false;
+		}
+
+		if (spawn.Enabled)
+		{
+			return true;
+		}
+
+		return string.Equals(TestBridge.Instance?.SceneTag, TargetChoiceRiskSceneTag, StringComparison.Ordinal);
 	}
 
 	private void SpawnMonster(Node monsterContainer, MonsterSpawnDefinition spawn, MonsterDefinition definition, Vector2 position)
@@ -380,7 +401,7 @@ public partial class GameController : Node2D
 		monster.Name = nodeName;
 		monster.Setup(
 			monsterName: monsterName,
-			stats: new CombatStats(7, 0.32, 2, 0.12, 1, 8, 45, 45),
+			stats: new CombatStats(7, 0.32, 0.0, 2.0, 2, 0.12, 1, 8, 45, 45),
 			position: position);
 		monsterContainer.AddChild(monster);
 		_monsters.Add(monster);
@@ -488,12 +509,137 @@ public partial class GameController : Node2D
 
 	public IReadOnlyList<Monster> FindHuntTargets(Adventurer adventurer, int maximumTargets)
 	{
-		return _monsters
+		List<TargetScore> scoredTargets = _monsters
 			.Where(monster => monster.IsAlive)
 			.Where(monster => !IsMonsterClaimedByAnotherAdventurer(monster, adventurer))
-			.OrderBy(monster => monster.GlobalPosition.DistanceSquaredTo(adventurer.GlobalPosition))
-			.Take(Math.Max(1, maximumTargets))
+			.Select(monster => ScoreHuntTarget(adventurer, monster))
+			.OrderByDescending(score => score.Score)
+			.ThenBy(score => score.Distance)
+			.ToList();
+		int targetCount = Math.Max(1, maximumTargets);
+		List<TargetScore> selectedTargets = scoredTargets
+			.Where(score => score.Score > MinimumViableTargetScore)
+			.Take(targetCount)
+			.ToList();
+
+		for (int index = 0; index < scoredTargets.Count; index++)
+		{
+			TargetScore score = scoredTargets[index];
+			bool selected = selectedTargets.Any(selectedScore => ReferenceEquals(selectedScore.Monster, score.Monster));
+			EmitTargetScore(adventurer, score, index + 1, selected);
+		}
+
+		return selectedTargets
+			.Select(score => score.Monster)
 			.ToArray();
+	}
+
+	private TargetScore ScoreHuntTarget(Adventurer adventurer, Monster monster)
+	{
+		double distance = adventurer.GlobalPosition.DistanceTo(monster.GlobalPosition);
+		double rewardValue = monster.GoldReward + monster.ExperienceReward;
+		double distancePenalty = distance / TargetScoreDistanceDivisor;
+		int levelDelta = monster.Level - adventurer.Level;
+		double dangerPenalty = Math.Max(0, levelDelta) * TargetScoreLevelDangerWeight;
+		double healthGap = monster.Health - adventurer.Health;
+		double healthGapPenalty = Math.Max(0, healthGap) / TargetScoreHealthGapDivisor;
+		CombatRiskEstimate combatRisk = EstimateCombatRisk(adventurer, monster);
+		double hpRatio = adventurer.Stats.MaxHealth <= 0
+			? 0.0
+			: adventurer.Health / (double)adventurer.Stats.MaxHealth;
+		double woundedCautionAdjustment = 0.0;
+
+		if (hpRatio < 0.50)
+		{
+			woundedCautionAdjustment = levelDelta > 0
+				? -TargetScoreWoundedDangerWeight * levelDelta
+				: TargetScoreWoundedSafeBonus;
+		}
+
+		double score = rewardValue
+			- distancePenalty
+			- dangerPenalty
+			- healthGapPenalty
+			- combatRisk.CombatDeficitPenalty
+			+ woundedCautionAdjustment;
+
+		return new TargetScore(
+			monster,
+			distance,
+			rewardValue,
+			distancePenalty,
+			dangerPenalty,
+			healthGap,
+			healthGapPenalty,
+			combatRisk.AdventurerExpectedDamagePerTick,
+			combatRisk.MonsterExpectedDamagePerTick,
+			combatRisk.ExpectedTicksToKillMonster,
+			combatRisk.ExpectedTicksToKillAdventurer,
+			combatRisk.CombatTicksMargin,
+			combatRisk.CombatDeficitPenalty,
+			woundedCautionAdjustment,
+			hpRatio,
+			score);
+	}
+
+	private static CombatRiskEstimate EstimateCombatRisk(Adventurer adventurer, Monster monster)
+	{
+		double adventurerExpectedDamagePerTick = EstimateExpectedDamagePerTick(adventurer.Stats, monster.Stats);
+		double monsterExpectedDamagePerTick = EstimateExpectedDamagePerTick(monster.Stats, adventurer.Stats);
+		double expectedTicksToKillMonster = monster.Health / Math.Max(0.001, adventurerExpectedDamagePerTick);
+		double expectedTicksToKillAdventurer = adventurer.Health / Math.Max(0.001, monsterExpectedDamagePerTick);
+		double combatTicksMargin = expectedTicksToKillAdventurer - expectedTicksToKillMonster;
+		double combatDeficitPenalty = Math.Max(0.0, -combatTicksMargin) / TargetScoreCombatDeficitDivisor;
+
+		return new CombatRiskEstimate(
+			adventurerExpectedDamagePerTick,
+			monsterExpectedDamagePerTick,
+			expectedTicksToKillMonster,
+			expectedTicksToKillAdventurer,
+			combatTicksMargin,
+			combatDeficitPenalty);
+	}
+
+	private static double EstimateExpectedDamagePerTick(CombatStats attackerStats, CombatStats defenderStats)
+	{
+		double hitChance = Math.Clamp(TargetScoreBaseHitChance + attackerStats.Accuracy - defenderStats.Evasion, 0.05, 0.95);
+		double normalDamage = Math.Max(1, attackerStats.Attack - defenderStats.Defense);
+		double critChance = Math.Clamp(TargetScoreBaseCritChance + attackerStats.CritChance, 0.0, 1.0);
+		double expectedDamage = normalDamage * (1.0 + (critChance * Math.Max(0.0, attackerStats.CritDamage - 1.0)));
+		return expectedDamage * hitChance / Math.Max(1, attackerStats.AttackSpeedTicks);
+	}
+
+	private void EmitTargetScore(Adventurer adventurer, TargetScore score, int rank, bool selected)
+	{
+		EmitBridgeEvent("adventurer_target_scored", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "adventurer", adventurer.AdventurerName },
+			{ "adventurer_level", adventurer.Level },
+			{ "adventurer_health", adventurer.Health },
+			{ "adventurer_max_health", adventurer.Stats.MaxHealth },
+			{ "adventurer_hp_ratio", score.AdventurerHpRatio },
+			{ "monster", score.Monster.MonsterName },
+			{ "monster_level", score.Monster.Level },
+			{ "monster_gold_reward", score.Monster.GoldReward },
+			{ "monster_experience_reward", score.Monster.ExperienceReward },
+			{ "reward_value", score.RewardValue },
+			{ "distance", score.Distance },
+			{ "distance_penalty", score.DistancePenalty },
+			{ "danger_penalty", score.DangerPenalty },
+			{ "health_gap", score.HealthGap },
+			{ "health_gap_penalty", score.HealthGapPenalty },
+			{ "adventurer_expected_damage_per_tick", score.AdventurerExpectedDamagePerTick },
+			{ "monster_expected_damage_per_tick", score.MonsterExpectedDamagePerTick },
+			{ "expected_ticks_to_kill_monster", score.ExpectedTicksToKillMonster },
+			{ "expected_ticks_to_kill_adventurer", score.ExpectedTicksToKillAdventurer },
+			{ "combat_ticks_margin", score.CombatTicksMargin },
+			{ "combat_deficit_penalty", score.CombatDeficitPenalty },
+			{ "wounded_caution_adjustment", score.WoundedCautionAdjustment },
+			{ "score", score.Score },
+			{ "rank", rank },
+			{ "selected", selected }
+		});
 	}
 
 	private bool IsMonsterClaimedByAnotherAdventurer(Monster monster, Adventurer adventurer)
@@ -503,6 +649,32 @@ public partial class GameController : Node2D
 			&& candidate.IsAlive
 			&& ReferenceEquals(candidate.CurrentMonsterTarget, monster));
 	}
+
+	private readonly record struct TargetScore(
+		Monster Monster,
+		double Distance,
+		double RewardValue,
+		double DistancePenalty,
+		double DangerPenalty,
+		double HealthGap,
+		double HealthGapPenalty,
+		double AdventurerExpectedDamagePerTick,
+		double MonsterExpectedDamagePerTick,
+		double ExpectedTicksToKillMonster,
+		double ExpectedTicksToKillAdventurer,
+		double CombatTicksMargin,
+		double CombatDeficitPenalty,
+		double WoundedCautionAdjustment,
+		double AdventurerHpRatio,
+		double Score);
+
+	private readonly record struct CombatRiskEstimate(
+		double AdventurerExpectedDamagePerTick,
+		double MonsterExpectedDamagePerTick,
+		double ExpectedTicksToKillMonster,
+		double ExpectedTicksToKillAdventurer,
+		double CombatTicksMargin,
+		double CombatDeficitPenalty);
 
 	public IReadOnlyList<Adventurer> FindEncounterAdventurers(Adventurer leader, int maximumAdventurers)
 	{
@@ -882,7 +1054,7 @@ public partial class GameController : Node2D
 	{
 		if (_stateLabel is not null)
 		{
-			_stateLabel.Text = $"Adventurer: {adventurer.AdventurerName} | Lv {adventurer.Level} | Role: {adventurer.Role} | Archetype: {adventurer.Archetype} | Intention: {adventurer.IntentionStateName} | HP: {adventurer.Health}/{adventurer.Stats.MaxHealth}";
+			_stateLabel.Text = $"Adventurer: {adventurer.AdventurerName} | Lv {adventurer.Level} | Role: {adventurer.Role} | Intention: {adventurer.IntentionStateName} | HP: {adventurer.Health}/{adventurer.Stats.MaxHealth}";
 		}
 
 		if (_combatLabel is not null)

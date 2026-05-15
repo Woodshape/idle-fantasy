@@ -29,6 +29,9 @@ public partial class AdventurerController : Node
 	[Export(PropertyHint.Range, "0.0,1.0,0.05")]
 	public float DamageDealerRestHealthRatio { get; set; } = 0.70f;
 
+	[Export(PropertyHint.Range, "0.0,1.0,0.05")]
+	public float WoundedRetreatHealthRatio { get; set; } = 0.50f;
+
 	[Export]
 	public int MaxEncounterMonsters { get; set; } = 1;
 
@@ -125,6 +128,7 @@ public partial class AdventurerController : Node
 		if (ShouldReturnToTownForRest())
 		{
 			_adventurer.ClearCombatTarget();
+			EmitRetreatChosen("health_below_rest_threshold");
 			ChangeState(AdventurerIntentionState.ReturnToTown);
 			return;
 		}
@@ -374,7 +378,14 @@ public partial class AdventurerController : Node
 
 		_adventurer.ClearCombatTarget();
 		_encounterMonsters.Clear();
-		ChangeState(ShouldReturnToTownForRest() ? AdventurerIntentionState.ReturnToTown : AdventurerIntentionState.ChooseTarget);
+		if (ShouldReturnToTownForRest())
+		{
+			EmitRetreatChosen("post_combat_health_below_rest_threshold");
+			ChangeState(AdventurerIntentionState.ReturnToTown);
+			return;
+		}
+
+		ChangeState(AdventurerIntentionState.ChooseTarget);
 	}
 
 	private bool ShouldReturnToTownForRest()
@@ -390,12 +401,34 @@ public partial class AdventurerController : Node
 
 	private float GetRestHealthRatio()
 	{
+		float baselineRestHealthRatio = RestHealthRatio;
+
 		if (_adventurer?.Role == CombatantRole.DamageDealer)
 		{
-			return DamageDealerRestHealthRatio;
+			baselineRestHealthRatio = DamageDealerRestHealthRatio;
 		}
 
-		return RestHealthRatio;
+		return Math.Max(baselineRestHealthRatio, WoundedRetreatHealthRatio);
+	}
+
+	private void EmitRetreatChosen(string reason)
+	{
+		if (_adventurer is null)
+		{
+			return;
+		}
+
+		EmitBridgeEvent("adventurer_retreat_chosen", new GDict
+		{
+			{ "source", nameof(AdventurerController) },
+			{ "adventurer", _adventurer.AdventurerName },
+			{ "reason", reason },
+			{ "health", _adventurer.Health },
+			{ "max_health", _adventurer.Stats.MaxHealth },
+			{ "health_ratio", _adventurer.Stats.MaxHealth <= 0 ? 0.0 : _adventurer.Health / (double)_adventurer.Stats.MaxHealth },
+			{ "rest_health_ratio", GetRestHealthRatio() },
+			{ "state", State.ToString() }
+		});
 	}
 
 	private void UpdateReturn(double delta)

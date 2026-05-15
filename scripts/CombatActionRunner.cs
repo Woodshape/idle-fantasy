@@ -8,10 +8,13 @@ using GDict = Godot.Collections.Dictionary;
 
 public sealed class CombatActionRunner
 {
-	private const double BaseHitChance = 0.50;
-	private const double MinHitChance = 0.05;
-	private const double MaxHitChance = 0.95;
-	private const int GlobalCooldownTicks = 4;
+	private const double BASE_HIT_CHANCE = 0.50;
+	private const double MIN_HIT_CHANCE = 0.05;
+	private const double MAX_HIT_CHANCE = 0.95;
+	private const double BASE_CRIT_CHANCE = 0.10;
+	private const double MIN_CRIT_CHANCE = 0.0;
+	private const double MAX_CRIT_CHANCE = 1.0;
+	private const int GLOBAL_COOLDOWN_TICKS = 4;
 
 	private readonly ICombatant _owner;
 	private readonly CombatLoadout _loadout;
@@ -492,13 +495,19 @@ public sealed class CombatActionRunner
 		CombatStats ownerStats = _owner.Stats;
 		CombatStats targetStats = _target.Stats;
 		double accuracyAdvantage = ownerStats.Accuracy - targetStats.Evasion;
-		double hitChance = Math.Clamp(BaseHitChance + accuracyAdvantage, MinHitChance, MaxHitChance);
+		double hitChance = Math.Clamp(BASE_HIT_CHANCE + accuracyAdvantage, MIN_HIT_CHANCE, MAX_HIT_CHANCE);
 		double roll = _rng.Randf();
 		bool hit = roll <= hitChance;
 		int rawDamage = (int)Math.Round(ownerStats.Attack * action.DamageMultiplier, MidpointRounding.AwayFromZero);
-		int damage = hit ? Math.Max(1, rawDamage - targetStats.Defense) : 0;
+		int normalDamage = hit ? Math.Max(1, rawDamage - targetStats.Defense) : 0;
+		double critChance = Math.Clamp(BASE_CRIT_CHANCE + ownerStats.CritChance, MIN_CRIT_CHANCE, MAX_CRIT_CHANCE);
+		double critRoll = hit ? _rng.Randf() : -1.0;
+		bool critical = hit && critRoll <= critChance;
+		int damage = critical
+			? Math.Max(1, (int)Math.Round(rawDamage * ownerStats.CritDamage, MidpointRounding.AwayFromZero) - targetStats.Defense)
+			: normalDamage;
 
-		GD.Print($"ATTACK_ROLL tick={tick} attacker={_owner.DisplayName} defender={_target.DisplayName} action={action.ActionId} hit_chance={hitChance:0.00} roll={roll:0.00} hit={hit} damage={damage}");
+		GD.Print($"ATTACK_ROLL tick={tick} attacker={_owner.DisplayName} defender={_target.DisplayName} action={action.ActionId} hit_chance={hitChance:0.00} roll={roll:0.00} hit={hit} crit_chance={critChance:0.00} crit_roll={critRoll:0.00} critical={critical} damage={damage}");
 		_emitEvent("attack_roll_resolved", new GDict
 		{
 			{ "source", nameof(CombatActionRunner) },
@@ -509,10 +518,15 @@ public sealed class CombatActionRunner
 			{ "defender_kind", _target.CombatantKind },
 			{ "action_id", action.ActionId },
 			{ "hit_formula", "clamp(0.5 + attacker_accuracy - defender_evasion, 0.05, 0.95)" },
-			{ "damage_formula", "max(1, round(attacker_attack * action_multiplier) - defender_defense)" },
+			{ "crit_formula", "clamp(0.10 + attacker_crit_chance, 0.0, 1.0)" },
+			{ "damage_formula", "critical ? max(1, round(round(attacker_attack * action_multiplier) * attacker_crit_damage) - defender_defense) : max(1, round(attacker_attack * action_multiplier) - defender_defense)" },
 			{ "hit_chance", hitChance },
 			{ "roll", roll },
 			{ "hit", hit },
+			{ "crit_chance", critChance },
+			{ "crit_roll", critRoll },
+			{ "critical", critical },
+			{ "normal_damage", normalDamage },
 			{ "damage", damage }
 		});
 
@@ -570,8 +584,8 @@ public sealed class CombatActionRunner
 
 		if (action.Kind is CombatActionKind.Skill or CombatActionKind.Spell)
 		{
-			GlobalCooldownTicksRemaining = GlobalCooldownTicks;
-			EmitCooldownStarted("global_cooldown", "global", GlobalCooldownTicks, tick);
+			GlobalCooldownTicksRemaining = GLOBAL_COOLDOWN_TICKS;
+			EmitCooldownStarted("global_cooldown", "global", GLOBAL_COOLDOWN_TICKS, tick);
 		}
 	}
 

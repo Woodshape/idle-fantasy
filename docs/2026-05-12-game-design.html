@@ -785,16 +785,19 @@
 					<h2>Combat</h2>
 					<span class="tag">Probability Rolls</span>
 				</div>
-				<p>Combat should be random, but the randomness should come from explicit probability calculations. Attacks, defenses, spells, resists, dodges, blocks, and similar actions produce a fixed probability under the hood, then roll against it.</p>
+				<p>Combat should be random, but the randomness should come from explicit probability calculations. Attacks, defenses, spells, resists, dodges, blocks, critical hits, and similar actions produce a fixed probability under the hood, then roll against it.</p>
 				<div class="mini-card contrast" style="margin-bottom: 1rem;">
 					<h3>Formula Shape</h3>
 					<p><code>hit_chance = f(attacker_accuracy, defender_evasion, level_delta, status_effects)</code></p>
 					<p><code>attack_hits = random(0..1) &lt;= hit_chance</code></p>
+					<p><code>attack_crits = attack_hits &amp;&amp; random(0..1) &lt;= clamp(0.10 + attacker_crit_chance, 0.0, 1.0)</code></p>
 				</div>
 				<ol class="flow">
 					<li>Adventurer and monster enter combat.</li>
 					<li>Combatants exchange attacks at fixed intervals.</li>
 					<li>Each attack computes a success probability and rolls against it.</li>
+					<li>Successful attacks roll separately for critical hits.</li>
+					<li>Critical hits multiply attack, ability, or spell damage before defense by the attacker's crit damage.</li>
 					<li>Successful attacks apply damage, mitigation, effects, or spell outcomes.</li>
 					<li>Health reaches zero.</li>
 					<li>Winner receives rewards or enters a post-combat state.</li>

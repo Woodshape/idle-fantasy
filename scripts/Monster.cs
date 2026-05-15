@@ -324,6 +324,8 @@ public partial class Monster : Node2D, ICombatant
 			{ "max_health", Stats.MaxHealth },
 			{ "attack", Stats.Attack },
 			{ "accuracy", Stats.Accuracy },
+			{ "crit_chance", Stats.CritChance },
+			{ "crit_damage", Stats.CritDamage },
 			{ "defense", Stats.Defense },
 			{ "evasion", Stats.Evasion },
 			{ "initiative", Stats.Initiative },

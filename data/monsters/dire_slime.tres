@@ -1,25 +1,26 @@
-[gd_resource type="Resource" script_class="MonsterDefinition" format=3 uid="uid://daobxg1dsx6md"]
+[gd_resource type="Resource" script_class="MonsterDefinition" format=3 uid="uid://cb8qv7g14lld2"]
 
 [ext_resource type="Script" uid="uid://dxyrq54yboh17" path="res://scripts/MonsterDefinition.cs" id="1_monster"]
 [ext_resource type="Resource" uid="uid://cdwc6vsjnmp72" path="res://data/combat/loadouts/slime_starting.tres" id="2_loadout"]
 [ext_resource type="Script" uid="uid://bv3qr7yw0gw25" path="res://scripts/CombatStatsDefinition.cs" id="3_stats_script"]
 
-[sub_resource type="Resource" id="Stats_slime"]
+[sub_resource type="Resource" id="Stats_dire_slime"]
 script = ExtResource("3_stats_script")
-MaxHealth = 45
-Attack = 7
-Accuracy = 0.32
-Defense = 2
+MaxHealth = 500
+Attack = 4
+Accuracy = 0.3
+Defense = 1
 Evasion = 0.12
-Initiative = 1
+Initiative = 2
 AttackSpeedTicks = 8
 
 [resource]
 script = ExtResource("1_monster")
-DefinitionId = "slime"
-DisplayName = "Slime"
-Stats = SubResource("Stats_slime")
+DefinitionId = "dire_slime"
+DisplayName = "Dire Slime"
+Level = 2
+Stats = SubResource("Stats_dire_slime")
 CombatLoadout = ExtResource("2_loadout")
-GoldReward = 7
-ExperienceReward = 10
-SpriteModulate = Color(1, 0.2, 0.2, 1)
+GoldReward = 18
+ExperienceReward = 25
+SpriteModulate = Color(0.75, 0.05, 0.05, 1)

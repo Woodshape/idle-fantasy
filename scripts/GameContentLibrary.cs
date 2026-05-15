@@ -292,6 +292,16 @@ public partial class GameContentLibrary : Resource
 			errors.Add($"Stats for '{ownerId}' require accuracy between 0 and 1.");
 		}
 
+		if (stats.CritChance < 0.0 || stats.CritChance > 1.0)
+		{
+			errors.Add($"Stats for '{ownerId}' require crit chance between 0 and 1.");
+		}
+
+		if (stats.CritDamage < 1.0)
+		{
+			errors.Add($"Stats for '{ownerId}' require crit damage of at least 1.");
+		}
+
 		if (stats.Defense < 0)
 		{
 			errors.Add($"Stats for '{ownerId}' cannot have negative defense.");

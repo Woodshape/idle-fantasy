@@ -5,24 +5,15 @@ using System;
 using System.Collections.Generic;
 using GDict = Godot.Collections.Dictionary;
 
-public enum AdventurerArchetype
-{
-	Warrior,
-	Mage
-}
-
 public partial class Adventurer : Node2D, ICombatant
 {
-	private const string DefaultAdventurerName = "Mira";
+	private const string DefaultAdventurerName = "Adventurer";
 
 	[Export]
 	public string AdventurerName { get; set; } = DefaultAdventurerName;
 
 	[Export]
 	public AdventurerDefinition? Definition { get; set; }
-
-	[Export]
-	public AdventurerArchetype Archetype { get; set; } = AdventurerArchetype.Warrior;
 
 	[Export]
 	public CombatantRole Role { get; set; } = CombatantRole.Tank;
@@ -119,7 +110,6 @@ public partial class Adventurer : Node2D, ICombatant
 
 	public void Setup(
 		string? adventurerName = null,
-		AdventurerArchetype? archetype = null,
 		CombatantRole? role = null,
 		int? level = null,
 		CombatStats? stats = null,
@@ -131,7 +121,6 @@ public partial class Adventurer : Node2D, ICombatant
 		string definitionId = "")
 	{
 		AdventurerName = adventurerName ?? AdventurerName;
-		Archetype = archetype ?? Archetype;
 		Role = role ?? Role;
 		Level = level ?? Level;
 
@@ -197,7 +186,6 @@ public partial class Adventurer : Node2D, ICombatant
 		Definition = definition;
 		Setup(
 			adventurerName: string.IsNullOrWhiteSpace(displayNameOverride) ? definition.DisplayName : displayNameOverride,
-			archetype: ParseArchetype(definition.ArchetypeId),
 			role: definition.Role,
 			level: definition.Level,
 			stats: definition.Stats.ToRuntimeStats(),
@@ -371,7 +359,6 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "source", nameof(Adventurer) },
 			{ "name", AdventurerName },
 			{ "combatant_id", CombatantId },
-			{ "archetype", Archetype.ToString() },
 			{ "role", Role.ToString() },
 			{ "level", Level },
 			{ "experience", Experience },
@@ -383,6 +370,8 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "max_health", Stats.MaxHealth },
 			{ "attack", Stats.Attack },
 			{ "accuracy", Stats.Accuracy },
+			{ "crit_chance", Stats.CritChance },
+			{ "crit_damage", Stats.CritDamage },
 			{ "defense", Stats.Defense },
 			{ "evasion", Stats.Evasion },
 			{ "initiative", Stats.Initiative },
@@ -556,6 +545,8 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "attack", stats.Attack },
 			{ "defense", stats.Defense },
 			{ "accuracy", stats.Accuracy },
+			{ "crit_chance", stats.CritChance },
+			{ "crit_damage", stats.CritDamage },
 			{ "evasion", stats.Evasion },
 			{ "initiative", stats.Initiative },
 			{ "attack_speed", stats.AttackSpeedTicks }
@@ -622,12 +613,5 @@ public partial class Adventurer : Node2D, ICombatant
 		}
 
 		return actionIds;
-	}
-
-	private static AdventurerArchetype ParseArchetype(string archetypeId)
-	{
-		return string.Equals(archetypeId, "mage", StringComparison.OrdinalIgnoreCase)
-			? AdventurerArchetype.Mage
-			: AdventurerArchetype.Warrior;
 	}
 }

@@ -434,7 +434,7 @@
 					<li>Finished casts queue their completed action.</li>
 					<li>Ready combatants choose the first available action by priority.</li>
 					<li>Queued actions roll initiative scores and sort by action order.</li>
-					<li>Actions resolve in sorted order. A dead target cancels later queued actions.</li>
+					<li>Actions resolve in sorted order. Each hit rolls a separate critical chance before damage is applied. A dead target cancels later queued actions.</li>
 					<li>Damage, death, rewards, encounter end checks, and bridge state updates are published.</li>
 					<li>The encounter emits <code>combat_tick_completed</code>.</li>
 				</ol>
@@ -477,6 +477,16 @@
 							<td>Mira 0.20, Slime 0.00.</td>
 						</tr>
 						<tr>
+							<td><code>CritChance</code></td>
+							<td>Flat probability modifier added to the base 10% critical hit chance after an attack hits.</td>
+							<td>Mira 0.00, Slime 0.00.</td>
+						</tr>
+						<tr>
+							<td><code>CritDamage</code></td>
+							<td>Multiplier applied to attack, skill, or spell damage before defense when the separate crit roll succeeds.</td>
+							<td>Mira 2.0x, Slime 2.0x.</td>
+						</tr>
+						<tr>
 							<td><code>Evasion</code></td>
 							<td>Flat probability modifier subtracted from incoming hit chance. <code>0.15</code> means -15 percentage points for attackers.</td>
 							<td>Mira 0.15, Slime 0.00.</td>
@@ -494,9 +504,9 @@
 					</tbody>
 				</table>
 				<div class="callout" style="margin-top: 1rem;">
-					Hit chance is currently <code>clamp(0.75 + attacker_accuracy - defender_evasion, 0.05, 0.95)</code>.
-					For example, Mira attacking Slime is <code>0.75 + 0.20 - 0.00 = 0.95</code>, or 95%.
-					Slime attacking Mira is <code>0.75 + 0.00 - 0.15 = 0.60</code>, or 60%.
+					Hit chance is currently <code>clamp(0.5 + attacker_accuracy - defender_evasion, 0.05, 0.95)</code>.
+					Critical chance is a separate pass after a hit: <code>clamp(0.10 + attacker_crit_chance, 0.0, 1.0)</code>.
+					A critical hit multiplies attack, skill, or spell damage by <code>attacker_crit_damage</code> before defense is subtracted.
 				</div>
 			</section>
 

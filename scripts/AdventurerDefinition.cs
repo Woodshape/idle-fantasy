@@ -19,9 +19,6 @@ public partial class AdventurerDefinition : Resource
 	public string DisplayName { get; set; } = string.Empty;
 
 	[Export]
-	public string ArchetypeId { get; set; } = string.Empty;
-
-	[Export]
 	public CombatantRole Role { get; set; } = CombatantRole.DamageDealer;
 
 	[Export]

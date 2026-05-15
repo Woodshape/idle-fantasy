@@ -15,6 +15,12 @@ public partial class CombatStatsDefinition : Resource
 	public double Accuracy { get; set; }
 
 	[Export]
+	public double CritChance { get; set; }
+
+	[Export]
+	public double CritDamage { get; set; } = 2.0;
+
+	[Export]
 	public int Defense { get; set; }
 
 	[Export]
@@ -31,6 +37,8 @@ public partial class CombatStatsDefinition : Resource
 		return new CombatStats(
 			Attack,
 			Accuracy,
+			CritChance,
+			CritDamage,
 			Defense,
 			Evasion,
 			Initiative,

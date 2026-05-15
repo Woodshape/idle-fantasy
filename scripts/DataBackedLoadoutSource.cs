@@ -44,7 +44,7 @@ public sealed class DataBackedLoadoutSource : ICombatLoadoutSource
 		loadout = null;
 		string definitionId = !string.IsNullOrWhiteSpace(adventurer.DefinitionId)
 			? adventurer.DefinitionId
-			: adventurer.Archetype == AdventurerArchetype.Mage ? "mage" : "warrior";
+			: "warrior";
 
 		if (!_content.TryGetAdventurer(definitionId, out AdventurerDefinition? definition)
 			|| definition?.CombatLoadout is null)

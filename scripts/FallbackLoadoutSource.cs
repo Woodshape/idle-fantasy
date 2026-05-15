@@ -8,7 +8,7 @@ public sealed class FallbackLoadoutSource : ICombatLoadoutSource
 	{
 		string definitionId = combatant switch
 		{
-			Adventurer adventurer => adventurer.Archetype == AdventurerArchetype.Mage ? "mage" : "warrior",
+			Adventurer => "warrior",
 			Monster => "slime",
 			_ => throw new ArgumentException($"Unsupported combatant type: {combatant.GetType()}")
 		};
