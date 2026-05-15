@@ -15,10 +15,7 @@ public partial class GameController : Node2D
 	private const double TargetScoreLevelDangerWeight = 10.0;
 	private const double TargetScoreWoundedDangerWeight = 12.0;
 	private const double TargetScoreWoundedSafeBonus = 8.0;
-	private const double TargetScoreHealthGapDivisor = 25.0;
-	private const double TargetScoreCombatDeficitDivisor = 4.0;
-	private const double TargetScoreBaseHitChance = 0.50;
-	private const double TargetScoreBaseCritChance = 0.10;
+	private const double TargetScoreHealthGapDivisor = 10.0;
 	private const double MinimumViableTargetScore = 0.0;
 	private const string TargetChoiceRiskSceneTag = "target_choice_risk";
 
@@ -543,7 +540,6 @@ public partial class GameController : Node2D
 		double dangerPenalty = Math.Max(0, levelDelta) * TargetScoreLevelDangerWeight;
 		double healthGap = monster.Health - adventurer.Health;
 		double healthGapPenalty = Math.Max(0, healthGap) / TargetScoreHealthGapDivisor;
-		CombatRiskEstimate combatRisk = EstimateCombatRisk(adventurer, monster);
 		double hpRatio = adventurer.Stats.MaxHealth <= 0
 			? 0.0
 			: adventurer.Health / (double)adventurer.Stats.MaxHealth;
@@ -560,7 +556,6 @@ public partial class GameController : Node2D
 			- distancePenalty
 			- dangerPenalty
 			- healthGapPenalty
-			- combatRisk.CombatDeficitPenalty
 			+ woundedCautionAdjustment;
 
 		return new TargetScore(
@@ -571,42 +566,9 @@ public partial class GameController : Node2D
 			dangerPenalty,
 			healthGap,
 			healthGapPenalty,
-			combatRisk.AdventurerExpectedDamagePerTick,
-			combatRisk.MonsterExpectedDamagePerTick,
-			combatRisk.ExpectedTicksToKillMonster,
-			combatRisk.ExpectedTicksToKillAdventurer,
-			combatRisk.CombatTicksMargin,
-			combatRisk.CombatDeficitPenalty,
 			woundedCautionAdjustment,
 			hpRatio,
 			score);
-	}
-
-	private static CombatRiskEstimate EstimateCombatRisk(Adventurer adventurer, Monster monster)
-	{
-		double adventurerExpectedDamagePerTick = EstimateExpectedDamagePerTick(adventurer.Stats, monster.Stats);
-		double monsterExpectedDamagePerTick = EstimateExpectedDamagePerTick(monster.Stats, adventurer.Stats);
-		double expectedTicksToKillMonster = monster.Health / Math.Max(0.001, adventurerExpectedDamagePerTick);
-		double expectedTicksToKillAdventurer = adventurer.Health / Math.Max(0.001, monsterExpectedDamagePerTick);
-		double combatTicksMargin = expectedTicksToKillAdventurer - expectedTicksToKillMonster;
-		double combatDeficitPenalty = Math.Max(0.0, -combatTicksMargin) / TargetScoreCombatDeficitDivisor;
-
-		return new CombatRiskEstimate(
-			adventurerExpectedDamagePerTick,
-			monsterExpectedDamagePerTick,
-			expectedTicksToKillMonster,
-			expectedTicksToKillAdventurer,
-			combatTicksMargin,
-			combatDeficitPenalty);
-	}
-
-	private static double EstimateExpectedDamagePerTick(CombatStats attackerStats, CombatStats defenderStats)
-	{
-		double hitChance = Math.Clamp(TargetScoreBaseHitChance + attackerStats.Accuracy - defenderStats.Evasion, 0.05, 0.95);
-		double normalDamage = Math.Max(1, attackerStats.Attack - defenderStats.Defense);
-		double critChance = Math.Clamp(TargetScoreBaseCritChance + attackerStats.CritChance, 0.0, 1.0);
-		double expectedDamage = normalDamage * (1.0 + (critChance * Math.Max(0.0, attackerStats.CritDamage - 1.0)));
-		return expectedDamage * hitChance / Math.Max(1, attackerStats.AttackSpeedTicks);
 	}
 
 	private void EmitTargetScore(Adventurer adventurer, TargetScore score, int rank, bool selected)
@@ -629,12 +591,6 @@ public partial class GameController : Node2D
 			{ "danger_penalty", score.DangerPenalty },
 			{ "health_gap", score.HealthGap },
 			{ "health_gap_penalty", score.HealthGapPenalty },
-			{ "adventurer_expected_damage_per_tick", score.AdventurerExpectedDamagePerTick },
-			{ "monster_expected_damage_per_tick", score.MonsterExpectedDamagePerTick },
-			{ "expected_ticks_to_kill_monster", score.ExpectedTicksToKillMonster },
-			{ "expected_ticks_to_kill_adventurer", score.ExpectedTicksToKillAdventurer },
-			{ "combat_ticks_margin", score.CombatTicksMargin },
-			{ "combat_deficit_penalty", score.CombatDeficitPenalty },
 			{ "wounded_caution_adjustment", score.WoundedCautionAdjustment },
 			{ "score", score.Score },
 			{ "rank", rank },
@@ -658,23 +614,9 @@ public partial class GameController : Node2D
 		double DangerPenalty,
 		double HealthGap,
 		double HealthGapPenalty,
-		double AdventurerExpectedDamagePerTick,
-		double MonsterExpectedDamagePerTick,
-		double ExpectedTicksToKillMonster,
-		double ExpectedTicksToKillAdventurer,
-		double CombatTicksMargin,
-		double CombatDeficitPenalty,
 		double WoundedCautionAdjustment,
 		double AdventurerHpRatio,
 		double Score);
-
-	private readonly record struct CombatRiskEstimate(
-		double AdventurerExpectedDamagePerTick,
-		double MonsterExpectedDamagePerTick,
-		double ExpectedTicksToKillMonster,
-		double ExpectedTicksToKillAdventurer,
-		double CombatTicksMargin,
-		double CombatDeficitPenalty);
 
 	public IReadOnlyList<Adventurer> FindEncounterAdventurers(Adventurer leader, int maximumAdventurers)
 	{

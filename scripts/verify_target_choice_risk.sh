@@ -80,29 +80,27 @@ if (( scored_count < 2 )); then
 	exit 1
 fi
 
-dire_line="$(grep '"type":"adventurer_target_scored"' "${EVENTS_FILE}" | grep '"monster":"Dire Slime"' | grep '"selected":false' | head -n 1 || true)"
-selected_slime_line="$(grep '"type":"adventurer_target_scored"' "${EVENTS_FILE}" | grep '"monster":"Slime"' | grep '"selected":true' | head -n 1 || true)"
-selected_event_line="$(grep '"type":"adventurer_target_selected"' "${EVENTS_FILE}" | grep '"monster":"Slime"' | head -n 1 || true)"
+selected_dire_line="$(grep '"type":"adventurer_target_scored"' "${EVENTS_FILE}" | grep '"monster":"Dire Slime"' | grep '"selected":true' | head -n 1 || true)"
+lower_slime_line="$(grep '"type":"adventurer_target_scored"' "${EVENTS_FILE}" | grep '"monster":"Slime"' | grep '"selected":false' | head -n 1 || true)"
+selected_event_line="$(grep '"type":"adventurer_target_selected"' "${EVENTS_FILE}" | grep '"monster":"Dire Slime"' | head -n 1 || true)"
 
-if [[ -z "${dire_line}" || -z "${selected_slime_line}" || -z "${selected_event_line}" ]]; then
-	echo "Missing evidence that an over-tough Dire Slime was rejected in favor of a normal slime. Session: ${SESSION_DIR}" >&2
+if [[ -z "${selected_dire_line}" || -z "${lower_slime_line}" || -z "${selected_event_line}" ]]; then
+	echo "Missing evidence that a manageable Dire Slime was selected over a normal slime. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
-dire_distance="$(printf '%s\n' "${dire_line}" | sed -n 's/.*"distance":\([0-9.]*\).*/\1/p')"
-dire_score="$(printf '%s\n' "${dire_line}" | sed -n 's/.*"score":\(-*[0-9.]*\).*/\1/p')"
-dire_reward="$(printf '%s\n' "${dire_line}" | sed -n 's/.*"reward_value":\([0-9.]*\).*/\1/p')"
-dire_danger="$(printf '%s\n' "${dire_line}" | sed -n 's/.*"danger_penalty":\([0-9.]*\).*/\1/p')"
-dire_level="$(printf '%s\n' "${dire_line}" | sed -n 's/.*"monster_level":\([0-9]*\).*/\1/p')"
-dire_health_gap="$(printf '%s\n' "${dire_line}" | sed -n 's/.*"health_gap":\(-*[0-9.]*\).*/\1/p')"
-dire_health_gap_penalty="$(printf '%s\n' "${dire_line}" | sed -n 's/.*"health_gap_penalty":\([0-9.]*\).*/\1/p')"
-dire_combat_margin="$(printf '%s\n' "${dire_line}" | sed -n 's/.*"combat_ticks_margin":\(-*[0-9.]*\).*/\1/p')"
-dire_combat_penalty="$(printf '%s\n' "${dire_line}" | sed -n 's/.*"combat_deficit_penalty":\([0-9.]*\).*/\1/p')"
-slime_distance="$(printf '%s\n' "${selected_slime_line}" | sed -n 's/.*"distance":\([0-9.]*\).*/\1/p')"
-slime_score="$(printf '%s\n' "${selected_slime_line}" | sed -n 's/.*"score":\(-*[0-9.]*\).*/\1/p')"
-slime_reward="$(printf '%s\n' "${selected_slime_line}" | sed -n 's/.*"reward_value":\([0-9.]*\).*/\1/p')"
-slime_danger="$(printf '%s\n' "${selected_slime_line}" | sed -n 's/.*"danger_penalty":\([0-9.]*\).*/\1/p')"
-slime_level="$(printf '%s\n' "${selected_slime_line}" | sed -n 's/.*"monster_level":\([0-9]*\).*/\1/p')"
+dire_distance="$(printf '%s\n' "${selected_dire_line}" | sed -n 's/.*"distance":\([0-9.]*\).*/\1/p')"
+dire_score="$(printf '%s\n' "${selected_dire_line}" | sed -n 's/.*"score":\(-*[0-9.]*\).*/\1/p')"
+dire_reward="$(printf '%s\n' "${selected_dire_line}" | sed -n 's/.*"reward_value":\([0-9.]*\).*/\1/p')"
+dire_danger="$(printf '%s\n' "${selected_dire_line}" | sed -n 's/.*"danger_penalty":\([0-9.]*\).*/\1/p')"
+dire_level="$(printf '%s\n' "${selected_dire_line}" | sed -n 's/.*"monster_level":\([0-9]*\).*/\1/p')"
+dire_health_gap="$(printf '%s\n' "${selected_dire_line}" | sed -n 's/.*"health_gap":\(-*[0-9.]*\).*/\1/p')"
+dire_health_gap_penalty="$(printf '%s\n' "${selected_dire_line}" | sed -n 's/.*"health_gap_penalty":\([0-9.]*\).*/\1/p')"
+slime_distance="$(printf '%s\n' "${lower_slime_line}" | sed -n 's/.*"distance":\([0-9.]*\).*/\1/p')"
+slime_score="$(printf '%s\n' "${lower_slime_line}" | sed -n 's/.*"score":\(-*[0-9.]*\).*/\1/p')"
+slime_reward="$(printf '%s\n' "${lower_slime_line}" | sed -n 's/.*"reward_value":\([0-9.]*\).*/\1/p')"
+slime_danger="$(printf '%s\n' "${lower_slime_line}" | sed -n 's/.*"danger_penalty":\([0-9.]*\).*/\1/p')"
+slime_level="$(printf '%s\n' "${lower_slime_line}" | sed -n 's/.*"monster_level":\([0-9]*\).*/\1/p')"
 
 if ! awk \
 	-v dire_distance="${dire_distance}" \
@@ -117,10 +115,8 @@ if ! awk \
 	-v slime_level="${slime_level}" \
 	-v dire_health_gap="${dire_health_gap}" \
 	-v dire_health_gap_penalty="${dire_health_gap_penalty}" \
-	-v dire_combat_margin="${dire_combat_margin}" \
-	-v dire_combat_penalty="${dire_combat_penalty}" \
-	'BEGIN { exit !(dire_distance > slime_distance && dire_score < slime_score && dire_reward > slime_reward && dire_danger > slime_danger && dire_level > slime_level && dire_health_gap > 1000 && dire_health_gap_penalty > 0 && dire_combat_margin < 0 && dire_combat_penalty > 0) }'; then
-	echo "Target scoring did not reject the farther, higher-reward, over-tough Dire Slime. Session: ${SESSION_DIR}" >&2
+	'BEGIN { exit !(dire_distance > slime_distance && dire_score > slime_score && dire_reward > slime_reward && dire_danger > slime_danger && dire_level > slime_level && dire_health_gap > 0 && dire_health_gap < 100 && dire_health_gap_penalty > 0) }'; then
+	echo "Target scoring did not prefer the farther, higher-reward Dire Slime while its health gap is manageable. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
@@ -130,24 +126,27 @@ for field in \
 	'"danger_penalty"' \
 	'"health_gap"' \
 	'"health_gap_penalty"' \
-	'"adventurer_expected_damage_per_tick"' \
-	'"monster_expected_damage_per_tick"' \
-	'"expected_ticks_to_kill_monster"' \
-	'"expected_ticks_to_kill_adventurer"' \
-	'"combat_ticks_margin"' \
-	'"combat_deficit_penalty"' \
 	'"wounded_caution_adjustment"' \
 	'"adventurer_hp_ratio"'; do
-	if ! printf '%s\n' "${dire_line}" | grep -q "${field}"; then
+	if ! printf '%s\n' "${selected_dire_line}" | grep -q "${field}"; then
 		echo "Target score event is missing field ${field}. Session: ${SESSION_DIR}" >&2
 		exit 1
 	fi
 done
 
-if printf '%s\n' "${dire_line}" | grep -q '"level_fit_bonus"'; then
-	echo "Target score event still includes removed level_fit_bonus. Session: ${SESSION_DIR}" >&2
-	exit 1
-fi
+for removed_field in \
+	'"level_fit_bonus"' \
+	'"adventurer_expected_damage_per_tick"' \
+	'"monster_expected_damage_per_tick"' \
+	'"expected_ticks_to_kill_monster"' \
+	'"expected_ticks_to_kill_adventurer"' \
+	'"combat_ticks_margin"' \
+	'"combat_deficit_penalty"'; do
+	if printf '%s\n' "${selected_dire_line}" | grep -q "${removed_field}"; then
+		echo "Target score event still includes removed field ${removed_field}. Session: ${SESSION_DIR}" >&2
+		exit 1
+	fi
+done
 
 retreat_line="$(grep '"type":"adventurer_retreat_chosen"' "${EVENTS_FILE}" | grep '"adventurer":"Warrior"' | head -n 1 || true)"
 
@@ -165,8 +164,8 @@ if ! awk -v health_ratio="${retreat_health_ratio}" -v threshold="${retreat_thres
 	exit 1
 fi
 
-if grep '"type":"adventurer_target_selected"' "${EVENTS_FILE}" | grep -q '"monster":"Dire Slime"'; then
-	echo "Dire Slime was selected despite a negative combat-risk score. Session: ${SESSION_DIR}" >&2
+if ! grep '"type":"adventurer_target_selected"' "${EVENTS_FILE}" | grep -q '"monster":"Dire Slime"'; then
+	echo "Dire Slime was not selected despite a positive health-gap score. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
