@@ -553,6 +553,30 @@ public partial class TestBridge : Node
 
 				throw new InvalidOperationException($"Node is not clickable: {nodePath}");
 			}
+			case "damage_adventurer":
+			{
+				if (!TryGetLong(command, "amount", out long rawAmount))
+				{
+					throw new InvalidOperationException("damage_adventurer requires an amount field.");
+				}
+
+				string requestedName = TryGetString(command, "name", out string parsedName) ? parsedName : string.Empty;
+				Adventurer adventurer = FindAdventurer(requestedName)
+					?? throw new InvalidOperationException($"Adventurer not found: {requestedName}");
+				int healthBefore = adventurer.Health;
+				int damage = adventurer.ApplyDamage((int)Math.Max(0L, rawAmount));
+				EmitCommandCompleted(commandId, commandName, new GDict
+				{
+					{ "adventurer", adventurer.AdventurerName },
+					{ "requested_damage", rawAmount },
+					{ "damage", damage },
+					{ "health_before", healthBefore },
+					{ "health_after", adventurer.Health },
+					{ "max_health", adventurer.Stats.MaxHealth },
+					{ "gold", adventurer.Gold }
+				});
+				break;
+			}
 			default:
 				throw new InvalidOperationException($"Unsupported command: {commandName}");
 		}
@@ -952,6 +976,24 @@ public partial class TestBridge : Node
 		}
 
 		return currentScene.GetNodeOrNull(rawPath);
+	}
+
+	private Adventurer? FindAdventurer(string requestedName)
+	{
+		if (GetTree().CurrentScene is not GameController game)
+		{
+			return null;
+		}
+
+		if (string.IsNullOrWhiteSpace(requestedName))
+		{
+			return game.Adventurers.FirstOrDefault();
+		}
+
+		return game.Adventurers.FirstOrDefault(adventurer =>
+			string.Equals(adventurer.AdventurerName, requestedName, StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(adventurer.Name, requestedName, StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(adventurer.DefinitionId, requestedName, StringComparison.OrdinalIgnoreCase));
 	}
 
 	private static string ExtractSource(GDict payload, string fallback)

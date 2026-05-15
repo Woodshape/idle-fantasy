@@ -40,12 +40,14 @@ until [[ -f "${EVENTS_FILE}" ]] && grep -q '"type":"bridge_started"' "${EVENTS_F
 done
 
 cat >> "${COMMANDS_FILE}" <<'JSONL'
-{"id":1,"cmd":"set_time_scale","scale":4.0}
-{"id":2,"cmd":"click_world","x":160,"y":272}
-{"id":3,"cmd":"wait_for_event","event":"character_selected","timeout_ms":5000}
-{"id":4,"cmd":"wait_for_event","event":"game_loop_completed","timeout_ms":30000}
-{"id":5,"cmd":"wait_for_event","event":"monster_wave_respawned","timeout_ms":15000}
-{"id":6,"cmd":"quit"}
+{"id":1,"cmd":"wait_for_state","name":"game_loop","timeout_ms":5000}
+{"id":2,"cmd":"damage_adventurer","name":"Warrior","amount":30}
+{"id":3,"cmd":"set_time_scale","scale":4.0}
+{"id":4,"cmd":"wait_for_event","event":"town_service_unaffordable","timeout_ms":10000}
+{"id":5,"cmd":"wait_for_event","event":"adventurer_recovery_tick","timeout_ms":5000}
+{"id":6,"cmd":"wait_for_event","event":"game_loop_completed","timeout_ms":45000}
+{"id":7,"cmd":"wait_for_event","event":"monster_wave_respawned","timeout_ms":15000}
+{"id":8,"cmd":"quit"}
 JSONL
 
 if ! wait "${GODOT_PID}"; then
@@ -69,7 +71,9 @@ required_events=(
 	"combat_tick_completed"
 	"loot_collected"
 	"adventurer_level_up"
-	"character_selected"
+	"town_service_unaffordable"
+	"town_service_used"
+	"gold_spent"
 	"game_loop_completed"
 	"monster_wave_cleared"
 	"monster_wave_respawned"
@@ -94,6 +98,35 @@ fi
 
 if ! grep -q '"living_adventurers":2' "${SESSION_DIR}/state.json"; then
 	echo "Expected both starter adventurers to be alive after the completed loop. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
+
+unaffordable_line="$(grep '"type":"town_service_unaffordable"' "${EVENTS_FILE}" | head -n 1 || true)"
+
+if [[ -z "${unaffordable_line}" ]] \
+	|| ! printf '%s\n' "${unaffordable_line}" | grep -q '"service":"paid_recovery"' \
+	|| ! printf '%s\n' "${unaffordable_line}" | grep -q '"gold":0'; then
+	echo "Missing broke paid-recovery fallback evidence. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
+
+gold_spent_line="$(grep '"type":"gold_spent"' "${EVENTS_FILE}" | grep '"service":"paid_recovery"' | head -n 1 || true)"
+town_service_line="$(grep '"type":"town_service_used"' "${EVENTS_FILE}" | grep '"service":"paid_recovery"' | head -n 1 || true)"
+
+if [[ -z "${gold_spent_line}" || -z "${town_service_line}" ]]; then
+	echo "Missing paid recovery town service and gold spend evidence. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
+
+gold_spent_amount="$(printf '%s\n' "${gold_spent_line}" | sed -n 's/.*"amount":\([0-9]*\).*/\1/p')"
+gold_before="$(printf '%s\n' "${gold_spent_line}" | sed -n 's/.*"gold_before":\([0-9]*\).*/\1/p')"
+gold_after="$(printf '%s\n' "${gold_spent_line}" | sed -n 's/.*"gold_after":\([0-9]*\).*/\1/p')"
+town_service_cost="$(printf '%s\n' "${town_service_line}" | sed -n 's/.*"cost":\([0-9]*\).*/\1/p')"
+town_service_healed="$(printf '%s\n' "${town_service_line}" | sed -n 's/.*"healed":\([0-9]*\).*/\1/p')"
+
+if ! awk -v amount="${gold_spent_amount}" -v before="${gold_before}" -v after="${gold_after}" -v cost="${town_service_cost}" -v healed="${town_service_healed}" \
+	'BEGIN { exit !(amount == 5 && cost == 5 && before >= amount && after == before - amount && healed > 0) }'; then
+	echo "Paid recovery did not spend gold and heal as expected. amount=${gold_spent_amount:-missing} before=${gold_before:-missing} after=${gold_after:-missing} cost=${town_service_cost:-missing} healed=${town_service_healed:-missing}. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 

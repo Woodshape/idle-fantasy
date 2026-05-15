@@ -122,6 +122,13 @@ public partial class AdventurerController : Node
 			return;
 		}
 
+		if (ShouldReturnToTownForRest())
+		{
+			_adventurer.ClearCombatTarget();
+			ChangeState(AdventurerIntentionState.ReturnToTown);
+			return;
+		}
+
 		_encounterMonsters.Clear();
 		_lootedMonsterIds.Clear();
 		_encounterMonsters.AddRange(_game.FindHuntTargets(_adventurer, MaxEncounterMonsters));

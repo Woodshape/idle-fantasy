@@ -292,6 +292,25 @@ public partial class Adventurer : Node2D, ICombatant
 		PublishState();
 	}
 
+	public bool SpendGold(int amount)
+	{
+		int spendAmount = Math.Max(0, amount);
+
+		if (spendAmount == 0)
+		{
+			return true;
+		}
+
+		if (Gold < spendAmount)
+		{
+			return false;
+		}
+
+		Gold -= spendAmount;
+		PublishState();
+		return true;
+	}
+
 	public void RecoverToFull()
 	{
 		RestoreStatsToFullHealth();
