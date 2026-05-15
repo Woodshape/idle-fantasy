@@ -9,12 +9,15 @@ using GDict = Godot.Collections.Dictionary;
 public sealed class CombatEncounter
 {
 	private static readonly Dictionary<string, int> ActiveMonsterEncounters = new(StringComparer.Ordinal);
+	private static readonly Dictionary<string, int> ActiveAdventurerEncounters = new(StringComparer.Ordinal);
 
 	private readonly List<Adventurer> _adventurers = new();
 	private readonly List<Monster> _monsters = new();
 	private readonly List<CombatActionRunner> _runners = new();
 	private readonly HashSet<string> _defeatedMonsterEventIds = new(StringComparer.Ordinal);
 	private readonly HashSet<string> _deadAdventurerEventIds = new(StringComparer.Ordinal);
+	private readonly HashSet<string> _eligibleRewardRecipientIds = new(StringComparer.Ordinal);
+	private readonly HashSet<string> _rewardedMonsterIds = new(StringComparer.Ordinal);
 	private readonly ICombatLoadoutSource _loadoutSource;
 	private readonly RandomNumberGenerator _rng;
 	private readonly Action<string, GDict> _emitEvent;
@@ -46,15 +49,23 @@ public sealed class CombatEncounter
 			emitEvent,
 			eventSource);
 
-		_adventurers.AddRange(adventurers
-			.Where(adventurer => adventurer.IsAlive)
-			.Distinct());
-
-		foreach (Monster monster in monsters.Where(monster => monster.IsAlive).Distinct())
+		foreach (Adventurer adventurer in adventurers.Where(adventurer => adventurer.IsAlive).Distinct())
 		{
-			if (TryClaimMonster(monster))
+			if (TryClaimAdventurer(adventurer))
 			{
-				_monsters.Add(monster);
+				_adventurers.Add(adventurer);
+				_eligibleRewardRecipientIds.Add(adventurer.CombatantId);
+			}
+		}
+
+		if (_adventurers.Count > 0)
+		{
+			foreach (Monster monster in monsters.Where(monster => monster.IsAlive).Distinct())
+			{
+				if (TryClaimMonster(monster))
+				{
+					_monsters.Add(monster);
+				}
 			}
 		}
 	}
@@ -66,6 +77,30 @@ public sealed class CombatEncounter
 	public bool IsActive { get; private set; }
 
 	public bool CanStart => _adventurers.Count > 0 && _monsters.Count > 0;
+
+	public static bool IsMonsterClaimed(Monster? monster)
+	{
+		return monster is not null && ActiveMonsterEncounters.ContainsKey(monster.CombatantId);
+	}
+
+	public static bool IsAdventurerClaimed(Adventurer? adventurer)
+	{
+		return adventurer is not null && ActiveAdventurerEncounters.ContainsKey(adventurer.CombatantId);
+	}
+
+	public static int GetMonsterEncounterId(Monster? monster)
+	{
+		return monster is not null && ActiveMonsterEncounters.TryGetValue(monster.CombatantId, out int encounterId)
+			? encounterId
+			: 0;
+	}
+
+	public static int GetAdventurerEncounterId(Adventurer? adventurer)
+	{
+		return adventurer is not null && ActiveAdventurerEncounters.TryGetValue(adventurer.CombatantId, out int encounterId)
+			? encounterId
+			: 0;
+	}
 
 	public void Start(long currentTick)
 	{
@@ -180,9 +215,52 @@ public sealed class CombatEncounter
 
 		IsActive = false;
 		ReleaseMonsterClaims();
+		ReleaseAdventurerClaims();
 		_runners.Clear();
 		_adventurers.Clear();
 		_monsters.Clear();
+	}
+
+	public IReadOnlyList<EncounterRewardPayout> CollectRewards()
+	{
+		if (_monsters.Any(monster => monster.IsAlive))
+		{
+			return Array.Empty<EncounterRewardPayout>();
+		}
+
+		Adventurer[] recipients = _adventurers
+			.Where(adventurer => _eligibleRewardRecipientIds.Contains(adventurer.CombatantId))
+			.OrderBy(adventurer => adventurer.CombatantId, StringComparer.Ordinal)
+			.ToArray();
+
+		if (recipients.Length == 0)
+		{
+			return Array.Empty<EncounterRewardPayout>();
+		}
+
+		List<EncounterRewardPayout> payouts = new();
+
+		foreach (Monster monster in _monsters.Where(monster => !monster.IsAlive).OrderBy(monster => monster.CombatantId, StringComparer.Ordinal))
+		{
+			if (!_rewardedMonsterIds.Add(monster.CombatantId))
+			{
+				continue;
+			}
+
+			for (int index = 0; index < recipients.Length; index++)
+			{
+				payouts.Add(new EncounterRewardPayout(
+					EncounterId,
+					monster,
+					recipients[index],
+					SplitAmount(monster.GoldReward, recipients.Length, index),
+					SplitAmount(monster.ExperienceReward, recipients.Length, index),
+					index,
+					recipients.Length));
+			}
+		}
+
+		return payouts;
 	}
 
 	public CombatEncounterState BuildState()
@@ -192,6 +270,11 @@ public sealed class CombatEncounter
 			IsActive,
 			_lastProcessedTick,
 			_tickIntervalSeconds,
+			_adventurers.Select(adventurer => adventurer.CombatantId).ToArray(),
+			_monsters.Select(monster => monster.CombatantId).ToArray(),
+			_defeatedMonsterEventIds.ToArray(),
+			_eligibleRewardRecipientIds.ToArray(),
+			_rewardedMonsterIds.ToArray(),
 			_adventurers.Select(BuildCombatantState).ToArray(),
 			_monsters.Select(BuildCombatantState).ToArray());
 	}
@@ -306,6 +389,7 @@ public sealed class CombatEncounter
 
 		IsActive = false;
 		ReleaseMonsterClaims();
+		ReleaseAdventurerClaims();
 		return true;
 	}
 
@@ -407,6 +491,30 @@ public sealed class CombatEncounter
 		return true;
 	}
 
+	private bool TryClaimAdventurer(Adventurer adventurer)
+	{
+		if (ActiveAdventurerEncounters.TryGetValue(adventurer.CombatantId, out int activeEncounterId)
+			&& activeEncounterId != EncounterId)
+		{
+			return false;
+		}
+
+		ActiveAdventurerEncounters[adventurer.CombatantId] = EncounterId;
+		return true;
+	}
+
+	private static int SplitAmount(int total, int recipientCount, int recipientIndex)
+	{
+		if (recipientCount <= 0)
+		{
+			return 0;
+		}
+
+		int baseAmount = total / recipientCount;
+		int remainder = total % recipientCount;
+		return baseAmount + (recipientIndex < remainder ? 1 : 0);
+	}
+
 	private void ReleaseMonsterClaims()
 	{
 		foreach (Monster monster in _monsters)
@@ -418,4 +526,25 @@ public sealed class CombatEncounter
 			}
 		}
 	}
+
+	private void ReleaseAdventurerClaims()
+	{
+		foreach (Adventurer adventurer in _adventurers)
+		{
+			if (ActiveAdventurerEncounters.TryGetValue(adventurer.CombatantId, out int activeEncounterId)
+				&& activeEncounterId == EncounterId)
+			{
+				ActiveAdventurerEncounters.Remove(adventurer.CombatantId);
+			}
+		}
+	}
 }
+
+public sealed record EncounterRewardPayout(
+	int EncounterId,
+	Monster Monster,
+	Adventurer Recipient,
+	int Gold,
+	int Experience,
+	int RecipientIndex,
+	int RecipientCount);

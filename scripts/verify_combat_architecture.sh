@@ -99,8 +99,8 @@ JSONL
 
 dotnet build "${PROJECT_ROOT}/Idle Fantasy.csproj" >/tmp/idle-fantasy-combat-architecture-build.log
 run_scene "res://scenes/tests/TestCombat1v1.tscn" "combat_1v1" 1 1 1
-run_scene "res://scenes/tests/TestCombat1v2.tscn" "combat_1v2" 1 1 1
-run_scene "res://scenes/tests/TestCombat2v1.tscn" "combat_2v1" 1 1 1
-run_scene "res://scenes/tests/TestCombat2v2.tscn" "combat_2v2" 1 1 2
+run_scene "res://scenes/tests/TestCombat1v2.tscn" "combat_1v2" 1 2 1
+run_scene "res://scenes/tests/TestCombat2v1.tscn" "combat_2v1" 2 1 1
+run_scene "res://scenes/tests/TestCombat2v2.tscn" "combat_2v2" 2 2 1
 
 echo "Combat architecture verification passed."

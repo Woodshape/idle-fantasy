@@ -6,7 +6,7 @@
 [ext_resource type="Script" path="res://scripts/Town.cs" id="4_noivq"]
 [ext_resource type="Resource" path="res://data/adventurers/warrior.tres" id="5_warrior"]
 [ext_resource type="Resource" path="res://data/adventurers/mage.tres" id="6_mage"]
-[ext_resource type="Resource" path="res://data/monsters/slime.tres" id="7_slime"]
+[ext_resource type="Resource" path="res://data/monsters/training_slime.tres" id="7_slime"]
 
 [node name="TestCombat2v2" type="Node2D" unique_id=1843572492]
 script = ExtResource("1_813nc")
@@ -15,6 +15,8 @@ AdventurerScene = ExtResource("2_8vplc")
 MonsterScene = ExtResource("3_c3io6")
 AutoSpawnDefaultAdventurers = false
 AutoSpawnDefaultMonsters = false
+DefaultMaxEncounterMonsters = 2
+DefaultMaxEncounterAdventurers = 2
 
 [node name="Town" type="Node2D" parent="." unique_id=593411800]
 position = Vector2(160, 300)
@@ -34,11 +36,11 @@ Definition = ExtResource("6_mage")
 [node name="Monsters" type="Node2D" parent="." unique_id=1641391484]
 
 [node name="Slime" parent="Monsters" unique_id=2046450583 instance=ExtResource("3_c3io6")]
-position = Vector2(560, 260)
+position = Vector2(560, 285)
 Definition = ExtResource("7_slime")
 
 [node name="Slime2" parent="Monsters" unique_id=911282931 instance=ExtResource("3_c3io6")]
-position = Vector2(560, 340)
+position = Vector2(560, 315)
 MonsterName = "Slime 2"
 Definition = ExtResource("7_slime")
 

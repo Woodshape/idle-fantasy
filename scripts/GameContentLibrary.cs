@@ -13,6 +13,7 @@ public partial class GameContentLibrary : Resource
 	private readonly Dictionary<string, CombatLoadoutDefinition> _loadoutsById = new(StringComparer.Ordinal);
 	private readonly Dictionary<string, AdventurerDefinition> _adventurersById = new(StringComparer.Ordinal);
 	private readonly Dictionary<string, MonsterDefinition> _monstersById = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, EnemyGroupDefinition> _enemyGroupsById = new(StringComparer.Ordinal);
 
 	[Export]
 	public CombatActionDefinition[] CombatActions { get; set; } = Array.Empty<CombatActionDefinition>();
@@ -27,6 +28,9 @@ public partial class GameContentLibrary : Resource
 	public MonsterDefinition[] Monsters { get; set; } = Array.Empty<MonsterDefinition>();
 
 	[Export]
+	public EnemyGroupDefinition[] EnemyGroups { get; set; } = Array.Empty<EnemyGroupDefinition>();
+
+	[Export]
 	public AdventurerSpawnDefinition[] DefaultAdventurerSpawns { get; set; } = Array.Empty<AdventurerSpawnDefinition>();
 
 	[Export]
@@ -36,6 +40,7 @@ public partial class GameContentLibrary : Resource
 	public IReadOnlyDictionary<string, CombatLoadoutDefinition> LoadoutsById => _loadoutsById;
 	public IReadOnlyDictionary<string, AdventurerDefinition> AdventurersById => _adventurersById;
 	public IReadOnlyDictionary<string, MonsterDefinition> MonstersById => _monstersById;
+	public IReadOnlyDictionary<string, EnemyGroupDefinition> EnemyGroupsById => _enemyGroupsById;
 
 	public IReadOnlyList<string> ValidateAndBuild()
 	{
@@ -44,11 +49,13 @@ public partial class GameContentLibrary : Resource
 		_loadoutsById.Clear();
 		_adventurersById.Clear();
 		_monstersById.Clear();
+		_enemyGroupsById.Clear();
 
 		IndexById(CombatActions, action => action.ActionId, _actionsById, "combat action", errors);
 		IndexById(CombatLoadouts, loadout => loadout.LoadoutId, _loadoutsById, "combat loadout", errors);
 		IndexById(Adventurers, adventurer => adventurer.DefinitionId, _adventurersById, "adventurer", errors);
 		IndexById(Monsters, monster => monster.DefinitionId, _monstersById, "monster", errors);
+		IndexById(EnemyGroups, group => group.GroupId, _enemyGroupsById, "enemy group", errors);
 
 		foreach (CombatActionDefinition action in CombatActions.Where(action => action is not null))
 		{
@@ -74,6 +81,11 @@ public partial class GameContentLibrary : Resource
 			ValidateMonster(monster, errors);
 		}
 
+		foreach (EnemyGroupDefinition group in EnemyGroups.Where(group => group is not null))
+		{
+			ValidateEnemyGroup(group, errors);
+		}
+
 		foreach (AdventurerSpawnDefinition spawn in DefaultAdventurerSpawns.Where(spawn => spawn is not null && spawn.Enabled))
 		{
 			if (spawn.ActorDefinition is null)
@@ -95,6 +107,11 @@ public partial class GameContentLibrary : Resource
 			else if (!_monstersById.ContainsKey(spawn.ActorDefinition.DefinitionId))
 			{
 				errors.Add($"Default monster spawn '{FormatSpawnName(spawn.NodeName)}' references unregistered monster '{spawn.ActorDefinition.DefinitionId}'.");
+			}
+
+			if (spawn.EnemyGroup is not null && !_enemyGroupsById.ContainsKey(spawn.EnemyGroup.GroupId))
+			{
+				errors.Add($"Default monster spawn '{FormatSpawnName(spawn.NodeName)}' references unregistered enemy group '{spawn.EnemyGroup.GroupId}'.");
 			}
 		}
 
@@ -272,6 +289,24 @@ public partial class GameContentLibrary : Resource
 		if (monster.AggroAttackDistance < 0.0f)
 		{
 			errors.Add($"Monster '{monster.DefinitionId}' cannot have negative aggro attack distance.");
+		}
+	}
+
+	private static void ValidateEnemyGroup(EnemyGroupDefinition group, List<string> errors)
+	{
+		if (string.IsNullOrWhiteSpace(group.GroupId))
+		{
+			errors.Add("Enemy group is missing a group id.");
+		}
+
+		if (string.IsNullOrWhiteSpace(group.DisplayName))
+		{
+			errors.Add($"Enemy group '{group.GroupId}' is missing a display name.");
+		}
+
+		if (group.SocialRadius < 0.0f)
+		{
+			errors.Add($"Enemy group '{group.GroupId}' cannot have a negative social radius.");
 		}
 	}
 

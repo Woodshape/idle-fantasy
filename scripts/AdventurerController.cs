@@ -42,7 +42,6 @@ public partial class AdventurerController : Node
 	private GameController? _game;
 	private Town? _town;
 	private readonly List<Monster> _encounterMonsters = new();
-	private readonly HashSet<string> _lootedMonsterIds = new(StringComparer.Ordinal);
 	private double _stateTimer;
 	private bool _combatStartedForTarget;
 	private bool _movementPausedForCurrentCast;
@@ -72,6 +71,14 @@ public partial class AdventurerController : Node
 		if (!_adventurer.IsAlive && State != AdventurerIntentionState.Dead)
 		{
 			ChangeState(AdventurerIntentionState.Dead);
+		}
+
+		if (State != AdventurerIntentionState.Dead
+			&& _adventurer.CombatController?.HasActiveEncounter != true
+			&& CombatEncounter.IsAdventurerClaimed(_adventurer))
+		{
+			_adventurer.PublishState();
+			return;
 		}
 
 		switch (State)
@@ -134,7 +141,6 @@ public partial class AdventurerController : Node
 		}
 
 		_encounterMonsters.Clear();
-		_lootedMonsterIds.Clear();
 		_encounterMonsters.AddRange(_game.FindHuntTargets(_adventurer, MaxEncounterMonsters));
 		Monster? target = _encounterMonsters.FirstOrDefault();
 
@@ -337,42 +343,40 @@ public partial class AdventurerController : Node
 			return;
 		}
 
-		IReadOnlyList<Monster> rewardMonsters = _adventurer.CombatController?.EncounterMonsters.Count > 0
-			? _adventurer.CombatController.EncounterMonsters
-			: _encounterMonsters;
-		List<Monster> defeatedMonsters = rewardMonsters.Count > 0
-			? rewardMonsters
-				.Where(monster => !monster.IsAlive && !_lootedMonsterIds.Contains(monster.CombatantId))
-				.ToList()
-			: _adventurer.CurrentMonsterTarget is Monster target
-				&& !target.IsAlive
-				&& !_lootedMonsterIds.Contains(target.CombatantId)
-					? new List<Monster> { target }
-					: new List<Monster>();
+		IReadOnlyList<EncounterRewardPayout> payouts = _adventurer.CombatController?.CollectRewards()
+			?? Array.Empty<EncounterRewardPayout>();
 
-		if (defeatedMonsters.Count == 0)
+		if (payouts.Count == 0)
 		{
 			_encounterMonsters.Clear();
 			ChangeState(AdventurerIntentionState.ReturnToTown);
 			return;
 		}
 
-		foreach (Monster defeatedMonster in defeatedMonsters)
+		foreach (EncounterRewardPayout payout in payouts)
 		{
-			_lootedMonsterIds.Add(defeatedMonster.CombatantId);
-			_adventurer.AddRewards(defeatedMonster.GoldReward, defeatedMonster.ExperienceReward);
-			GD.Print($"LOOT_COLLECTED adventurer={_adventurer.AdventurerName} monster={defeatedMonster.MonsterName} gold={defeatedMonster.GoldReward} xp={defeatedMonster.ExperienceReward}");
+			payout.Recipient.AddRewards(payout.Gold, payout.Experience);
+			GD.Print($"LOOT_COLLECTED encounter={payout.EncounterId} adventurer={payout.Recipient.AdventurerName} monster={payout.Monster.MonsterName} gold={payout.Gold} xp={payout.Experience}");
 			EmitBridgeEvent("loot_collected", new GDict
 			{
 				{ "source", nameof(AdventurerController) },
-				{ "adventurer", _adventurer.AdventurerName },
-				{ "monster", defeatedMonster.MonsterName },
-				{ "gold", defeatedMonster.GoldReward },
-				{ "experience", defeatedMonster.ExperienceReward },
-				{ "total_gold", _adventurer.Gold },
-				{ "current_experience", _adventurer.Experience },
-				{ "xp_to_next_level", _adventurer.XpToNextLevel },
-				{ "total_experience", _adventurer.TotalExperience }
+				{ "encounter_id", payout.EncounterId },
+				{ "collector", _adventurer.AdventurerName },
+				{ "adventurer", payout.Recipient.AdventurerName },
+				{ "adventurer_id", payout.Recipient.CombatantId },
+				{ "monster", payout.Monster.MonsterName },
+				{ "monster_id", payout.Monster.CombatantId },
+				{ "gold", payout.Gold },
+				{ "experience", payout.Experience },
+				{ "total_gold_reward", payout.Monster.GoldReward },
+				{ "total_experience_reward", payout.Monster.ExperienceReward },
+				{ "recipient_index", payout.RecipientIndex },
+				{ "recipient_count", payout.RecipientCount },
+				{ "split_reward", payout.RecipientCount > 1 },
+				{ "total_gold", payout.Recipient.Gold },
+				{ "current_experience", payout.Recipient.Experience },
+				{ "xp_to_next_level", payout.Recipient.XpToNextLevel },
+				{ "total_experience", payout.Recipient.TotalExperience }
 			});
 		}
 

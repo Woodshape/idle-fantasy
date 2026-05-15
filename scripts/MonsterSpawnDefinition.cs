@@ -15,6 +15,9 @@ public partial class MonsterSpawnDefinition : Resource
 	public MonsterDefinition? ActorDefinition { get; set; }
 
 	[Export]
+	public EnemyGroupDefinition? EnemyGroup { get; set; }
+
+	[Export]
 	public Vector2 Position { get; set; }
 
 	[Export]

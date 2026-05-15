@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="MonsterDefinition" format=3 uid="uid://cc8ayqo6lltq5"]
+
+[ext_resource type="Script" uid="uid://dxyrq54yboh17" path="res://scripts/MonsterDefinition.cs" id="1_monster"]
+[ext_resource type="Resource" uid="uid://cdwc6vsjnmp72" path="res://data/combat/loadouts/slime_starting.tres" id="2_loadout"]
+[ext_resource type="Script" uid="uid://bv3qr7yw0gw25" path="res://scripts/CombatStatsDefinition.cs" id="3_stats_script"]
+
+[sub_resource type="Resource" id="Stats_training_slime"]
+script = ExtResource("3_stats_script")
+MaxHealth = 20
+Attack = 3
+Accuracy = 0.28
+Defense = 1
+Evasion = 0.08
+Initiative = 1
+AttackSpeedTicks = 8
+
+[resource]
+script = ExtResource("1_monster")
+DefinitionId = "training_slime"
+DisplayName = "Training Slime"
+Stats = SubResource("Stats_training_slime")
+CombatLoadout = ExtResource("2_loadout")
+GoldReward = 6
+ExperienceReward = 8
+SpriteModulate = Color(1, 0.35, 0.2, 1)

@@ -71,6 +71,7 @@ public partial class AdventurerCombatController : Node
 
 		if (!encounter.CanStart)
 		{
+			encounter.Stop();
 			PublishEncounterState();
 			return;
 		}
@@ -108,6 +109,18 @@ public partial class AdventurerCombatController : Node
 		}
 
 		return added;
+	}
+
+	public IReadOnlyList<EncounterRewardPayout> CollectRewards()
+	{
+		IReadOnlyList<EncounterRewardPayout> payouts = _encounter?.CollectRewards() ?? Array.Empty<EncounterRewardPayout>();
+
+		if (payouts.Count > 0)
+		{
+			PublishEncounterState();
+		}
+
+		return payouts;
 	}
 
 	public void ProcessSimulationTick(long tick, double tickIntervalSeconds)
@@ -157,6 +170,11 @@ public partial class AdventurerCombatController : Node
 				false,
 				0,
 				0.25,
+				Array.Empty<string>(),
+				Array.Empty<string>(),
+				Array.Empty<string>(),
+				Array.Empty<string>(),
+				Array.Empty<string>(),
 				Array.Empty<CombatantEncounterState>(),
 				Array.Empty<CombatantEncounterState>());
 		TestBridge.Instance.EmitState("combat_encounter", state.ToBridgeDictionary(nameof(AdventurerCombatController), _adventurer));

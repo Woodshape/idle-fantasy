@@ -49,6 +49,12 @@ public partial class GameController : Node2D
 	[Export]
 	public int HireCost { get; set; } = 20;
 
+	[Export]
+	public int DefaultMaxEncounterMonsters { get; set; } = 1;
+
+	[Export]
+	public int DefaultMaxEncounterAdventurers { get; set; } = 1;
+
 	private Town? _town;
 	private Adventurer? _adventurer;
 	private readonly List<Adventurer> _adventurers = new();
@@ -282,6 +288,11 @@ public partial class GameController : Node2D
 		adventurer.SetupFromDefinition(definition, displayName, position);
 		AddChild(adventurer);
 		_adventurers.Add(adventurer);
+		if (adventurer.Controller is not null)
+		{
+			adventurer.Controller.MaxEncounterMonsters = Math.Max(1, DefaultMaxEncounterMonsters);
+			adventurer.Controller.MaxEncounterAdventurers = Math.Max(1, DefaultMaxEncounterAdventurers);
+		}
 		adventurer.CombatController?.SetLoadoutSource(_loadoutSource);
 		return adventurer;
 	}
@@ -383,6 +394,7 @@ public partial class GameController : Node2D
 		Monster monster = MonsterScene.Instantiate<Monster>();
 		monster.Name = string.IsNullOrWhiteSpace(spawn.NodeName) ? definition.DisplayName : spawn.NodeName;
 		monster.SetupFromDefinition(definition, spawn.DisplayNameOverride, position);
+		monster.ConfigureEnemyGroup(spawn.EnemyGroup);
 		monsterContainer.AddChild(monster);
 		_monsters.Add(monster);
 	}
@@ -459,6 +471,12 @@ public partial class GameController : Node2D
 	{
 		foreach (Adventurer adventurer in _adventurers)
 		{
+			if (adventurer.Controller is not null)
+			{
+				adventurer.Controller.MaxEncounterMonsters = Math.Max(1, DefaultMaxEncounterMonsters);
+				adventurer.Controller.MaxEncounterAdventurers = Math.Max(1, DefaultMaxEncounterAdventurers);
+			}
+
 			adventurer.CombatController?.SetLoadoutSource(_loadoutSource);
 		}
 	}
@@ -600,6 +618,11 @@ public partial class GameController : Node2D
 
 	private bool IsMonsterClaimedByAnotherAdventurer(Monster monster, Adventurer adventurer)
 	{
+		if (CombatEncounter.IsMonsterClaimed(monster))
+		{
+			return true;
+		}
+
 		return _adventurers.Any(candidate =>
 			!ReferenceEquals(candidate, adventurer)
 			&& candidate.IsAlive
@@ -622,6 +645,7 @@ public partial class GameController : Node2D
 	{
 		return _adventurers
 			.Where(adventurer => adventurer.IsAlive)
+			.Where(adventurer => ReferenceEquals(adventurer, leader) || !CombatEncounter.IsAdventurerClaimed(adventurer))
 			.OrderBy(adventurer => ReferenceEquals(adventurer, leader) ? 0 : 1)
 			.ThenBy(adventurer => adventurer.GlobalPosition.DistanceSquaredTo(leader.GlobalPosition))
 			.Take(Math.Max(1, maximumAdventurers))
@@ -890,7 +914,10 @@ public partial class GameController : Node2D
 
 	public void ApplySocialAggro(Monster sourceMonster, Adventurer aggroTarget, string actionId, long currentTick)
 	{
-		if (!sourceMonster.IsAlive || !aggroTarget.IsAlive)
+		if (!sourceMonster.IsAlive
+			|| !aggroTarget.IsAlive
+			|| string.IsNullOrWhiteSpace(sourceMonster.EnemyGroupId)
+			|| sourceMonster.SocialRadius <= 0.0f)
 		{
 			return;
 		}
@@ -899,12 +926,26 @@ public partial class GameController : Node2D
 		{
 			if (ReferenceEquals(monster, sourceMonster)
 				|| !monster.IsAlive
-				|| monster.GlobalPosition.DistanceTo(sourceMonster.GlobalPosition) > monster.AggroRange)
+				|| CombatEncounter.IsMonsterClaimed(monster)
+				|| !string.Equals(monster.EnemyGroupId, sourceMonster.EnemyGroupId, StringComparison.Ordinal)
+				|| monster.GlobalPosition.DistanceTo(sourceMonster.GlobalPosition) > sourceMonster.SocialRadius)
 			{
 				continue;
 			}
 
 			monster.SetAggroTarget(aggroTarget, actionId, "social_aggro", currentTick);
+			EmitBridgeEvent("enemy_group_social_aggro", new GDict
+			{
+				{ "source", nameof(GameController) },
+				{ "tick", currentTick },
+				{ "enemy_group_id", sourceMonster.EnemyGroupId },
+				{ "social_radius", sourceMonster.SocialRadius },
+				{ "source_monster", sourceMonster.MonsterName },
+				{ "monster", monster.MonsterName },
+				{ "target", aggroTarget.AdventurerName },
+				{ "action_id", actionId },
+				{ "distance_to_source", monster.GlobalPosition.DistanceTo(sourceMonster.GlobalPosition) }
+			});
 			TryAddAggroMonsterToEncounter(monster, aggroTarget, "social_aggro", currentTick, actionId);
 		}
 	}

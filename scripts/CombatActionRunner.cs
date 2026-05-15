@@ -147,6 +147,7 @@ public sealed class CombatActionRunner
 
 			SetTarget(null, tick, "target_unavailable");
 			ChangeState(_owner.IsAlive ? CombatState.Ready : CombatState.Defeated);
+			UpdateCooldowns(tick);
 			PublishSnapshot();
 			return;
 		}

@@ -37,6 +37,9 @@ public partial class Monster : Node2D, ICombatant
 	[Export]
 	public float AggroAttackDistance { get; set; } = 42.0f;
 
+	[Export]
+	public EnemyGroupDefinition? EnemyGroup { get; set; }
+
 	public int Health => Stats.CurrentHealth;
 	public CombatState CombatState { get; private set; } = CombatState.OutOfCombat;
 	public bool IsAlive => Health > 0;
@@ -60,6 +63,8 @@ public partial class Monster : Node2D, ICombatant
 	public bool CanAct { get; private set; }
 	public Adventurer? AggroTarget { get; private set; }
 	public bool HasAggroTarget => AggroTarget?.IsAlive == true;
+	public string EnemyGroupId { get; private set; } = string.Empty;
+	public float SocialRadius { get; private set; }
 
 	private readonly Dictionary<string, int> _skillCooldowns = new();
 	private readonly List<string> _actionIds = new();
@@ -154,6 +159,7 @@ public partial class Monster : Node2D, ICombatant
 		Speed = speed ?? Speed;
 		AggroRange = aggroRange ?? AggroRange;
 		AggroAttackDistance = aggroAttackDistance ?? AggroAttackDistance;
+		ApplyEnemyGroupDefinition();
 		AggroTarget = null;
 		_wasMovingToAggroTarget = false;
 		CombatState = Health > 0 ? global::CombatState.OutOfCombat : global::CombatState.Defeated;
@@ -174,6 +180,17 @@ public partial class Monster : Node2D, ICombatant
 		_loadout = null;
 		_hasSetup = true;
 		UpdateHealthBar();
+
+		if (IsInsideTree())
+		{
+			PublishState();
+		}
+	}
+
+	public void ConfigureEnemyGroup(EnemyGroupDefinition? enemyGroup)
+	{
+		EnemyGroup = enemyGroup;
+		ApplyEnemyGroupDefinition();
 
 		if (IsInsideTree())
 		{
@@ -257,6 +274,8 @@ public partial class Monster : Node2D, ICombatant
 				{ "distance_to_target", GlobalPosition.DistanceTo(attacker.GlobalPosition) },
 				{ "aggro_range", AggroRange },
 				{ "aggro_attack_distance", AggroAttackDistance },
+				{ "enemy_group_id", EnemyGroupId },
+				{ "social_radius", SocialRadius },
 				{ "desired_combat_distance", GetDesiredCombatDistance() }
 			});
 		}
@@ -333,6 +352,8 @@ public partial class Monster : Node2D, ICombatant
 			{ "speed", Speed },
 			{ "aggro_range", AggroRange },
 			{ "aggro_attack_distance", AggroAttackDistance },
+			{ "enemy_group_id", EnemyGroupId },
+			{ "social_radius", SocialRadius },
 			{ "gold_reward", GoldReward },
 			{ "experience_reward", ExperienceReward },
 			{ "is_alive", IsAlive },
@@ -376,6 +397,12 @@ public partial class Monster : Node2D, ICombatant
 	private void RestoreStatsToFullHealth()
 	{
 		Stats = Stats with { CurrentHealth = Stats.MaxHealth };
+	}
+
+	private void ApplyEnemyGroupDefinition()
+	{
+		EnemyGroupId = EnemyGroup?.GroupId.Trim() ?? string.Empty;
+		SocialRadius = Math.Max(0.0f, EnemyGroup?.SocialRadius ?? 0.0f);
 	}
 
 	private void UpdateProximityAggro(GameController game, long currentTick)

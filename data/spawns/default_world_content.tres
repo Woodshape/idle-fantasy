@@ -14,6 +14,7 @@
 [ext_resource type="Script" uid="uid://bshiwqvpv5c7l" path="res://scripts/AdventurerSpawnDefinition.cs" id="12_adventurer_spawn_script"]
 [ext_resource type="Script" uid="uid://ru0xkmibods7" path="res://scripts/MonsterSpawnDefinition.cs" id="13_monster_spawn_script"]
 [ext_resource type="Resource" uid="uid://cb8qv7g14lld2" path="res://data/monsters/dire_slime.tres" id="14_dire_slime"]
+[ext_resource type="Script" uid="uid://dxb4fp5lq64tw" path="res://scripts/EnemyGroupDefinition.cs" id="15_enemy_group_script"]
 
 [sub_resource type="Resource" id="AdventurerSpawn_warrior"]
 script = ExtResource("12_adventurer_spawn_script")
@@ -26,12 +27,20 @@ script = ExtResource("12_adventurer_spawn_script")
 NodeName = "Mage"
 ActorDefinition = ExtResource("10_mage")
 Position = Vector2(0, 28)
+Enabled = false
+
+[sub_resource type="Resource" id="EnemyGroup_slime_pack"]
+script = ExtResource("15_enemy_group_script")
+GroupId = "slime_pack"
+DisplayName = "Slime Pack"
+SocialRadius = 115.0
 
 [sub_resource type="Resource" id="MonsterSpawn_slime_1"]
 script = ExtResource("13_monster_spawn_script")
 NodeName = "Slime"
 DisplayNameOverride = "Slime"
 ActorDefinition = ExtResource("11_slime")
+EnemyGroup = SubResource("EnemyGroup_slime_pack")
 Position = Vector2(580, 300)
 
 [sub_resource type="Resource" id="MonsterSpawn_slime_2"]
@@ -39,6 +48,7 @@ script = ExtResource("13_monster_spawn_script")
 NodeName = "Slime2"
 DisplayNameOverride = "Slime 2"
 ActorDefinition = ExtResource("11_slime")
+EnemyGroup = SubResource("EnemyGroup_slime_pack")
 Position = Vector2(670, 240)
 
 [sub_resource type="Resource" id="MonsterSpawn_slime_3"]
@@ -53,6 +63,7 @@ script = ExtResource("13_monster_spawn_script")
 NodeName = "Slime4"
 DisplayNameOverride = "Slime 4"
 ActorDefinition = ExtResource("11_slime")
+EnemyGroup = SubResource("EnemyGroup_slime_pack")
 Position = Vector2(760, 270)
 
 [sub_resource type="Resource" id="MonsterSpawn_slime_5"]
@@ -60,6 +71,7 @@ script = ExtResource("13_monster_spawn_script")
 NodeName = "Slime5"
 DisplayNameOverride = "Slime 5"
 ActorDefinition = ExtResource("11_slime")
+EnemyGroup = SubResource("EnemyGroup_slime_pack")
 Position = Vector2(760, 330)
 
 [sub_resource type="Resource" id="MonsterSpawn_dire_slime"]
@@ -68,6 +80,7 @@ NodeName = "DireSlime"
 DisplayNameOverride = "Dire Slime"
 ActorDefinition = ExtResource("14_dire_slime")
 Position = Vector2(900, 120)
+Enabled = false
 
 [resource]
 script = ExtResource("1_library")
@@ -75,5 +88,6 @@ CombatActions = [ExtResource("2_basic"), ExtResource("3_basic_ranged"), ExtResou
 CombatLoadouts = [ExtResource("6_warrior_loadout"), ExtResource("7_mage_loadout"), ExtResource("8_slime_loadout")]
 Adventurers = [ExtResource("9_warrior"), ExtResource("10_mage")]
 Monsters = [ExtResource("11_slime"), ExtResource("14_dire_slime")]
+EnemyGroups = [SubResource("EnemyGroup_slime_pack")]
 DefaultAdventurerSpawns = [SubResource("AdventurerSpawn_warrior"), SubResource("AdventurerSpawn_mage")]
 DefaultMonsterSpawns = [SubResource("MonsterSpawn_slime_1"), SubResource("MonsterSpawn_slime_2"), SubResource("MonsterSpawn_slime_3"), SubResource("MonsterSpawn_slime_4"), SubResource("MonsterSpawn_slime_5"), SubResource("MonsterSpawn_dire_slime")]

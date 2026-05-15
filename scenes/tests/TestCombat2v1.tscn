@@ -6,7 +6,7 @@
 [ext_resource type="Script" path="res://scripts/Town.cs" id="4_v871i"]
 [ext_resource type="Resource" path="res://data/adventurers/warrior.tres" id="5_warrior"]
 [ext_resource type="Resource" path="res://data/adventurers/mage.tres" id="6_mage"]
-[ext_resource type="Resource" path="res://data/monsters/slime.tres" id="7_slime"]
+[ext_resource type="Resource" path="res://data/monsters/training_slime.tres" id="7_slime"]
 
 [node name="TestCombat2v1" type="Node2D" unique_id=766809739]
 script = ExtResource("1_xo1yv")
@@ -15,6 +15,7 @@ AdventurerScene = ExtResource("2_1wm3o")
 MonsterScene = ExtResource("3_1aybq")
 AutoSpawnDefaultAdventurers = false
 AutoSpawnDefaultMonsters = false
+DefaultMaxEncounterAdventurers = 2
 
 [node name="Town" type="Node2D" parent="." unique_id=462206121]
 position = Vector2(160, 300)

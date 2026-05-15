@@ -17,6 +17,11 @@ public sealed record CombatEncounterState(
 	bool Active,
 	long LastProcessedTick,
 	double TickIntervalSeconds,
+	IReadOnlyList<string> AdventurerIds,
+	IReadOnlyList<string> MonsterIds,
+	IReadOnlyList<string> DefeatedMonsterIds,
+	IReadOnlyList<string> EligibleRewardRecipientIds,
+	IReadOnlyList<string> RewardedMonsterIds,
 	IReadOnlyList<CombatantEncounterState> Adventurers,
 	IReadOnlyList<CombatantEncounterState> Monsters)
 {
@@ -34,6 +39,11 @@ public sealed record CombatEncounterState(
 			{ "active", Active },
 			{ "last_processed_tick", LastProcessedTick },
 			{ "tick_interval_seconds", TickIntervalSeconds },
+			{ "adventurer_ids", BuildStringArray(AdventurerIds) },
+			{ "monster_ids", BuildStringArray(MonsterIds) },
+			{ "defeated_monster_ids", BuildStringArray(DefeatedMonsterIds) },
+			{ "eligible_reward_recipient_ids", BuildStringArray(EligibleRewardRecipientIds) },
+			{ "rewarded_monster_ids", BuildStringArray(RewardedMonsterIds) },
 			{ "adventurer", primaryAdventurerState?.ToBridgeDictionary() ?? CombatantEncounterState.Empty("adventurer").ToBridgeDictionary() },
 			{ "monster", primaryMonsterState?.ToBridgeDictionary() ?? CombatantEncounterState.Empty("monster").ToBridgeDictionary() },
 			{ "adventurers", BuildCombatantStates(Adventurers) },
@@ -52,6 +62,18 @@ public sealed record CombatEncounterState(
 		foreach (CombatantEncounterState state in states)
 		{
 			array.Add(state.ToBridgeDictionary());
+		}
+
+		return array;
+	}
+
+	private static GArray BuildStringArray(IEnumerable<string> values)
+	{
+		GArray array = new();
+
+		foreach (string value in values)
+		{
+			array.Add(value);
 		}
 
 		return array;
