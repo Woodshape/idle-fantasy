@@ -154,8 +154,10 @@ public partial class Adventurer : Node2D, ICombatant
 
 		Speed = speed ?? Speed;
 		StopDistance = stopDistance ?? StopDistance;
+		DefinitionId = definitionId;
 		Experience = Math.Max(0, experience);
 		TotalExperience = Experience;
+		ProcessLevelUps(Experience);
 		Gold = gold;
 		MoveTarget = null;
 		CurrentMonsterTarget = null;
@@ -164,7 +166,6 @@ public partial class Adventurer : Node2D, ICombatant
 		QueuedActionId = string.Empty;
 		ActiveActionId = string.Empty;
 		LastActionId = string.Empty;
-		DefinitionId = definitionId;
 		CombatLoadoutId = string.Empty;
 		_actionIds.Clear();
 		BasicAttackCooldownTicksRemaining = 0;

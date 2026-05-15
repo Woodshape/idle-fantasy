@@ -84,10 +84,11 @@ for event_type in "${required_events[@]}"; do
 	fi
 done
 
+expected_loot_collected_count=5
 loot_collected_count="$(grep -c '"type":"loot_collected"' "${EVENTS_FILE}" || true)"
 
-if (( loot_collected_count < 3 )); then
-	echo "Expected all three starter slimes to be looted; saw ${loot_collected_count}. Session: ${SESSION_DIR}" >&2
+if (( loot_collected_count < expected_loot_collected_count )); then
+	echo "Expected all ${expected_loot_collected_count} starter slimes to be looted; saw ${loot_collected_count}. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
