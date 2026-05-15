@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://6co0kxkbg3h2"]
 
-[ext_resource type="Script" uid="uid://coayya7pcwfic" path="res://scripts/Adventurer.cs" id="1_1smsq"]
-[ext_resource type="Texture2D" uid="uid://nv01a6tbu2gc" path="res://icon.svg" id="2_04uff"]
-[ext_resource type="Script" uid="uid://c66ov47jswk43" path="res://scripts/AdventurerController.cs" id="3_ur0ol"]
-[ext_resource type="Script" uid="uid://diwyeoq4xci1f" path="res://scripts/AdventurerCombatController.cs" id="4_7bqsy"]
+[ext_resource type="Script" path="res://scripts/Adventurer.cs" id="1_1smsq"]
+[ext_resource type="Texture2D" path="res://icon.svg" id="2_04uff"]
+[ext_resource type="Script" path="res://scripts/AdventurerController.cs" id="3_ur0ol"]
+[ext_resource type="Script" path="res://scripts/AdventurerCombatController.cs" id="4_7bqsy"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_n3bty"]
 bg_color = Color(0.08, 0.08, 0.09, 1)

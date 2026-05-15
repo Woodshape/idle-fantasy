@@ -86,6 +86,7 @@ public partial class Adventurer : Node2D, ICombatant
 	private readonly List<string> _actionIds = new();
 	private bool _hasSetup;
 	private ProgressBar? _healthBar;
+	private Line2D? _selectionOutline;
 
 	public override void _Ready()
 	{
@@ -104,8 +105,19 @@ public partial class Adventurer : Node2D, ICombatant
 		Controller = GetNodeOrNull<AdventurerController>("AdventurerController");
 		CombatController = GetNodeOrNull<AdventurerCombatController>("AdventurerCombatController");
 		_healthBar = GetNodeOrNull<ProgressBar>("HealthBar");
+		EnsureSelectionOutline();
 		UpdateHealthBar();
 		PublishState();
+	}
+
+	public void SetSelected(bool selected)
+	{
+		EnsureSelectionOutline();
+
+		if (_selectionOutline is not null)
+		{
+			_selectionOutline.Visible = selected;
+		}
 	}
 
 	public CombatStats CreateStartingStats()
@@ -399,6 +411,42 @@ public partial class Adventurer : Node2D, ICombatant
 
 		_healthBar.MaxValue = Mathf.Max(1, MaxHealth);
 		_healthBar.Value = Mathf.Clamp(Health, 0, MaxHealth);
+	}
+
+	private void EnsureSelectionOutline()
+	{
+		if (_selectionOutline is not null)
+		{
+			return;
+		}
+
+		_selectionOutline = GetNodeOrNull<Line2D>("SelectionOutline");
+
+		if (_selectionOutline is null)
+		{
+			_selectionOutline = new Line2D
+			{
+				Name = "SelectionOutline",
+				Closed = true,
+				Width = 2.0f,
+				DefaultColor = new Color(1.0f, 0.92f, 0.35f, 0.9f),
+				ZIndex = 10,
+				Visible = false
+			};
+
+			const int pointCount = 32;
+			const float radius = 21.0f;
+
+			for (int index = 0; index < pointCount; index++)
+			{
+				float angle = Mathf.Tau * index / pointCount;
+				_selectionOutline.AddPoint(new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius);
+			}
+
+			AddChild(_selectionOutline);
+		}
+
+		_selectionOutline.Visible = false;
 	}
 
 	private GDict BuildSkillCooldownState()

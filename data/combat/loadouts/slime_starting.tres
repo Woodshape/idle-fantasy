@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="CombatLoadoutDefinition" format=3 uid="uid://cdwc6vsjnmp72"]
 
-[ext_resource type="Script" uid="uid://bje3drdi4brxg" path="res://scripts/CombatLoadoutDefinition.cs" id="1_loadout"]
+[ext_resource type="Script" path="res://scripts/CombatLoadoutDefinition.cs" id="1_loadout"]
 [ext_resource type="Resource" path="res://data/combat/actions/basic_attack.tres" id="2_basic"]
 
 [resource]

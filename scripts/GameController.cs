@@ -110,6 +110,7 @@ public partial class GameController : Node2D
 		_combatLabel = GetNodeOrNull<Label>("Hud/Panel/VBoxContainer/CombatLabel");
 		_rewardLabel = GetNodeOrNull<Label>("Hud/Panel/VBoxContainer/RewardLabel");
 
+		UpdateSelectionOutlines();
 		UpdateHud();
 		PublishState();
 	}
@@ -131,6 +132,7 @@ public partial class GameController : Node2D
 		}
 
 		GetViewport().SetInputAsHandled();
+		UpdateSelectionOutlines();
 		UpdateHud();
 		PublishState();
 	}
@@ -642,6 +644,16 @@ public partial class GameController : Node2D
 			Monster monster when _monsters.Contains(monster) => monster,
 			_ => _adventurer
 		};
+	}
+
+	private void UpdateSelectionOutlines()
+	{
+		ICombatant? selectedCombatant = GetSelectedCombatant();
+
+		foreach (Adventurer adventurer in _adventurers)
+		{
+			adventurer.SetSelected(ReferenceEquals(adventurer, selectedCombatant));
+		}
 	}
 
 	private bool TrySelectCharacterAt(Vector2 worldPosition)

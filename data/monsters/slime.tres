@@ -1,8 +1,8 @@
 [gd_resource type="Resource" format=3 uid="uid://daobxg1dsx6md"]
 
-[ext_resource type="Script" uid="uid://dxyrq54yboh17" path="res://scripts/MonsterDefinition.cs" id="1_monster"]
-[ext_resource type="Resource" uid="uid://cdwc6vsjnmp72" path="res://data/combat/loadouts/slime_starting.tres" id="2_loadout"]
-[ext_resource type="Script" uid="uid://bv3qr7yw0gw25" path="res://scripts/CombatStatsDefinition.cs" id="3_stats_script"]
+[ext_resource type="Script" path="res://scripts/MonsterDefinition.cs" id="1_monster"]
+[ext_resource type="Resource" path="res://data/combat/loadouts/slime_starting.tres" id="2_loadout"]
+[ext_resource type="Script" path="res://scripts/CombatStatsDefinition.cs" id="3_stats_script"]
 
 [sub_resource type="Resource" id="Stats_slime"]
 script = ExtResource("3_stats_script")

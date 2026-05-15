@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Next Gameplay Slices Plan</title>
+	<style>
+		:root {
+			--bg: #101914;
+			--panel: #fff8e8;
+			--panel-2: #f1e4c3;
+			--ink: #22180f;
+			--muted: #6b5a46;
+			--line: #d5bd87;
+			--green: #2f6b4f;
+			--gold: #c4872c;
+			--red: #9d3e28;
+			--blue: #405f91;
+			--shadow: 0 22px 60px rgba(16, 25, 20, 0.22);
+			--radius: 20px;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html {
+			scroll-behavior: smooth;
+		}
+
+		body {
+			background:
+				radial-gradient(circle at 12% 8%, rgba(196, 135, 44, 0.35), transparent 23rem),
+				radial-gradient(circle at 90% 14%, rgba(64, 95, 145, 0.28), transparent 28rem),
+				radial-gradient(circle at 60% 92%, rgba(47, 107, 79, 0.28), transparent 24rem),
+				linear-gradient(135deg, #101914 0%, #203629 48%, #49331f 100%);
+			color: var(--ink);
+			font-family: "Trebuchet MS", "Gill Sans", Verdana, sans-serif;
+			line-height: 1.55;
+			margin: 0;
+		}
+
+		a {
+			color: inherit;
+		}
+
+		code {
+			background: rgba(64, 95, 145, 0.1);
+			border: 1px solid rgba(64, 95, 145, 0.18);
+			border-radius: 8px;
+			color: #263e75;
+			padding: 0.08rem 0.28rem;
+		}
+
+		pre {
+			background: #1f2b24;
+			border-radius: 14px;
+			color: #fff8e8;
+			overflow-x: auto;
+			padding: 1rem;
+		}
+
+		pre code {
+			background: transparent;
+			border: 0;
+			color: inherit;
+			padding: 0;
+		}
+
+		.layout {
+			display: grid;
+			gap: 1.5rem;
+			grid-template-columns: 280px minmax(0, 1fr);
+			margin: 0 auto;
+			max-width: 1480px;
+			padding: 1.5rem;
+			width: 100%;
+		}
+
+		.sidebar {
+			align-self: start;
+			background: rgba(255, 248, 232, 0.93);
+			border: 1px solid rgba(213, 189, 135, 0.85);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			padding: 1rem;
+			position: sticky;
+			top: 1rem;
+		}
+
+		.sidebar h2 {
+			font-family: Georgia, serif;
+			font-size: 0.95rem;
+			letter-spacing: 0.12em;
+			margin: 0 0 0.8rem;
+			text-transform: uppercase;
+		}
+
+		.sidebar a {
+			border-radius: 999px;
+			color: var(--muted);
+			display: block;
+			padding: 0.42rem 0.65rem;
+			text-decoration: none;
+		}
+
+		.sidebar a:hover {
+			background: var(--panel-2);
+			color: var(--ink);
+		}
+
+		main {
+			display: grid;
+			gap: 1rem;
+			min-width: 0;
+			overflow: hidden;
+			width: 100%;
+		}
+
+		.hero,
+		.panel,
+		.card,
+		.metric,
+		.slice {
+			border: 1px solid rgba(213, 189, 135, 0.78);
+			border-radius: var(--radius);
+			box-shadow: var(--shadow);
+			min-width: 0;
+			overflow: hidden;
+		}
+
+		.hero {
+			background:
+				linear-gradient(135deg, rgba(255, 248, 232, 0.96), rgba(241, 228, 195, 0.94)),
+				linear-gradient(90deg, rgba(47, 107, 79, 0.22), rgba(196, 135, 44, 0.2));
+			padding: clamp(1.5rem, 4vw, 3rem);
+			position: relative;
+		}
+
+		.hero:after {
+			background:
+				linear-gradient(90deg, rgba(47, 107, 79, 0.08) 1px, transparent 1px),
+				linear-gradient(rgba(47, 107, 79, 0.08) 1px, transparent 1px);
+			background-size: 34px 34px;
+			content: "";
+			inset: 0;
+			position: absolute;
+		}
+
+		.hero > * {
+			position: relative;
+			z-index: 1;
+		}
+
+		.kicker {
+			color: var(--green);
+			font-weight: 800;
+			letter-spacing: 0.14em;
+			margin: 0 0 0.75rem;
+			text-transform: uppercase;
+		}
+
+		h1,
+		h2,
+		h3 {
+			font-family: Georgia, "Times New Roman", serif;
+			line-height: 1.12;
+		}
+
+		h1 {
+			font-size: clamp(2.35rem, 6vw, 5.1rem);
+			margin: 0 0 1rem;
+			max-width: 13ch;
+		}
+
+		h2 {
+			font-size: clamp(1.45rem, 3vw, 2.25rem);
+			margin: 0;
+		}
+
+		h3 {
+			font-size: 1.14rem;
+			margin: 0 0 0.5rem;
+		}
+
+		p {
+			margin: 0 0 1rem;
+		}
+
+		p:last-child,
+		li:last-child {
+			margin-bottom: 0;
+		}
+
+		.hero p {
+			font-size: clamp(1.05rem, 2vw, 1.24rem);
+			max-width: 78ch;
+		}
+
+		.panel,
+		.card,
+		.metric,
+		.slice {
+			background: rgba(255, 248, 232, 0.94);
+			padding: clamp(1.1rem, 2.4vw, 1.75rem);
+		}
+
+		.section-title {
+			align-items: end;
+			border-bottom: 2px solid rgba(213, 189, 135, 0.65);
+			display: flex;
+			gap: 1rem;
+			justify-content: space-between;
+			margin-bottom: 1rem;
+			padding-bottom: 0.75rem;
+		}
+
+		.tag {
+			background: rgba(47, 107, 79, 0.12);
+			border: 1px solid rgba(47, 107, 79, 0.25);
+			border-radius: 999px;
+			color: var(--green);
+			font-size: 0.76rem;
+			font-weight: 800;
+			letter-spacing: 0.08em;
+			padding: 0.32rem 0.62rem;
+			text-transform: uppercase;
+			white-space: nowrap;
+		}
+
+		.grid,
+		.grid-2,
+		.grid-3,
+		.summary,
+		.slice-grid {
+			display: grid;
+			gap: 1rem;
+		}
+
+		.grid-2 {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.grid-3,
+		.slice-grid {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.summary {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+
+		.metric {
+			padding: 1rem;
+		}
+
+		.metric strong {
+			color: var(--green);
+			display: block;
+			font-family: Georgia, serif;
+			font-size: 1.35rem;
+			line-height: 1.1;
+			margin-bottom: 0.35rem;
+		}
+
+		.metric span,
+		.card span,
+		.muted {
+			color: var(--muted);
+		}
+
+		.green {
+			background: linear-gradient(135deg, rgba(47, 107, 79, 0.13), rgba(255, 248, 232, 0.9));
+			border-color: rgba(47, 107, 79, 0.28);
+		}
+
+		.gold {
+			background: linear-gradient(135deg, rgba(196, 135, 44, 0.16), rgba(255, 248, 232, 0.9));
+			border-color: rgba(196, 135, 44, 0.3);
+		}
+
+		.red {
+			background: linear-gradient(135deg, rgba(157, 62, 40, 0.13), rgba(255, 248, 232, 0.9));
+			border-color: rgba(157, 62, 40, 0.28);
+		}
+
+		.blue {
+			background: linear-gradient(135deg, rgba(64, 95, 145, 0.13), rgba(255, 248, 232, 0.9));
+			border-color: rgba(64, 95, 145, 0.28);
+		}
+
+		ul,
+		ol {
+			margin: 0;
+			padding-left: 1.15rem;
+		}
+
+		li + li {
+			margin-top: 0.36rem;
+		}
+
+		.slice {
+			position: relative;
+		}
+
+		.slice-number {
+			align-items: center;
+			background: var(--green);
+			border-radius: 50%;
+			color: #fff8e8;
+			display: inline-flex;
+			font-family: Georgia, serif;
+			font-size: 1.1rem;
+			font-weight: 800;
+			height: 2.35rem;
+			justify-content: center;
+			margin-bottom: 0.75rem;
+			width: 2.35rem;
+		}
+
+		.slice h3 {
+			font-size: 1.28rem;
+		}
+
+		.slice-footer {
+			border-top: 1px solid rgba(213, 189, 135, 0.72);
+			color: var(--muted);
+			font-size: 0.95rem;
+			margin-top: 1rem;
+			padding-top: 0.75rem;
+		}
+
+		.status-list,
+		.event-list {
+			display: grid;
+			gap: 0.65rem;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			list-style: none;
+			padding: 0;
+		}
+
+		.status-list li,
+		.event-list li {
+			background: #fffdf5;
+			border: 1px solid rgba(213, 189, 135, 0.72);
+			border-radius: 13px;
+			margin: 0;
+			padding: 0.7rem;
+		}
+
+		.status-list strong {
+			color: var(--blue);
+			display: block;
+		}
+
+		.flow {
+			counter-reset: step;
+			display: grid;
+			gap: 0.7rem;
+			list-style: none;
+			padding: 0;
+		}
+
+		.flow li {
+			background: var(--panel-2);
+			border: 1px solid rgba(213, 189, 135, 0.8);
+			border-radius: 14px;
+			margin: 0;
+			min-height: 3.5rem;
+			padding: 0.9rem 1rem 0.9rem 3.5rem;
+			position: relative;
+		}
+
+		.flow li:before {
+			align-items: center;
+			background: var(--green);
+			border-radius: 50%;
+			color: #fff8e8;
+			content: counter(step);
+			counter-increment: step;
+			display: inline-flex;
+			font-weight: 800;
+			height: 2rem;
+			justify-content: center;
+			left: 0.85rem;
+			position: absolute;
+			top: 0.75rem;
+			width: 2rem;
+		}
+
+		.callout {
+			background: #2f6650;
+			border-radius: var(--radius);
+			color: #fff8e8;
+			padding: 1.15rem;
+		}
+
+		.callout p {
+			color: rgba(255, 248, 232, 0.9);
+		}
+
+		.two-column {
+			columns: 2 18rem;
+			column-gap: 2rem;
+		}
+
+		.two-column li {
+			break-inside: avoid;
+			margin-bottom: 0.35rem;
+		}
+
+		.footer-note {
+			color: rgba(255, 248, 232, 0.82);
+			font-size: 0.9rem;
+			text-align: center;
+		}
+
+		@media (max-width: 1100px) {
+			.layout {
+				grid-template-columns: 1fr;
+			}
+
+			.sidebar {
+				position: static;
+			}
+
+			.sidebar nav {
+				display: grid;
+				gap: 0.25rem;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.summary,
+			.grid-3,
+			.slice-grid {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+		}
+
+		@media (max-width: 760px) {
+			.layout {
+				padding: 1rem;
+			}
+
+			.summary,
+			.grid-2,
+			.grid-3,
+			.slice-grid,
+			.status-list,
+			.event-list,
+			.sidebar nav {
+				grid-template-columns: 1fr;
+			}
+
+			.section-title {
+				align-items: start;
+				flex-direction: column;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="layout">
+		<aside class="sidebar" aria-label="Plan navigation">
+			<h2>Gameplay Slices</h2>
+			<nav>
+				<a href="#overview">Overview</a>
+				<a href="#snapshot">Current Snapshot</a>
+				<a href="#slices">Six Slices</a>
+				<a href="#slice-1">Starter Loop</a>
+				<a href="#slice-2">Progression</a>
+				<a href="#slice-3">Town Gold Sink</a>
+				<a href="#slice-4">Tavern Hiring</a>
+				<a href="#slice-5">Target Risk</a>
+				<a href="#slice-6">Encounter Hardening</a>
+				<a href="#verification">Verification</a>
+				<a href="#order">Order Of Work</a>
+				<a href="#decisions">Decisions</a>
+			</nav>
+		</aside>
+
+		<main>
+			<header class="hero" id="overview">
+				<p class="kicker">Core Gameplay Roadmap</p>
+				<h1>Next Gameplay Slices Plan</h1>
+				<p>Build the smallest reliable path from the current warrior + mage + slime wave proof-of-concept into a readable idle RPG loop with progression, a town economy hook, player hiring, autonomous target choice, and hardened multi-combatant encounters.</p>
+				<p>The ordering is intentional: do not build shops, parties, or dungeon-like target selection until the starter loop is consistently watchable and verified.</p>
+			</header>
+
+			<section class="summary" aria-label="At a glance">
+				<div class="metric">
+					<strong>1st</strong>
+					<span>Make the current watchable combat loop reliable before adding systems.</span>
+				</div>
+				<div class="metric">
+					<strong>6</strong>
+					<span>Gameplay slices from tuning through encounter ownership.</span>
+				</div>
+				<div class="metric">
+					<strong>Bridge</strong>
+					<span>Use TestBridge events and state for acceptance evidence.</span>
+				</div>
+				<div class="metric">
+					<strong>Green</strong>
+					<span><code>verify_combat_main_loop.sh</code> remains the baseline gate.</span>
+				</div>
+			</section>
+
+			<section class="panel" id="snapshot">
+				<div class="section-title">
+					<h2>Current Implementation Snapshot</h2>
+					<span class="tag">Grounded In Code</span>
+				</div>
+				<ul class="status-list">
+					<li><strong>Simulation</strong>A fixed simulation tick is driven by <code>GameController</code>.</li>
+					<li><strong>Content</strong>Warrior, mage, slime, combat actions, loadouts, and default spawns live under <code>data/</code>.</li>
+					<li><strong>Actions</strong>Warrior melee <code>heavy_strike</code>, mage ranged <code>spark</code>, and slime <code>basic_attack</code> are live.</li>
+					<li><strong>Idle Loop</strong>Adventurers choose targets, travel, fight, collect loot, return, recover, and can die.</li>
+					<li><strong>Town</strong><code>Town.Recover</code> emits <code>adventurer_recovery_tick</code> and <code>adventurer_recovered</code>.</li>
+					<li><strong>Wave</strong>Wave clear and respawn emit <code>monster_wave_cleared</code> and <code>monster_wave_respawned</code>.</li>
+					<li><strong>Bridge</strong>TestBridge publishes adventurer, monster, encounter, loop, and clock state.</li>
+					<li><strong>Ownership</strong>Early encounter ownership exists through <code>CombatEncounter</code> and claim avoidance.</li>
+				</ul>
+				<div class="callout" style="margin-top: 1rem;">
+					<h3>Primary Acceptance Gate</h3>
+					<p>The next slices should keep this command green as the always-on starter-loop proof:</p>
+					<pre><code>scripts/verify_combat_main_loop.sh</code></pre>
+				</div>
+			</section>
+
+			<section class="panel" id="slices">
+				<div class="section-title">
+					<h2>Six Slices</h2>
+					<span class="tag">Build Order</span>
+				</div>
+				<div class="slice-grid">
+					<a class="slice green" href="#slice-1">
+						<span class="slice-number">1</span>
+						<h3>Reliable Watchable Starter Loop</h3>
+						<p>Tune the current warrior + mage + slime wave until it is fun, readable, and verified.</p>
+						<p class="slice-footer">Foundation before shops, parties, or dungeons.</p>
+					</a>
+					<a class="slice gold" href="#slice-2">
+						<span class="slice-number">2</span>
+						<h3>Adventurer Progression</h3>
+						<p>Add XP thresholds, level-up events, stat growth, HUD, and TestBridge state.</p>
+						<p class="slice-footer">Makes repeated loops matter.</p>
+					</a>
+					<a class="slice blue" href="#slice-3">
+						<span class="slice-number">3</span>
+						<h3>Town Gold Sink</h3>
+						<p>Spend earned gold on faster recovery or one simple potion.</p>
+						<p class="slice-footer">First fight to town economy loop.</p>
+					</a>
+					<a class="slice" href="#slice-4">
+						<span class="slice-number">4</span>
+						<h3>Manual Tavern Hiring</h3>
+						<p>Let the player spend gold to hire from existing adventurer definitions.</p>
+						<p class="slice-footer">Smallest meaningful strategic lever.</p>
+					</a>
+					<a class="slice red" href="#slice-5">
+						<span class="slice-number">5</span>
+						<h3>Target Choice And Risk</h3>
+						<p>Score targets by distance, reward, danger, level fit, and current HP.</p>
+						<p class="slice-footer">Creates autonomous RPG simulator behavior.</p>
+					</a>
+					<a class="slice green" href="#slice-6">
+						<span class="slice-number">6</span>
+						<h3>Encounter/Party Hardening</h3>
+						<p>Make 1v2, 2v1, and 2v2 ownership and rewards reliable.</p>
+						<p class="slice-footer">Required before real parties.</p>
+					</a>
+				</div>
+			</section>
+
+			<section class="panel" id="slice-1">
+				<div class="section-title">
+					<h2>Slice 1: Reliable Watchable Starter Loop</h2>
+					<span class="tag">Foundation</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Outcome</h3>
+						<p>The current warrior + mage + three-slime wave is reliably fun and readable in headless verification and in the editor. Adventurers usually clear the first wave, take visible pressure, collect rewards, return/recover when appropriate, and see the wave respawn.</p>
+					</div>
+					<div class="card gold">
+						<h3>Implementation Notes</h3>
+						<ul>
+							<li>Prefer data edits in <code>data/adventurers/*.tres</code>, <code>data/monsters/slime.tres</code>, and <code>data/spawns/default_world_content.tres</code>.</li>
+							<li>Tune <code>RestHealthRatio</code>, <code>RecoveryHealthPerSecond</code>, slime <code>Attack</code>, <code>MaxHealth</code>, and <code>AttackSpeedTicks</code> first.</li>
+							<li>If randomness flakes, verify bounded outcomes rather than exact damage sequences.</li>
+						</ul>
+					</div>
+				</div>
+				<div class="grid-2" style="margin-top: 1rem;">
+					<div class="card">
+						<h3>Scope</h3>
+						<ul>
+							<li>Tune only existing warrior, mage, slime stats, rewards, spacing, and recovery.</li>
+							<li>Keep the first wave small.</li>
+							<li>Confirm slime melee behavior after mage ranged opener.</li>
+							<li>Confirm target selection, combat, loot, recovery, wave clear, and respawn.</li>
+						</ul>
+					</div>
+					<div class="card">
+						<h3>Acceptance</h3>
+						<ul>
+							<li><code>scripts/verify_combat_main_loop.sh</code> passes repeatedly.</li>
+							<li>Events include combat, loot, recovery, loop completion, wave clear, and respawn evidence.</li>
+							<li>State shows living adventurers after one completed loop.</li>
+							<li>Ranged mage behavior and slime melee response remain covered.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="slice-2">
+				<div class="section-title">
+					<h2>Slice 2: Adventurer Progression</h2>
+					<span class="tag">Repeated Loops Matter</span>
+				</div>
+				<div class="grid-3">
+					<div class="card green">
+						<h3>Outcome</h3>
+						<p>XP creates clear level-up moments and small stat growth without class trees or build choices.</p>
+					</div>
+					<div class="card gold">
+						<h3>Minimal Model</h3>
+						<ul>
+							<li><code>xp_to_next_level = 20 + ((level - 1) * 15)</code>.</li>
+							<li>Increment <code>Level</code>, subtract threshold XP, then grow stats.</li>
+							<li>Suggested growth: <code>MaxHealth +4</code>, <code>Attack +1</code>, <code>Defense +1</code> every other level.</li>
+						</ul>
+					</div>
+					<div class="card blue">
+						<h3>Acceptance</h3>
+						<ul>
+							<li>Verification observes <code>loot_collected</code> and <code>adventurer_level_up</code>.</li>
+							<li>TestBridge state includes XP threshold fields.</li>
+							<li>HUD and state show level-up changes.</li>
+						</ul>
+					</div>
+				</div>
+				<div class="card" style="margin-top: 1rem;">
+					<h3>Implementation Notes</h3>
+					<ul>
+						<li>Put progression behavior on <code>Adventurer</code>, likely near <code>AddRewards</code>.</li>
+						<li>Emit <code>adventurer_level_up</code> with old/new level, XP before/after, threshold, and changed stats.</li>
+						<li>Update <code>Adventurer.PublishState</code> and <code>GameController.UpdateAdventurerHud</code>.</li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="panel" id="slice-3">
+				<div class="section-title">
+					<h2>Slice 3: Town Gold Sink</h2>
+					<span class="tag">Fight To Town Economy</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Paid Healing First</h3>
+						<ul>
+							<li>Add one town service before inventory UI.</li>
+							<li>Spend adventurer gold at town when injured and able to pay.</li>
+							<li>If no gold, use existing slow recovery.</li>
+							<li>Emit <code>town_service_used</code>, <code>gold_spent</code>, and optionally <code>town_service_unaffordable</code>.</li>
+						</ul>
+					</div>
+					<div class="card blue">
+						<h3>Potion Variant</h3>
+						<ul>
+							<li>Add <code>PotionCharges</code> to <code>Adventurer</code>, capped at 1.</li>
+							<li>Buy one potion in town if gold is available and none is carried.</li>
+							<li>Auto-use below a low HP threshold.</li>
+							<li>Emit <code>potion_bought</code> and <code>potion_used</code>.</li>
+						</ul>
+					</div>
+				</div>
+				<div class="grid-2" style="margin-top: 1rem;">
+					<div class="card gold">
+						<h3>Proposed Values</h3>
+						<ul>
+							<li><code>PaidRecoveryCost = 5</code>.</li>
+							<li><code>PaidRecoveryHeal = 12</code>.</li>
+							<li>Continue passive recovery if still injured.</li>
+							<li>Add <code>Adventurer.SpendGold(int amount)</code>.</li>
+						</ul>
+					</div>
+					<div class="card">
+						<h3>Acceptance</h3>
+						<ul>
+							<li>Gold decreases after town service use.</li>
+							<li>Events include <code>town_service_used</code> and <code>gold_spent</code>.</li>
+							<li>Broke adventurers still recover through <code>adventurer_recovery_tick</code>.</li>
+							<li>The main loop verifier stays green.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="slice-4">
+				<div class="section-title">
+					<h2>Slice 4: Manual Tavern Hiring</h2>
+					<span class="tag">First Strategic Lever</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Scope</h3>
+						<ul>
+							<li>Add a TestBridge command first; UI button can follow.</li>
+							<li>Cost gold from an explicitly chosen owner.</li>
+							<li>Spawn from existing <code>AdventurerDefinition</code> data.</li>
+							<li>Emit <code>hire_requested</code>, <code>gold_spent</code>, <code>adventurer_hired</code>, and <code>hire_failed</code>.</li>
+						</ul>
+					</div>
+					<div class="card gold">
+						<h3>Currency Recommendation</h3>
+						<p>Introduce a simple <code>PlayerGold</code> or <code>TownGold</code> counter on <code>GameController</code> before hiring. Keep adventurer personal gold for recovery unless design explicitly wants pooled party funds.</p>
+					</div>
+				</div>
+				<div class="card blue" style="margin-top: 1rem;">
+					<h3>Acceptance</h3>
+					<ul class="two-column">
+						<li>TestBridge can request a hire by definition id.</li>
+						<li>Gold decreases on successful hire.</li>
+						<li>New adventurer appears in <code>game_loop.adventurer_count</code>.</li>
+						<li>Broke hire emits <code>hire_failed</code> and does not spawn.</li>
+						<li>The main loop verifier stays green.</li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="panel" id="slice-5">
+				<div class="section-title">
+					<h2>Slice 5: Target Choice And Risk</h2>
+					<span class="tag">Autonomy</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Scope</h3>
+						<ul>
+							<li>Add at least one additional monster tier or meaningful distance/reward distinction.</li>
+							<li>Score targets by distance, monster level/reward, adventurer level, and current HP ratio.</li>
+							<li>Emit target scoring details for TestBridge.</li>
+							<li>Add earlier retreat behavior for hurt adventurers.</li>
+						</ul>
+					</div>
+					<div class="card red">
+						<h3>Target Score</h3>
+						<pre><code>score = reward_value
+  - distance_penalty
+  - danger_penalty
+  + level_fit_bonus
+  + wounded_caution_adjustment</code></pre>
+					</div>
+				</div>
+				<div class="grid-2" style="margin-top: 1rem;">
+					<div class="card gold">
+						<h3>Readable Heuristics</h3>
+						<ul>
+							<li><code>reward_value = monster.GoldReward + monster.ExperienceReward</code>.</li>
+							<li><code>distance_penalty = distance / 80</code>.</li>
+							<li><code>danger_penalty = max(0, monster.Level - adventurer.Level) * 10</code>.</li>
+							<li>Below 50% HP, prefer lower danger or return to town.</li>
+						</ul>
+					</div>
+					<div class="card">
+						<h3>Acceptance</h3>
+						<ul>
+							<li>TestBridge shows at least two scored targets with different inputs.</li>
+							<li>Adventurers do not always pick nearest when reward/risk justifies it.</li>
+							<li>Hurt adventurers return earlier than healthy adventurers.</li>
+							<li>The main loop verifier stays green.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="slice-6">
+				<div class="section-title">
+					<h2>Slice 6: Encounter/Party Hardening</h2>
+					<span class="tag">Before Real Parties</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Scope</h3>
+						<ul>
+							<li>Make 1v2, 2v1, and 2v2 intentional single-encounter cases.</li>
+							<li>Prevent duplicate monster claims across active encounters.</li>
+							<li>Track reward membership explicitly.</li>
+							<li>Add reward splitting only after membership is reliable.</li>
+						</ul>
+					</div>
+					<div class="card blue">
+						<h3>Implementation Notes</h3>
+						<ul>
+							<li>Treat <code>CombatEncounter</code> as the authoritative owner of membership.</li>
+							<li>Add encounter id, adventurer ids, monster ids, defeated monster ids, and eligible reward recipients.</li>
+							<li>Ensure social aggro and <code>FindHuntTargets</code> use the same ownership checks.</li>
+						</ul>
+					</div>
+				</div>
+				<div class="card gold" style="margin-top: 1rem;">
+					<h3>Acceptance</h3>
+					<ul class="two-column">
+						<li>Verification covers 1v2, 2v1, and 2v2 starts as one encounter each.</li>
+						<li>No monster appears in two active encounters.</li>
+						<li>A defeated monster rewards only intended encounter membership.</li>
+						<li>Reward splitting is added only after ownership is stable.</li>
+						<li>The main loop verifier stays green.</li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="panel" id="verification">
+				<div class="section-title">
+					<h2>Verification Strategy</h2>
+					<span class="tag">Keep Baseline Fast</span>
+				</div>
+				<div class="grid-2">
+					<div class="card green">
+						<h3>Always-Green Baseline</h3>
+						<pre><code>scripts/verify_combat_main_loop.sh</code></pre>
+						<p>Avoid turning this into a slow exhaustive suite. It should remain the starter-loop acceptance test.</p>
+					</div>
+					<div class="card">
+						<h3>Focused Additions</h3>
+						<ul>
+							<li>Progression: <code>adventurer_level_up</code> and XP threshold state.</li>
+							<li>Town service: <code>town_service_used</code>, <code>gold_spent</code>, and fallback recovery.</li>
+							<li>Hiring: hire command/UI path, cost, and adventurer count increase.</li>
+							<li>Target choice: scoring events and non-nearest selection.</li>
+							<li>Encounter hardening: 1v2, 2v1, 2v2 ownership and rewards.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<section class="panel" id="order">
+				<div class="section-title">
+					<h2>Recommended Order Of Work</h2>
+					<span class="tag">Sequence</span>
+				</div>
+				<ol class="flow">
+					<li>Stabilize and tune the current starter loop until it is visually readable and green repeatedly.</li>
+					<li>Add progression because it makes loop repetition meaningful with minimal new systems.</li>
+					<li>Add a paid town recovery service because it connects earned gold back into survivability.</li>
+					<li>Decide currency ownership, then add manual hiring through TestBridge first.</li>
+					<li>Add risk-aware target choice once leveling and healing create meaningful risk/reward inputs.</li>
+					<li>Harden encounter ownership before expanding real party behavior.</li>
+				</ol>
+			</section>
+
+			<section class="panel" id="decisions">
+				<div class="section-title">
+					<h2>Key Design Decisions</h2>
+					<span class="tag">Before Implementation</span>
+				</div>
+				<div class="grid-2">
+					<div class="card gold">
+						<h3>Open Questions</h3>
+						<ul>
+							<li>Should adventurer gold remain personal, or should combat loot feed a player/town treasury for hiring?</li>
+							<li>Should level-up heal the adventurer, partially heal, or only increase max health?</li>
+							<li>Should the first gold sink be paid healing or one carried potion?</li>
+							<li>Should hiring allow duplicate warriors/mages, or require unique definitions for now?</li>
+							<li>Should active combat retreat exist now, or only between fights first?</li>
+						</ul>
+					</div>
+					<div class="card green">
+						<h3>First Slice Exit Criteria</h3>
+						<ul>
+							<li>The mage clearly opens at range.</li>
+							<li>Slimes visibly pressure adventurers and attack at melee range.</li>
+							<li>Warrior and mage usually survive the starter wave.</li>
+							<li>Loot changes gold/XP.</li>
+							<li>Injured adventurers return and recover.</li>
+							<li>Cleared waves respawn.</li>
+							<li>The verifier proves those facts without flakes.</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<p class="footer-note">HTML overview page synced with plans/2026-05-15-next-gameplay-slices-plan.md.</p>
+		</main>
+	</div>
+</body>
+</html>

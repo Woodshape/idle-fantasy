@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://cl5ijkt38kwr3"]
 
-[ext_resource type="Script" uid="uid://crvc53pr1gid8" path="res://scripts/GameController.cs" id="1_b7urs"]
-[ext_resource type="PackedScene" uid="uid://6co0kxkbg3h2" path="res://scenes/Adventurer.tscn" id="2_naw2q"]
-[ext_resource type="PackedScene" uid="uid://hqsfpal0jyrh" path="res://scenes/Monster.tscn" id="3_5uja7"]
-[ext_resource type="Script" uid="uid://bmhff0lht44f5" path="res://scripts/Town.cs" id="4_mqsm7"]
+[ext_resource type="Script" path="res://scripts/GameController.cs" id="1_b7urs"]
+[ext_resource type="PackedScene" path="res://scenes/Adventurer.tscn" id="2_naw2q"]
+[ext_resource type="PackedScene" path="res://scenes/Monster.tscn" id="3_5uja7"]
+[ext_resource type="Script" path="res://scripts/Town.cs" id="4_mqsm7"]
 
 [node name="TestCombat1v1" type="Node2D" unique_id=370065387]
 script = ExtResource("1_b7urs")
