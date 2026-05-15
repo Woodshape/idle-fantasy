@@ -68,6 +68,7 @@ required_events=(
 	"monster_aggro_target_set"
 	"combat_tick_completed"
 	"loot_collected"
+	"adventurer_level_up"
 	"character_selected"
 	"game_loop_completed"
 	"monster_wave_cleared"
@@ -92,6 +93,71 @@ fi
 
 if ! grep -q '"living_adventurers":2' "${SESSION_DIR}/state.json"; then
 	echo "Expected both starter adventurers to be alive after the completed loop. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
+
+for state_field in '"level"' '"experience"' '"current_experience"' '"xp_to_next_level"' '"total_experience"'; do
+	if ! grep -q "${state_field}" "${SESSION_DIR}/state.json"; then
+		echo "Missing adventurer progression state field ${state_field}. Session: ${SESSION_DIR}" >&2
+		exit 1
+	fi
+done
+
+level_up_line="$(grep '"type":"adventurer_level_up"' "${EVENTS_FILE}" | head -n 1 || true)"
+
+if [[ -z "${level_up_line}" ]]; then
+	echo "Missing adventurer level-up event. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
+
+level_up_role="$(printf '%s\n' "${level_up_line}" | sed -n 's/.*"role":"\([^"]*\)".*/\1/p')"
+level_up_definition_id="$(printf '%s\n' "${level_up_line}" | sed -n 's/.*"definition_id":"\([^"]*\)".*/\1/p')"
+level_up_old_level="$(printf '%s\n' "${level_up_line}" | sed -n 's/.*"old_level":\([0-9]*\).*/\1/p')"
+level_up_new_level="$(printf '%s\n' "${level_up_line}" | sed -n 's/.*"new_level":\([0-9]*\).*/\1/p')"
+level_up_threshold="$(printf '%s\n' "${level_up_line}" | sed -n 's/.*"threshold":\([0-9]*\).*/\1/p')"
+level_up_xp_to_next="$(printf '%s\n' "${level_up_line}" | sed -n 's/.*"xp_to_next_level":\([0-9]*\).*/\1/p')"
+level_up_max_health_delta="$(printf '%s\n' "${level_up_line}" | sed -n 's/.*"changed_stats":{[^}]*"max_health":\([0-9]*\).*/\1/p')"
+level_up_attack_delta="$(printf '%s\n' "${level_up_line}" | sed -n 's/.*"changed_stats":{[^}]*"attack":\([0-9]*\).*/\1/p')"
+level_up_defense_delta="$(printf '%s\n' "${level_up_line}" | sed -n 's/.*"changed_stats":{[^}]*"defense":\([0-9]*\).*/\1/p')"
+
+if ! awk -v old_level="${level_up_old_level}" -v new_level="${level_up_new_level}" -v threshold="${level_up_threshold}" -v next_threshold="${level_up_xp_to_next}" \
+	'BEGIN { exit !(old_level == 1 && new_level == 2 && threshold == 20 && next_threshold == 35) }'; then
+	echo "Level-up event did not expose the expected deterministic threshold progression. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
+
+case "${level_up_role}" in
+	Tank)
+		expected_max_health_delta=6
+		expected_attack_delta=1
+		expected_defense_delta=1
+		;;
+	DamageDealer)
+		expected_max_health_delta=4
+		expected_attack_delta=2
+		expected_defense_delta=1
+		;;
+	Support)
+		expected_max_health_delta=5
+		expected_attack_delta=1
+		expected_defense_delta=1
+		;;
+	*)
+		echo "Level-up event did not expose an AdventurerDefinition role. role=${level_up_role:-missing}. Session: ${SESSION_DIR}" >&2
+		exit 1
+		;;
+esac
+
+if [[ "${level_up_max_health_delta}" != "${expected_max_health_delta}" \
+	|| "${level_up_attack_delta}" != "${expected_attack_delta}" \
+	|| "${level_up_defense_delta}" != "${expected_defense_delta}" ]]; then
+	echo "Level-up stat growth did not match role ${level_up_role}. max_health=${level_up_max_health_delta:-missing} attack=${level_up_attack_delta:-missing} defense=${level_up_defense_delta:-missing}. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
+
+if [[ -z "${level_up_definition_id}" ]] \
+	|| ! grep -q "\"adventurer:${level_up_definition_id}\":{.*\"level\":${level_up_new_level}" "${SESSION_DIR}/state.json"; then
+	echo "Leveled adventurer state was not published with the new level. definition_id=${level_up_definition_id:-missing} level=${level_up_new_level:-missing}. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 

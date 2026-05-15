@@ -47,6 +47,20 @@ DisplayNameOverride = "Slime 3"
 ActorDefinition = ExtResource("11_slime")
 Position = Vector2(670, 360)
 
+[sub_resource type="Resource" id="MonsterSpawn_slime_4"]
+script = ExtResource("13_monster_spawn_script")
+NodeName = "Slime4"
+DisplayNameOverride = "Slime 4"
+ActorDefinition = ExtResource("11_slime")
+Position = Vector2(760, 270)
+
+[sub_resource type="Resource" id="MonsterSpawn_slime_5"]
+script = ExtResource("13_monster_spawn_script")
+NodeName = "Slime5"
+DisplayNameOverride = "Slime 5"
+ActorDefinition = ExtResource("11_slime")
+Position = Vector2(760, 330)
+
 [resource]
 script = ExtResource("1_library")
 CombatActions = [ExtResource("2_basic"), ExtResource("3_basic_ranged"), ExtResource("4_heavy"), ExtResource("5_spark")]
@@ -54,4 +68,4 @@ CombatLoadouts = [ExtResource("6_warrior_loadout"), ExtResource("7_mage_loadout"
 Adventurers = [ExtResource("9_warrior"), ExtResource("10_mage")]
 Monsters = [ExtResource("11_slime")]
 DefaultAdventurerSpawns = [SubResource("AdventurerSpawn_warrior"), SubResource("AdventurerSpawn_mage")]
-DefaultMonsterSpawns = [SubResource("MonsterSpawn_slime_1"), SubResource("MonsterSpawn_slime_2"), SubResource("MonsterSpawn_slime_3")]
+DefaultMonsterSpawns = [SubResource("MonsterSpawn_slime_1"), SubResource("MonsterSpawn_slime_2"), SubResource("MonsterSpawn_slime_3"), SubResource("MonsterSpawn_slime_4"), SubResource("MonsterSpawn_slime_5")]

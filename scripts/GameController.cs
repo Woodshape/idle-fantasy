@@ -604,7 +604,7 @@ public partial class GameController : Node2D
 	{
 		if (_stateLabel is not null)
 		{
-			_stateLabel.Text = $"Adventurer: {adventurer.AdventurerName} | Role: {adventurer.Role} | Archetype: {adventurer.Archetype} | Intention: {adventurer.IntentionStateName} | HP: {adventurer.Health}/{adventurer.Stats.MaxHealth}";
+			_stateLabel.Text = $"Adventurer: {adventurer.AdventurerName} | Lv {adventurer.Level} | Role: {adventurer.Role} | Archetype: {adventurer.Archetype} | Intention: {adventurer.IntentionStateName} | HP: {adventurer.Health}/{adventurer.Stats.MaxHealth}";
 		}
 
 		if (_combatLabel is not null)
@@ -615,7 +615,7 @@ public partial class GameController : Node2D
 
 		if (_rewardLabel is not null)
 		{
-			_rewardLabel.Text = $"Gold: {adventurer.Gold} | XP: {adventurer.Experience} | Loops: {_completedLoops}";
+			_rewardLabel.Text = $"Gold: {adventurer.Gold} | XP: {adventurer.Experience}/{adventurer.XpToNextLevel} | Total XP: {adventurer.TotalExperience} | Loops: {_completedLoops}";
 		}
 	}
 

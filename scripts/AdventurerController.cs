@@ -359,7 +359,9 @@ public partial class AdventurerController : Node
 				{ "gold", defeatedMonster.GoldReward },
 				{ "experience", defeatedMonster.ExperienceReward },
 				{ "total_gold", _adventurer.Gold },
-				{ "total_experience", _adventurer.Experience }
+				{ "current_experience", _adventurer.Experience },
+				{ "xp_to_next_level", _adventurer.XpToNextLevel },
+				{ "total_experience", _adventurer.TotalExperience }
 			});
 		}
 

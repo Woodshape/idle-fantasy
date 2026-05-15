@@ -37,6 +37,8 @@ public partial class Adventurer : Node2D, ICombatant
 	public float StopDistance { get; set; } = 8.0f;
 
 	public int Experience { get; private set; }
+	public int TotalExperience { get; private set; }
+	public int XpToNextLevel => GetExperienceThresholdForLevel(Level);
 	public int Gold { get; private set; }
 	public int Health => Stats.CurrentHealth;
 	public Vector2? MoveTarget { get; private set; }
@@ -152,7 +154,8 @@ public partial class Adventurer : Node2D, ICombatant
 
 		Speed = speed ?? Speed;
 		StopDistance = stopDistance ?? StopDistance;
-		Experience = experience;
+		Experience = Math.Max(0, experience);
+		TotalExperience = Experience;
 		Gold = gold;
 		MoveTarget = null;
 		CurrentMonsterTarget = null;
@@ -281,7 +284,10 @@ public partial class Adventurer : Node2D, ICombatant
 	public void AddRewards(int gold, int experience)
 	{
 		Gold += gold;
-		Experience += experience;
+		int earnedExperience = Math.Max(0, experience);
+		Experience += earnedExperience;
+		TotalExperience += earnedExperience;
+		ProcessLevelUps(earnedExperience);
 		PublishState();
 	}
 
@@ -348,6 +354,9 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "role", Role.ToString() },
 			{ "level", Level },
 			{ "experience", Experience },
+			{ "current_experience", Experience },
+			{ "xp_to_next_level", XpToNextLevel },
+			{ "total_experience", TotalExperience },
 			{ "gold", Gold },
 			{ "health", Health },
 			{ "max_health", Stats.MaxHealth },
@@ -390,6 +399,11 @@ public partial class Adventurer : Node2D, ICombatant
 		}
 
 		TestBridge.Instance.EmitState("adventurer", state);
+
+		string definitionStateName = string.IsNullOrWhiteSpace(DefinitionId)
+			? $"adventurer:{AdventurerName}"
+			: $"adventurer:{DefinitionId}";
+		TestBridge.Instance.EmitState(definitionStateName, state);
 	}
 
 	private void UpdateHealthBar()
@@ -412,6 +426,121 @@ public partial class Adventurer : Node2D, ICombatant
 	{
 		Stats = Stats with { CurrentHealth = Stats.MaxHealth };
 	}
+
+	private void ProcessLevelUps(int earnedExperience)
+	{
+		while (Experience >= XpToNextLevel)
+		{
+			int oldLevel = Level;
+			int threshold = XpToNextLevel;
+			int xpBeforeLevelUp = Experience;
+			CombatStats statsBefore = Stats;
+
+			Level++;
+			Experience -= threshold;
+
+			StatGrowth growth = GetGrowthForRole(Role, Level);
+			ApplyGrowth(growth);
+			UpdateHealthBar();
+
+			EmitLevelUpEvent(
+				oldLevel,
+				Level,
+				xpBeforeLevelUp,
+				Experience,
+				threshold,
+				earnedExperience,
+				growth,
+				statsBefore,
+				Stats);
+		}
+	}
+
+	private void ApplyGrowth(StatGrowth growth)
+	{
+		int maxHealth = Stats.MaxHealth + growth.MaxHealth;
+		int currentHealth = IsAlive
+			? Mathf.Min(maxHealth, Stats.CurrentHealth + Math.Max(0, growth.MaxHealth))
+			: Stats.CurrentHealth;
+
+		Stats = Stats with
+		{
+			MaxHealth = maxHealth,
+			CurrentHealth = currentHealth,
+			Attack = Stats.Attack + growth.Attack,
+			Defense = Stats.Defense + growth.Defense
+		};
+	}
+
+	private void EmitLevelUpEvent(
+		int oldLevel,
+		int newLevel,
+		int xpBeforeLevelUp,
+		int xpAfterLevelUp,
+		int threshold,
+		int earnedExperience,
+		StatGrowth growth,
+		CombatStats statsBefore,
+		CombatStats statsAfter)
+	{
+		TestBridge.Instance?.EmitEvent("adventurer_level_up", new GDict
+		{
+			{ "source", nameof(Adventurer) },
+			{ "adventurer", AdventurerName },
+			{ "definition_id", DefinitionId },
+			{ "role", Role.ToString() },
+			{ "old_level", oldLevel },
+			{ "new_level", newLevel },
+			{ "xp_before", xpBeforeLevelUp },
+			{ "xp_after", xpAfterLevelUp },
+			{ "threshold", threshold },
+			{ "xp_to_next_level", XpToNextLevel },
+			{ "earned_experience", earnedExperience },
+			{ "total_experience", TotalExperience },
+			{ "changed_stats", new GDict
+				{
+					{ "max_health", growth.MaxHealth },
+					{ "current_health", statsAfter.CurrentHealth - statsBefore.CurrentHealth },
+					{ "attack", growth.Attack },
+					{ "defense", growth.Defense }
+				}
+			},
+			{ "stats_before", BuildStatsState(statsBefore) },
+			{ "stats_after", BuildStatsState(statsAfter) }
+		});
+	}
+
+	private static int GetExperienceThresholdForLevel(int level)
+	{
+		return 20 + ((Math.Max(1, level) - 1) * 15);
+	}
+
+	private static StatGrowth GetGrowthForRole(CombatantRole role, int newLevel)
+	{
+		return role switch
+		{
+			CombatantRole.Tank => new StatGrowth(6, 1, 1),
+			CombatantRole.Support => new StatGrowth(5, 1, newLevel % 2 == 0 ? 1 : 0),
+			_ => new StatGrowth(4, 2, newLevel % 2 == 0 ? 1 : 0)
+		};
+	}
+
+	private static GDict BuildStatsState(CombatStats stats)
+	{
+		return new GDict
+		{
+			{ "max_health", stats.MaxHealth },
+			{ "current_health", stats.CurrentHealth },
+			{ "attack", stats.Attack },
+			{ "defense", stats.Defense },
+			{ "accuracy", stats.Accuracy },
+			{ "evasion", stats.Evasion },
+			{ "initiative", stats.Initiative },
+			{ "attack_speed", stats.AttackSpeedTicks }
+		};
+	}
+
+	private readonly record struct StatGrowth(int MaxHealth, int Attack, int Defense);
 
 	private void EnsureSelectionOutline()
 	{
