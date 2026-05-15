@@ -118,6 +118,7 @@ public partial class Town : Node2D
 
 		if (cost > 0)
 		{
+			(GetTree().CurrentScene as GameController)?.AddPlayerGoldFromTown(cost, "paid_recovery", adventurer.AdventurerName);
 			EmitGoldSpent(adventurer, cost, goldBefore);
 		}
 

@@ -528,7 +528,17 @@ public partial class TestBridge : Node
 				if (node is Control control)
 				{
 					Vector2 controlPosition = control.GetGlobalRect().GetCenter();
-					InjectViewportClick(controlPosition);
+					if (control is BaseButton button)
+					{
+						if (!button.Disabled)
+						{
+							button.EmitSignal(BaseButton.SignalName.Pressed);
+						}
+					}
+					else
+					{
+						InjectViewportClick(controlPosition);
+					}
 					EmitCommandCompleted(commandId, commandName, new GDict
 					{
 						{ "path", nodePath },
@@ -575,6 +585,32 @@ public partial class TestBridge : Node
 					{ "max_health", adventurer.Stats.MaxHealth },
 					{ "gold", adventurer.Gold }
 				});
+				break;
+			}
+			case "hire_adventurer":
+			{
+				string definitionId = TryGetString(command, "definition_id", out string parsedDefinitionId)
+					? parsedDefinitionId
+					: string.Empty;
+				GameController game = GetTree().CurrentScene as GameController
+					?? throw new InvalidOperationException("hire_adventurer requires a GameController current scene.");
+				GDict result = game.RequestHireAdventurer(definitionId);
+				EmitCommandCompleted(commandId, commandName, result);
+				break;
+			}
+			case "set_gold":
+			{
+				if (!TryGetLong(command, "amount", out long rawAmount) &&
+					!TryGetLong(command, "gold", out rawAmount) &&
+					!TryGetLong(command, "value", out rawAmount))
+				{
+					throw new InvalidOperationException("set_gold requires an amount field.");
+				}
+
+				GameController game = GetTree().CurrentScene as GameController
+					?? throw new InvalidOperationException("set_gold requires a GameController current scene.");
+				GDict result = game.SetPlayerGold((int)Math.Max(0L, rawAmount));
+				EmitCommandCompleted(commandId, commandName, result);
 				break;
 			}
 			default:

@@ -74,6 +74,7 @@ required_events=(
 	"town_service_unaffordable"
 	"town_service_used"
 	"gold_spent"
+	"player_gold_received"
 	"game_loop_completed"
 	"monster_wave_cleared"
 	"monster_wave_respawned"
@@ -112,9 +113,10 @@ fi
 
 gold_spent_line="$(grep '"type":"gold_spent"' "${EVENTS_FILE}" | grep '"service":"paid_recovery"' | head -n 1 || true)"
 town_service_line="$(grep '"type":"town_service_used"' "${EVENTS_FILE}" | grep '"service":"paid_recovery"' | head -n 1 || true)"
+player_gold_received_line="$(grep '"type":"player_gold_received"' "${EVENTS_FILE}" | grep '"service":"paid_recovery"' | head -n 1 || true)"
 
-if [[ -z "${gold_spent_line}" || -z "${town_service_line}" ]]; then
-	echo "Missing paid recovery town service and gold spend evidence. Session: ${SESSION_DIR}" >&2
+if [[ -z "${gold_spent_line}" || -z "${town_service_line}" || -z "${player_gold_received_line}" ]]; then
+	echo "Missing paid recovery town service, gold spend, and player gold receipt evidence. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 
@@ -123,10 +125,19 @@ gold_before="$(printf '%s\n' "${gold_spent_line}" | sed -n 's/.*"gold_before":\(
 gold_after="$(printf '%s\n' "${gold_spent_line}" | sed -n 's/.*"gold_after":\([0-9]*\).*/\1/p')"
 town_service_cost="$(printf '%s\n' "${town_service_line}" | sed -n 's/.*"cost":\([0-9]*\).*/\1/p')"
 town_service_healed="$(printf '%s\n' "${town_service_line}" | sed -n 's/.*"healed":\([0-9]*\).*/\1/p')"
+player_gold_received_amount="$(printf '%s\n' "${player_gold_received_line}" | sed -n 's/.*"amount":\([0-9]*\).*/\1/p')"
+player_gold_before="$(printf '%s\n' "${player_gold_received_line}" | sed -n 's/.*"gold_before":\([0-9]*\).*/\1/p')"
+player_gold_after="$(printf '%s\n' "${player_gold_received_line}" | sed -n 's/.*"gold_after":\([0-9]*\).*/\1/p')"
 
 if ! awk -v amount="${gold_spent_amount}" -v before="${gold_before}" -v after="${gold_after}" -v cost="${town_service_cost}" -v healed="${town_service_healed}" \
 	'BEGIN { exit !(amount == 5 && cost == 5 && before >= amount && after == before - amount && healed > 0) }'; then
 	echo "Paid recovery did not spend gold and heal as expected. amount=${gold_spent_amount:-missing} before=${gold_before:-missing} after=${gold_after:-missing} cost=${town_service_cost:-missing} healed=${town_service_healed:-missing}. Session: ${SESSION_DIR}" >&2
+	exit 1
+fi
+
+if ! awk -v amount="${player_gold_received_amount}" -v before="${player_gold_before}" -v after="${player_gold_after}" -v spent="${gold_spent_amount}" \
+	'BEGIN { exit !(amount == spent && after == before + amount) }'; then
+	echo "Paid recovery did not credit player gold as expected. amount=${player_gold_received_amount:-missing} before=${player_gold_before:-missing} after=${player_gold_after:-missing} spent=${gold_spent_amount:-missing}. Session: ${SESSION_DIR}" >&2
 	exit 1
 fi
 

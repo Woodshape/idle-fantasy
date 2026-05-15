@@ -36,6 +36,12 @@ public partial class GameController : Node2D
 	[Export]
 	public bool AutoSpawnDefaultMonsters { get; set; } = true;
 
+	[Export]
+	public int StartingPlayerGold { get; set; } = 60;
+
+	[Export]
+	public int HireCost { get; set; } = 20;
+
 	private Town? _town;
 	private Adventurer? _adventurer;
 	private readonly List<Adventurer> _adventurers = new();
@@ -43,6 +49,8 @@ public partial class GameController : Node2D
 	private Label? _stateLabel;
 	private Label? _combatLabel;
 	private Label? _rewardLabel;
+	private Label? _playerGoldLabel;
+	private Button? _hireAdventurerButton;
 	private int _completedLoops;
 	private bool _loopStopped;
 	private double _simulationAccumulator;
@@ -51,6 +59,9 @@ public partial class GameController : Node2D
 	private double _monsterWaveRespawnTimer;
 	private ICombatant? _selectedCombatant;
 	private bool _contentLibraryValid;
+	private int _playerGold;
+	private int _hiredAdventurerSequence;
+	private readonly RandomNumberGenerator _hireRng = new();
 	private ICombatLoadoutSource _loadoutSource = new FallbackLoadoutSource();
 
 	public Town? Town => _town;
@@ -59,11 +70,15 @@ public partial class GameController : Node2D
 	public int CompletedLoops => _completedLoops;
 	public bool CompletedOnce => _completedLoops > 0;
 	public long SimulationTickCount => _simulationTickCount;
+	public int PlayerGold => _playerGold;
+	public int CurrentHireCost => GetHireCostForNextAdventurer();
 
 	public override void _Ready()
 	{
+		_hireRng.Randomize();
 		_town = GetNodeOrNull<Town>(TownPath);
 		_adventurer = GetNodeOrNull<Adventurer>(AdventurerPath);
+		_playerGold = Math.Max(0, StartingPlayerGold);
 		Node monsterContainer = GetOrCreateMonsterContainer();
 		_monsters.Clear();
 		ValidateContentLibrary();
@@ -109,6 +124,13 @@ public partial class GameController : Node2D
 		_stateLabel = GetNodeOrNull<Label>("Hud/Panel/VBoxContainer/StateLabel");
 		_combatLabel = GetNodeOrNull<Label>("Hud/Panel/VBoxContainer/CombatLabel");
 		_rewardLabel = GetNodeOrNull<Label>("Hud/Panel/VBoxContainer/RewardLabel");
+		_playerGoldLabel = GetNodeOrNull<Label>("Hud/Panel/VBoxContainer/HiringRow/PlayerGoldLabel");
+		_hireAdventurerButton = GetNodeOrNull<Button>("Hud/Panel/VBoxContainer/HiringRow/HireAdventurerButton");
+
+		if (_hireAdventurerButton is not null)
+		{
+			_hireAdventurerButton.Pressed += OnHireAdventurerPressed;
+		}
 
 		UpdateSelectionOutlines();
 		UpdateHud();
@@ -233,6 +255,17 @@ public partial class GameController : Node2D
 		AdventurerDefinition definition,
 		Vector2 position)
 	{
+		string nodeName = string.IsNullOrWhiteSpace(spawn.NodeName) ? definition.DisplayName : spawn.NodeName;
+		string displayName = string.IsNullOrWhiteSpace(spawn.DisplayNameOverride) ? definition.DisplayName : spawn.DisplayNameOverride;
+		return SpawnRuntimeAdventurer(definition, nodeName, displayName, position);
+	}
+
+	private Adventurer? SpawnRuntimeAdventurer(
+		AdventurerDefinition definition,
+		string nodeName,
+		string displayName,
+		Vector2 position)
+	{
 		if (AdventurerScene is null)
 		{
 			GD.PushError("AdventurerScene is not assigned; cannot spawn runtime adventurer.");
@@ -240,8 +273,8 @@ public partial class GameController : Node2D
 		}
 
 		Adventurer adventurer = AdventurerScene.Instantiate<Adventurer>();
-		adventurer.Name = string.IsNullOrWhiteSpace(spawn.NodeName) ? definition.DisplayName : spawn.NodeName;
-		adventurer.SetupFromDefinition(definition, spawn.DisplayNameOverride, position);
+		adventurer.Name = nodeName;
+		adventurer.SetupFromDefinition(definition, displayName, position);
 		AddChild(adventurer);
 		_adventurers.Add(adventurer);
 		adventurer.CombatController?.SetLoadoutSource(_loadoutSource);
@@ -481,6 +514,250 @@ public partial class GameController : Node2D
 			.ToArray();
 	}
 
+	public GDict SetPlayerGold(int amount)
+	{
+		int goldBefore = _playerGold;
+		_playerGold = Math.Max(0, amount);
+		UpdateHiringHud();
+		PublishState();
+
+		GDict result = new()
+		{
+			{ "success", true },
+			{ "gold_before", goldBefore },
+			{ "gold_after", _playerGold },
+			{ "player_gold", _playerGold },
+			{ "hire_cost", CurrentHireCost }
+		};
+
+		EmitBridgeEvent("player_gold_set", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "gold_before", goldBefore },
+			{ "gold_after", _playerGold },
+			{ "player_gold", _playerGold },
+			{ "hire_cost", CurrentHireCost }
+		});
+
+		return result;
+	}
+
+	public GDict AddPlayerGoldFromTown(int amount, string service, string payerName)
+	{
+		int receivedAmount = Math.Max(0, amount);
+		int goldBefore = _playerGold;
+		_playerGold += receivedAmount;
+		UpdateHiringHud();
+		PublishState();
+
+		GDict result = new()
+		{
+			{ "success", true },
+			{ "amount", receivedAmount },
+			{ "service", service },
+			{ "payer", payerName },
+			{ "gold_before", goldBefore },
+			{ "gold_after", _playerGold },
+			{ "player_gold", _playerGold },
+			{ "hire_cost", CurrentHireCost }
+		};
+
+		EmitBridgeEvent("player_gold_received", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "amount", receivedAmount },
+			{ "service", service },
+			{ "payer", payerName },
+			{ "gold_before", goldBefore },
+			{ "gold_after", _playerGold },
+			{ "player_gold", _playerGold },
+			{ "hire_cost", CurrentHireCost }
+		});
+
+		return result;
+	}
+
+	public GDict RequestHireAdventurer(string definitionId)
+	{
+		int cost = CurrentHireCost;
+		int goldBefore = _playerGold;
+		string normalizedDefinitionId = definitionId.Trim();
+		bool randomRequested = string.IsNullOrWhiteSpace(normalizedDefinitionId);
+
+		EmitBridgeEvent("hire_requested", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "definition_id", normalizedDefinitionId },
+			{ "random", randomRequested },
+			{ "cost", cost },
+			{ "player_gold", _playerGold }
+		});
+
+		if (!_contentLibraryValid || ContentLibrary is null)
+		{
+			return FailHire(normalizedDefinitionId, "content_unavailable", cost);
+		}
+
+		AdventurerDefinition? definition = randomRequested
+			? PickRandomAdventurerDefinition()
+			: ContentLibrary.TryGetAdventurer(normalizedDefinitionId, out AdventurerDefinition? parsedDefinition) ? parsedDefinition : null;
+
+		if (definition is null)
+		{
+			return FailHire(normalizedDefinitionId, randomRequested ? "no_adventurers_available" : "unknown_definition", cost);
+		}
+
+		normalizedDefinitionId = definition.DefinitionId;
+
+		if (AdventurerScene is null)
+		{
+			return FailHire(normalizedDefinitionId, "missing_adventurer_scene", cost);
+		}
+
+		if (_playerGold < cost)
+		{
+			return FailHire(normalizedDefinitionId, "insufficient_gold", cost);
+		}
+
+		int hireNumber = ++_hiredAdventurerSequence;
+		string baseName = string.IsNullOrWhiteSpace(definition.DisplayName) ? normalizedDefinitionId : definition.DisplayName;
+		string displayName = $"{baseName} Hire {hireNumber}";
+		string nodeName = $"Hired{SanitizeNodeName(baseName)}{hireNumber}";
+		Vector2 spawnPosition = GetHireSpawnPosition(hireNumber);
+		Adventurer? adventurer = SpawnRuntimeAdventurer(definition, nodeName, displayName, spawnPosition);
+
+		if (adventurer is null)
+		{
+			_hiredAdventurerSequence--;
+			return FailHire(normalizedDefinitionId, "spawn_failed", cost);
+		}
+
+		_playerGold -= cost;
+		EmitBridgeEvent("gold_spent", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "spender", "player" },
+			{ "spender_kind", "player" },
+			{ "service", "hire_adventurer" },
+			{ "definition_id", normalizedDefinitionId },
+			{ "amount", cost },
+			{ "gold_before", goldBefore },
+			{ "gold_after", _playerGold }
+		});
+
+		GDict result = new()
+		{
+			{ "success", true },
+			{ "definition_id", normalizedDefinitionId },
+			{ "adventurer", adventurer.AdventurerName },
+			{ "node_name", adventurer.Name.ToString() },
+			{ "cost", cost },
+			{ "player_gold_before", goldBefore },
+			{ "player_gold_after", _playerGold },
+			{ "next_hire_cost", CurrentHireCost },
+			{ "adventurer_count", _adventurers.Count },
+			{ "position", BridgePayload.VectorToArray(adventurer.GlobalPosition) }
+		};
+
+		EmitBridgeEvent("adventurer_hired", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "definition_id", normalizedDefinitionId },
+			{ "adventurer", adventurer.AdventurerName },
+			{ "node_name", adventurer.Name.ToString() },
+			{ "cost", cost },
+			{ "player_gold_before", goldBefore },
+			{ "player_gold_after", _playerGold },
+			{ "next_hire_cost", CurrentHireCost },
+			{ "adventurer_count", _adventurers.Count },
+			{ "position", BridgePayload.VectorToArray(adventurer.GlobalPosition) }
+		});
+
+		UpdateSelectionOutlines();
+		UpdateHud();
+		PublishState();
+		adventurer.PublishState();
+		return result;
+	}
+
+	private GDict FailHire(string definitionId, string reason, int cost)
+	{
+		GDict result = new()
+		{
+			{ "success", false },
+			{ "definition_id", definitionId },
+			{ "reason", reason },
+			{ "cost", cost },
+			{ "player_gold", _playerGold },
+			{ "next_hire_cost", CurrentHireCost },
+			{ "adventurer_count", _adventurers.Count }
+		};
+
+		EmitBridgeEvent("hire_failed", new GDict
+		{
+			{ "source", nameof(GameController) },
+			{ "definition_id", definitionId },
+			{ "reason", reason },
+			{ "cost", cost },
+			{ "player_gold", _playerGold },
+			{ "next_hire_cost", CurrentHireCost },
+			{ "adventurer_count", _adventurers.Count }
+		});
+		PublishState();
+		return result;
+	}
+
+	private void OnHireAdventurerPressed()
+	{
+		RequestHireAdventurer(string.Empty);
+	}
+
+	private AdventurerDefinition? PickRandomAdventurerDefinition()
+	{
+		if (ContentLibrary is null)
+		{
+			return null;
+		}
+
+		AdventurerDefinition[] definitions = ContentLibrary.Adventurers
+			.Where(definition => definition is not null)
+			.ToArray();
+
+		if (definitions.Length == 0)
+		{
+			return null;
+		}
+
+		return definitions[_hireRng.RandiRange(0, definitions.Length - 1)];
+	}
+
+	private int GetHireCostForNextAdventurer()
+	{
+		int baseCost = Math.Max(0, HireCost);
+
+		if (baseCost == 0)
+		{
+			return 0;
+		}
+
+		int multiplier = 1 << Math.Min(_hiredAdventurerSequence, 20);
+		return baseCost * multiplier;
+	}
+
+	private Vector2 GetHireSpawnPosition(int hireNumber)
+	{
+		Vector2 townPosition = _town?.ReturnPosition ?? Vector2.Zero;
+		int lane = (hireNumber - 1) % 5;
+		int row = (hireNumber - 1) / 5;
+		return townPosition + new Vector2(-56.0f - (row * 24.0f), -48.0f + (lane * 24.0f));
+	}
+
+	private static string SanitizeNodeName(string value)
+	{
+		string sanitized = new(value.Where(char.IsLetterOrDigit).ToArray());
+		return string.IsNullOrWhiteSpace(sanitized) ? "Adventurer" : sanitized;
+	}
+
 	public bool TryAddAggroMonsterToEncounter(Monster monster, Adventurer aggroTarget, string aggroTrigger, long currentTick, string actionId = "")
 	{
 		if (!monster.IsAlive || !aggroTarget.IsAlive)
@@ -582,6 +859,7 @@ public partial class GameController : Node2D
 
 	private void UpdateHud()
 	{
+		UpdateHiringHud();
 		ICombatant? selectedCombatant = GetSelectedCombatant();
 
 		if (selectedCombatant is null)
@@ -637,6 +915,25 @@ public partial class GameController : Node2D
 		if (_rewardLabel is not null)
 		{
 			_rewardLabel.Text = $"Gold Reward: {monster.GoldReward} | XP Reward: {monster.ExperienceReward} | Loops: {_completedLoops}";
+		}
+	}
+
+	private void UpdateHiringHud()
+	{
+		int currentHireCost = CurrentHireCost;
+
+		if (_playerGoldLabel is not null)
+		{
+			_playerGoldLabel.Text = $"Gold: {_playerGold}";
+		}
+
+		if (_hireAdventurerButton is not null)
+		{
+			_hireAdventurerButton.Text = $"Hire Adventurer ({currentHireCost}g)";
+			_hireAdventurerButton.Disabled = !_contentLibraryValid
+				|| ContentLibrary is null
+				|| ContentLibrary.Adventurers.Length == 0
+				|| _playerGold < currentHireCost;
 		}
 	}
 
@@ -738,6 +1035,8 @@ public partial class GameController : Node2D
 			{ "loop_stopped", _loopStopped },
 			{ "living_adventurers", _adventurers.Count(adventurer => adventurer.IsAlive) },
 			{ "adventurer_count", _adventurers.Count },
+			{ "player_gold", _playerGold },
+			{ "hire_cost", CurrentHireCost },
 			{ "living_monsters", _monsters.Count(monster => monster.IsAlive) },
 			{ "monster_count", _monsters.Count },
 			{ "monster_wave_respawn_pending", _monsterWaveRespawnPending },

@@ -24,7 +24,7 @@ script = ExtResource("5_7r4gi")
 offset_left = 12.0
 offset_top = 12.0
 offset_right = 430.0
-offset_bottom = 118.0
+offset_bottom = 150.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Hud/Panel" unique_id=1666019448]
 layout_mode = 2
@@ -40,3 +40,15 @@ text = "Combat"
 [node name="RewardLabel" type="Label" parent="Hud/Panel/VBoxContainer" unique_id=1637253519]
 layout_mode = 2
 text = "Rewards"
+
+[node name="HiringRow" type="HBoxContainer" parent="Hud/Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="PlayerGoldLabel" type="Label" parent="Hud/Panel/VBoxContainer/HiringRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Gold: 0"
+
+[node name="HireAdventurerButton" type="Button" parent="Hud/Panel/VBoxContainer/HiringRow"]
+layout_mode = 2
+text = "Hire Adventurer"

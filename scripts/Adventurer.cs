@@ -370,6 +370,7 @@ public partial class Adventurer : Node2D, ICombatant
 		{
 			{ "source", nameof(Adventurer) },
 			{ "name", AdventurerName },
+			{ "combatant_id", CombatantId },
 			{ "archetype", Archetype.ToString() },
 			{ "role", Role.ToString() },
 			{ "level", Level },
@@ -419,6 +420,7 @@ public partial class Adventurer : Node2D, ICombatant
 		}
 
 		TestBridge.Instance.EmitState("adventurer", state);
+		TestBridge.Instance.EmitState(CombatantId, state);
 
 		string definitionStateName = string.IsNullOrWhiteSpace(DefinitionId)
 			? $"adventurer:{AdventurerName}"
