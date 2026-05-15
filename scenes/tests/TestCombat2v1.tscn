@@ -4,6 +4,9 @@
 [ext_resource type="PackedScene" path="res://scenes/Adventurer.tscn" id="2_1wm3o"]
 [ext_resource type="PackedScene" path="res://scenes/Monster.tscn" id="3_1aybq"]
 [ext_resource type="Script" path="res://scripts/Town.cs" id="4_v871i"]
+[ext_resource type="Resource" path="res://data/adventurers/warrior.tres" id="5_warrior"]
+[ext_resource type="Resource" path="res://data/adventurers/mage.tres" id="6_mage"]
+[ext_resource type="Resource" path="res://data/monsters/slime.tres" id="7_slime"]
 
 [node name="TestCombat2v1" type="Node2D" unique_id=766809739]
 script = ExtResource("1_xo1yv")
@@ -20,27 +23,19 @@ script = ExtResource("4_v871i")
 [node name="Warrior" parent="." unique_id=637766807 instance=ExtResource("2_1wm3o")]
 position = Vector2(430, 270)
 AdventurerName = "Warrior"
-MaxHealth = 36
-Attack = 8
-Accuracy = 0.22
-Defense = 2
-Evasion = 0.12
-Initiative = 3
+Definition = ExtResource("5_warrior")
 
 [node name="Mage" parent="." unique_id=1931397600 instance=ExtResource("2_1wm3o")]
 position = Vector2(430, 330)
 AdventurerName = "Mage"
 Archetype = 1
-MaxHealth = 32
-Accuracy = 0.3
-Evasion = 0.18
-Initiative = 5
-AttackSpeed = 5
+Definition = ExtResource("6_mage")
 
 [node name="Monsters" type="Node2D" parent="." unique_id=156686184]
 
 [node name="Slime" parent="Monsters" unique_id=203811153 instance=ExtResource("3_1aybq")]
 position = Vector2(560, 300)
+Definition = ExtResource("7_slime")
 
 [node name="Hud" type="CanvasLayer" parent="." unique_id=450777919]
 

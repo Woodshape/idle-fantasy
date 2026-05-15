@@ -24,7 +24,10 @@ public partial class AdventurerController : Node
 	public float MeleeApproachDistance { get; set; } = 42.0f;
 
 	[Export(PropertyHint.Range, "0.0,1.0,0.05")]
-	public float RestHealthRatio { get; set; } = 0.60f;
+	public float RestHealthRatio { get; set; } = 0.45f;
+
+	[Export(PropertyHint.Range, "0.0,1.0,0.05")]
+	public float DamageDealerRestHealthRatio { get; set; } = 0.70f;
 
 	[Export]
 	public int MaxEncounterMonsters { get; set; } = 1;
@@ -372,8 +375,18 @@ public partial class AdventurerController : Node
 			return true;
 		}
 
-		int restHealth = Mathf.CeilToInt(_adventurer.MaxHealth * RestHealthRatio);
+		int restHealth = Mathf.CeilToInt(_adventurer.Stats.MaxHealth * GetRestHealthRatio());
 		return _adventurer.Health <= restHealth;
+	}
+
+	private float GetRestHealthRatio()
+	{
+		if (_adventurer?.Role == CombatantRole.DamageDealer)
+		{
+			return DamageDealerRestHealthRatio;
+		}
+
+		return RestHealthRatio;
 	}
 
 	private void UpdateReturn(double delta)

@@ -4,6 +4,8 @@
 [ext_resource type="PackedScene" path="res://scenes/Adventurer.tscn" id="2_naw2q"]
 [ext_resource type="PackedScene" path="res://scenes/Monster.tscn" id="3_5uja7"]
 [ext_resource type="Script" path="res://scripts/Town.cs" id="4_mqsm7"]
+[ext_resource type="Resource" path="res://data/adventurers/warrior.tres" id="5_warrior"]
+[ext_resource type="Resource" path="res://data/monsters/slime.tres" id="6_slime"]
 
 [node name="TestCombat1v1" type="Node2D" unique_id=370065387]
 script = ExtResource("1_b7urs")
@@ -20,17 +22,13 @@ script = ExtResource("4_mqsm7")
 [node name="Warrior" parent="." unique_id=534549237 instance=ExtResource("2_naw2q")]
 position = Vector2(300, 300)
 AdventurerName = "Warrior"
-MaxHealth = 36
-Attack = 8
-Accuracy = 0.22
-Defense = 2
-Evasion = 0.12
-Initiative = 3
+Definition = ExtResource("5_warrior")
 
 [node name="Monsters" type="Node2D" parent="." unique_id=1050059431]
 
 [node name="Slime" parent="Monsters" unique_id=773344853 instance=ExtResource("3_5uja7")]
 position = Vector2(560, 300)
+Definition = ExtResource("6_slime")
 
 [node name="Hud" type="CanvasLayer" parent="." unique_id=1201677361]
 

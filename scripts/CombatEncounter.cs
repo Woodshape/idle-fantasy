@@ -375,9 +375,9 @@ public sealed class CombatEncounter
 			combatant is Adventurer adventurer2 ? adventurer2.RecoveryTicksRemaining : combatant is Monster monster2 ? monster2.RecoveryTicksRemaining : 0,
 			new System.Collections.Generic.Dictionary<string, int>(skillCooldowns, StringComparer.Ordinal),
 			combatant.IsAlive,
-			combatant.AttackSpeed,
+			combatant.Stats.AttackSpeedTicks,
 			combatant.Health,
-			combatant.MaxHealth);
+			combatant.Stats.MaxHealth);
 	}
 
 	private static string GetCombatantState(CombatActionRunner? runner, ICombatant combatant)

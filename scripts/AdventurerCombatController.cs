@@ -90,8 +90,8 @@ public partial class AdventurerCombatController : Node
 			{ "monsters", BuildCombatantNames(_encounter.Monsters) },
 			{ "adventurer_count", _encounter.Adventurers.Count },
 			{ "monster_count", _encounter.Monsters.Count },
-			{ "adventurer_attack_speed_ticks", _encounter.Adventurers[0].AttackSpeed },
-			{ "monster_attack_speed_ticks", _encounter.Monsters[0].AttackSpeed },
+			{ "adventurer_attack_speed_ticks", _encounter.Adventurers[0].Stats.AttackSpeedTicks },
+			{ "monster_attack_speed_ticks", _encounter.Monsters[0].Stats.AttackSpeedTicks },
 			{ "tick_interval_seconds", 0.25 },
 			{ "timing_model", "simulation_ticks" }
 		});

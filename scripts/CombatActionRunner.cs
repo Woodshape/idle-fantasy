@@ -489,12 +489,14 @@ public sealed class CombatActionRunner
 			return new ActionResolution(false, 0);
 		}
 
-		double accuracyAdvantage = _owner.Accuracy - _target.Evasion;
+		CombatStats ownerStats = _owner.Stats;
+		CombatStats targetStats = _target.Stats;
+		double accuracyAdvantage = ownerStats.Accuracy - targetStats.Evasion;
 		double hitChance = Math.Clamp(BaseHitChance + accuracyAdvantage, MinHitChance, MaxHitChance);
 		double roll = _rng.Randf();
 		bool hit = roll <= hitChance;
-		int rawDamage = (int)Math.Round(_owner.Attack * action.DamageMultiplier, MidpointRounding.AwayFromZero);
-		int damage = hit ? Math.Max(1, rawDamage - _target.Defense) : 0;
+		int rawDamage = (int)Math.Round(ownerStats.Attack * action.DamageMultiplier, MidpointRounding.AwayFromZero);
+		int damage = hit ? Math.Max(1, rawDamage - targetStats.Defense) : 0;
 
 		GD.Print($"ATTACK_ROLL tick={tick} attacker={_owner.DisplayName} defender={_target.DisplayName} action={action.ActionId} hit_chance={hitChance:0.00} roll={roll:0.00} hit={hit} damage={damage}");
 		_emitEvent("attack_roll_resolved", new GDict
@@ -575,7 +577,7 @@ public sealed class CombatActionRunner
 
 	private int GetBasicAttackCooldownTicks()
 	{
-		return Math.Max(1, _owner.AttackSpeed);
+		return Math.Max(1, _owner.Stats.AttackSpeedTicks);
 	}
 
 	private void CancelQueuedAction(CombatAction action, long tick, string reason, double? distanceToTarget = null)

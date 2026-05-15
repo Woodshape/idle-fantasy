@@ -8,35 +8,19 @@ using GDict = Godot.Collections.Dictionary;
 
 public partial class Monster : Node2D, ICombatant
 {
+	private const string DefaultMonsterName = "Slime";
+
 	[Export]
-	public string MonsterName { get; set; } = "Slime";
+	public string MonsterName { get; set; } = DefaultMonsterName;
 
 	[Export]
 	public MonsterDefinition? Definition { get; set; }
 
 	[Export]
+	public CombatantRole Role { get; set; } = CombatantRole.DamageDealer;
+
+	[Export]
 	public int Level { get; set; } = 1;
-
-	[Export]
-	public int MaxHealth { get; set; } = 23;
-
-	[Export]
-	public int Attack { get; set; } = 6;
-
-	[Export]
-	public double Accuracy { get; set; } = 0.35;
-
-	[Export]
-	public int Defense { get; set; } = 1;
-
-	[Export]
-	public double Evasion { get; set; } = 0.0;
-
-	[Export]
-	public int Initiative { get; set; } = 1;
-
-	[Export]
-	public int AttackSpeed { get; set; } = 8;
 
 	[Export]
 	public int GoldReward { get; set; } = 7;
@@ -53,13 +37,13 @@ public partial class Monster : Node2D, ICombatant
 	[Export]
 	public float AggroAttackDistance { get; set; } = 42.0f;
 
-	public int Health { get; private set; }
+	public int Health => Stats.CurrentHealth;
 	public CombatState CombatState { get; private set; } = CombatState.OutOfCombat;
 	public bool IsAlive => Health > 0;
 	public string CombatantId => $"monster:{MonsterName}";
 	public string CombatantKind => "monster";
 	public string DisplayName => MonsterName;
-	public CombatStats Stats => new(Attack, Accuracy, Defense, Evasion, Initiative, AttackSpeed, MaxHealth, Health);
+	public CombatStats Stats { get; private set; }
 	public string CurrentCombatTargetName { get; private set; } = string.Empty;
 	public string QueuedActionId { get; private set; } = string.Empty;
 	public string ActiveActionId { get; private set; } = string.Empty;
@@ -91,12 +75,12 @@ public partial class Monster : Node2D, ICombatant
 		{
 			if (Definition is not null)
 			{
-				SetupFromDefinition(Definition, position: Position);
+				string? displayNameOverride = MonsterName == DefaultMonsterName ? null : MonsterName;
+				SetupFromDefinition(Definition, displayNameOverride, Position);
 			}
 			else
 			{
-				Health = MaxHealth;
-				_homePosition = Position;
+				throw new InvalidOperationException($"{nameof(Monster)} requires a definition or setup stats.");
 			}
 		}
 
@@ -118,11 +102,17 @@ public partial class Monster : Node2D, ICombatant
 
 	public CombatStats CreateStartingStats()
 	{
-		return new CombatStats(Attack, Accuracy, Defense, Evasion, Initiative, AttackSpeed, MaxHealth, MaxHealth);
+		if (!_hasSetup)
+		{
+			throw new InvalidOperationException($"{nameof(Monster)} starting stats are not available before setup.");
+		}
+
+		return Stats with { CurrentHealth = Stats.MaxHealth };
 	}
 
 	public void Setup(
 		string? monsterName = null,
+		CombatantRole? role = null,
 		int? level = null,
 		CombatStats? stats = null,
 		Vector2? position = null,
@@ -134,18 +124,15 @@ public partial class Monster : Node2D, ICombatant
 		string definitionId = "")
 	{
 		MonsterName = monsterName ?? MonsterName;
+		Role = role ?? Role;
 		Level = level ?? Level;
 
 		if (stats is CombatStats setupStats)
 		{
-			Attack = setupStats.Attack;
-			Accuracy = setupStats.Accuracy;
-			Defense = setupStats.Defense;
-			Evasion = setupStats.Evasion;
-			Initiative = setupStats.Initiative;
-			AttackSpeed = setupStats.AttackSpeedTicks;
-			MaxHealth = setupStats.MaxHealth;
-			Health = Mathf.Clamp(setupStats.CurrentHealth, 0, MaxHealth);
+			Stats = setupStats with
+			{
+				CurrentHealth = Mathf.Clamp(setupStats.CurrentHealth, 0, setupStats.MaxHealth)
+			};
 		}
 		else
 		{
@@ -208,6 +195,7 @@ public partial class Monster : Node2D, ICombatant
 		_loadout = definition.CombatLoadout?.ToRuntimeLoadout(definition.DefinitionId);
 		Setup(
 			monsterName: string.IsNullOrWhiteSpace(displayNameOverride) ? definition.DisplayName : displayNameOverride,
+			role: definition.Role,
 			level: definition.Level,
 			stats: definition.Stats.ToRuntimeStats(),
 			position: position,
@@ -233,7 +221,7 @@ public partial class Monster : Node2D, ICombatant
 		}
 
 		int previousHealth = Health;
-		Health = Mathf.Max(0, Health - Mathf.Max(0, amount));
+		SetCurrentHealth(Mathf.Max(0, Health - Mathf.Max(0, amount)));
 
 		if (Health <= 0)
 		{
@@ -303,7 +291,7 @@ public partial class Monster : Node2D, ICombatant
 
 	public void ResetForNextHunt()
 	{
-		Health = MaxHealth;
+		RestoreStatsToFullHealth();
 		Position = _homePosition;
 		AggroTarget = null;
 		_wasMovingToAggroTarget = false;
@@ -330,15 +318,16 @@ public partial class Monster : Node2D, ICombatant
 		{
 			{ "source", nameof(Monster) },
 			{ "name", MonsterName },
+			{ "role", Role.ToString() },
 			{ "level", Level },
 			{ "health", Health },
-			{ "max_health", MaxHealth },
-			{ "attack", Attack },
-			{ "accuracy", Accuracy },
-			{ "defense", Defense },
-			{ "evasion", Evasion },
-			{ "initiative", Initiative },
-			{ "attack_speed", AttackSpeed },
+			{ "max_health", Stats.MaxHealth },
+			{ "attack", Stats.Attack },
+			{ "accuracy", Stats.Accuracy },
+			{ "defense", Stats.Defense },
+			{ "evasion", Stats.Evasion },
+			{ "initiative", Stats.Initiative },
+			{ "attack_speed", Stats.AttackSpeedTicks },
 			{ "speed", Speed },
 			{ "aggro_range", AggroRange },
 			{ "aggro_attack_distance", AggroAttackDistance },
@@ -373,8 +362,18 @@ public partial class Monster : Node2D, ICombatant
 			return;
 		}
 
-		_healthBar.MaxValue = Mathf.Max(1, MaxHealth);
-		_healthBar.Value = Mathf.Clamp(Health, 0, MaxHealth);
+		_healthBar.MaxValue = Mathf.Max(1, Stats.MaxHealth);
+		_healthBar.Value = Mathf.Clamp(Health, 0, Stats.MaxHealth);
+	}
+
+	private void SetCurrentHealth(int health)
+	{
+		Stats = Stats with { CurrentHealth = Mathf.Clamp(health, 0, Stats.MaxHealth) };
+	}
+
+	private void RestoreStatsToFullHealth()
+	{
+		Stats = Stats with { CurrentHealth = Stats.MaxHealth };
 	}
 
 	private void UpdateProximityAggro(GameController game, long currentTick)

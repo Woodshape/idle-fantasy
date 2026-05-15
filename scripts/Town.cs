@@ -27,7 +27,7 @@ public partial class Town : Node2D
 			return false;
 		}
 
-		if (adventurer.Health >= adventurer.MaxHealth)
+		if (adventurer.Health >= adventurer.Stats.MaxHealth)
 		{
 			_recoveryProgress.Remove(adventurer.CombatantId);
 			EmitRecovered(adventurer);
@@ -50,7 +50,7 @@ public partial class Town : Node2D
 
 		if (healed > 0)
 		{
-			GD.Print($"TOWN_RECOVERY_TICK adventurer={adventurer.AdventurerName} town={DisplayName} healed={healed} health={adventurer.Health}/{adventurer.MaxHealth}");
+			GD.Print($"TOWN_RECOVERY_TICK adventurer={adventurer.AdventurerName} town={DisplayName} healed={healed} health={adventurer.Health}/{adventurer.Stats.MaxHealth}");
 			TestBridge.Instance?.EmitEvent("adventurer_recovery_tick", new GDict
 			{
 				{ "source", nameof(Town) },
@@ -58,11 +58,11 @@ public partial class Town : Node2D
 				{ "town", DisplayName },
 				{ "healed", healed },
 				{ "health", adventurer.Health },
-				{ "max_health", adventurer.MaxHealth }
+				{ "max_health", adventurer.Stats.MaxHealth }
 			});
 		}
 
-		if (adventurer.Health < adventurer.MaxHealth)
+		if (adventurer.Health < adventurer.Stats.MaxHealth)
 		{
 			return false;
 		}
@@ -81,7 +81,7 @@ public partial class Town : Node2D
 			{ "adventurer", adventurer.AdventurerName },
 			{ "town", DisplayName },
 			{ "health", adventurer.Health },
-			{ "max_health", adventurer.MaxHealth }
+			{ "max_health", adventurer.Stats.MaxHealth }
 		});
 	}
 

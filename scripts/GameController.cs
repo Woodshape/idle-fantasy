@@ -171,7 +171,8 @@ public partial class GameController : Node2D
 				nodeName: "Warrior",
 				adventurerName: "Warrior",
 				archetype: AdventurerArchetype.Warrior,
-				stats: new CombatStats(8, 0.22, 2, 0.12, 3, 4, 36, 36),
+				role: CombatantRole.Tank,
+				stats: new CombatStats(8, 0.24, 3, 0.18, 3, 4, 46, 46),
 				positionOffset: new Vector2(0.0f, -28.0f),
 				spriteModulate: new Color(0.25f, 0.55f, 1.0f));
 
@@ -187,7 +188,8 @@ public partial class GameController : Node2D
 				nodeName: "Mage",
 				adventurerName: "Mage",
 				archetype: AdventurerArchetype.Mage,
-				stats: new CombatStats(7, 0.30, 1, 0.18, 5, 5, 32, 32),
+				role: CombatantRole.DamageDealer,
+				stats: new CombatStats(13, 0.42, 2, 0.00, 5, 5, 30, 30),
 				positionOffset: new Vector2(0.0f, 28.0f),
 				spriteModulate: new Color(0.75f, 0.45f, 1.0f));
 		}
@@ -250,6 +252,7 @@ public partial class GameController : Node2D
 		string nodeName,
 		string adventurerName,
 		AdventurerArchetype archetype,
+		CombatantRole role,
 		CombatStats stats,
 		Vector2 positionOffset,
 		Color spriteModulate)
@@ -265,6 +268,7 @@ public partial class GameController : Node2D
 		adventurer.Setup(
 			adventurerName: adventurerName,
 			archetype: archetype,
+			role: role,
 			stats: stats,
 			position: (_town?.ReturnPosition ?? adventurer.Position) + positionOffset);
 		if (adventurer.GetNodeOrNull<Sprite2D>("Sprite2D") is Sprite2D sprite)
@@ -343,7 +347,7 @@ public partial class GameController : Node2D
 		monster.Name = nodeName;
 		monster.Setup(
 			monsterName: monsterName,
-			stats: monster.CreateStartingStats(),
+			stats: new CombatStats(7, 0.32, 2, 0.12, 1, 8, 45, 45),
 			position: position);
 		monsterContainer.AddChild(monster);
 		_monsters.Add(monster);
@@ -600,7 +604,7 @@ public partial class GameController : Node2D
 	{
 		if (_stateLabel is not null)
 		{
-			_stateLabel.Text = $"Adventurer: {adventurer.AdventurerName} | Role: {adventurer.Archetype} | Intention: {adventurer.IntentionStateName} | HP: {adventurer.Health}/{adventurer.MaxHealth}";
+			_stateLabel.Text = $"Adventurer: {adventurer.AdventurerName} | Role: {adventurer.Role} | Archetype: {adventurer.Archetype} | Intention: {adventurer.IntentionStateName} | HP: {adventurer.Health}/{adventurer.Stats.MaxHealth}";
 		}
 
 		if (_combatLabel is not null)
@@ -619,7 +623,7 @@ public partial class GameController : Node2D
 	{
 		if (_stateLabel is not null)
 		{
-			_stateLabel.Text = $"Monster: {monster.MonsterName} | HP: {monster.Health}/{monster.MaxHealth} | Alive: {monster.IsAlive}";
+			_stateLabel.Text = $"Monster: {monster.MonsterName} | HP: {monster.Health}/{monster.Stats.MaxHealth} | Alive: {monster.IsAlive}";
 		}
 
 		if (_combatLabel is not null)

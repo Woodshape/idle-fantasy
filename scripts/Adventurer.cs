@@ -13,8 +13,10 @@ public enum AdventurerArchetype
 
 public partial class Adventurer : Node2D, ICombatant
 {
+	private const string DefaultAdventurerName = "Mira";
+
 	[Export]
-	public string AdventurerName { get; set; } = "Mira";
+	public string AdventurerName { get; set; } = DefaultAdventurerName;
 
 	[Export]
 	public AdventurerDefinition? Definition { get; set; }
@@ -23,28 +25,10 @@ public partial class Adventurer : Node2D, ICombatant
 	public AdventurerArchetype Archetype { get; set; } = AdventurerArchetype.Warrior;
 
 	[Export]
+	public CombatantRole Role { get; set; } = CombatantRole.Tank;
+
+	[Export]
 	public int Level { get; set; } = 1;
-
-	[Export]
-	public int MaxHealth { get; set; } = 30;
-
-	[Export]
-	public int Attack { get; set; } = 7;
-
-	[Export]
-	public double Accuracy { get; set; } = 0.20;
-
-	[Export]
-	public int Defense { get; set; } = 1;
-
-	[Export]
-	public double Evasion { get; set; } = 0.15;
-
-	[Export]
-	public int Initiative { get; set; } = 4;
-
-	[Export]
-	public int AttackSpeed { get; set; } = 4;
 
 	[Export]
 	public float Speed { get; set; } = 120.0f;
@@ -54,7 +38,7 @@ public partial class Adventurer : Node2D, ICombatant
 
 	public int Experience { get; private set; }
 	public int Gold { get; private set; }
-	public int Health { get; private set; }
+	public int Health => Stats.CurrentHealth;
 	public Vector2? MoveTarget { get; private set; }
 	public Monster? CurrentMonsterTarget { get; private set; }
 	public AdventurerController? Controller { get; private set; }
@@ -65,7 +49,7 @@ public partial class Adventurer : Node2D, ICombatant
 	public string CombatantId => $"adventurer:{AdventurerName}";
 	public string CombatantKind => "adventurer";
 	public string DisplayName => AdventurerName;
-	public CombatStats Stats => new(Attack, Accuracy, Defense, Evasion, Initiative, AttackSpeed, MaxHealth, Health);
+	public CombatStats Stats { get; private set; }
 	public CombatState CombatState { get; private set; } = CombatState.OutOfCombat;
 	public string CurrentCombatTargetName { get; private set; } = string.Empty;
 	public string QueuedActionId { get; private set; } = string.Empty;
@@ -94,11 +78,12 @@ public partial class Adventurer : Node2D, ICombatant
 		{
 			if (Definition is not null)
 			{
-				SetupFromDefinition(Definition, position: Position);
+				string? displayNameOverride = AdventurerName == DefaultAdventurerName ? null : AdventurerName;
+				SetupFromDefinition(Definition, displayNameOverride, Position);
 			}
 			else
 			{
-				Health = MaxHealth;
+				throw new InvalidOperationException($"{nameof(Adventurer)} requires a definition or setup stats.");
 			}
 		}
 
@@ -122,12 +107,18 @@ public partial class Adventurer : Node2D, ICombatant
 
 	public CombatStats CreateStartingStats()
 	{
-		return new CombatStats(Attack, Accuracy, Defense, Evasion, Initiative, AttackSpeed, MaxHealth, MaxHealth);
+		if (!_hasSetup)
+		{
+			throw new InvalidOperationException($"{nameof(Adventurer)} starting stats are not available before setup.");
+		}
+
+		return Stats with { CurrentHealth = Stats.MaxHealth };
 	}
 
 	public void Setup(
 		string? adventurerName = null,
 		AdventurerArchetype? archetype = null,
+		CombatantRole? role = null,
 		int? level = null,
 		CombatStats? stats = null,
 		Vector2? position = null,
@@ -139,18 +130,15 @@ public partial class Adventurer : Node2D, ICombatant
 	{
 		AdventurerName = adventurerName ?? AdventurerName;
 		Archetype = archetype ?? Archetype;
+		Role = role ?? Role;
 		Level = level ?? Level;
 
 		if (stats is CombatStats setupStats)
 		{
-			Attack = setupStats.Attack;
-			Accuracy = setupStats.Accuracy;
-			Defense = setupStats.Defense;
-			Evasion = setupStats.Evasion;
-			Initiative = setupStats.Initiative;
-			AttackSpeed = setupStats.AttackSpeedTicks;
-			MaxHealth = setupStats.MaxHealth;
-			Health = Mathf.Clamp(setupStats.CurrentHealth, 0, MaxHealth);
+			Stats = setupStats with
+			{
+				CurrentHealth = Mathf.Clamp(setupStats.CurrentHealth, 0, setupStats.MaxHealth)
+			};
 		}
 		else
 		{
@@ -206,6 +194,7 @@ public partial class Adventurer : Node2D, ICombatant
 		Setup(
 			adventurerName: string.IsNullOrWhiteSpace(displayNameOverride) ? definition.DisplayName : displayNameOverride,
 			archetype: ParseArchetype(definition.ArchetypeId),
+			role: definition.Role,
 			level: definition.Level,
 			stats: definition.Stats.ToRuntimeStats(),
 			position: position,
@@ -283,7 +272,7 @@ public partial class Adventurer : Node2D, ICombatant
 		}
 
 		int previousHealth = Health;
-		Health = Mathf.Max(0, Health - Mathf.Max(0, amount));
+		SetCurrentHealth(Mathf.Max(0, Health - Mathf.Max(0, amount)));
 		UpdateHealthBar();
 		PublishState();
 		return previousHealth - Health;
@@ -298,7 +287,7 @@ public partial class Adventurer : Node2D, ICombatant
 
 	public void RecoverToFull()
 	{
-		Health = MaxHealth;
+		RestoreStatsToFullHealth();
 		UpdateHealthBar();
 		PublishState();
 	}
@@ -311,7 +300,7 @@ public partial class Adventurer : Node2D, ICombatant
 		}
 
 		int previousHealth = Health;
-		Health = Mathf.Min(MaxHealth, Health + amount);
+		SetCurrentHealth(Mathf.Min(Stats.MaxHealth, Health + amount));
 		UpdateHealthBar();
 		PublishState();
 		return Health - previousHealth;
@@ -356,17 +345,18 @@ public partial class Adventurer : Node2D, ICombatant
 			{ "source", nameof(Adventurer) },
 			{ "name", AdventurerName },
 			{ "archetype", Archetype.ToString() },
+			{ "role", Role.ToString() },
 			{ "level", Level },
 			{ "experience", Experience },
 			{ "gold", Gold },
 			{ "health", Health },
-			{ "max_health", MaxHealth },
-			{ "attack", Attack },
-			{ "accuracy", Accuracy },
-			{ "defense", Defense },
-			{ "evasion", Evasion },
-			{ "initiative", Initiative },
-			{ "attack_speed", AttackSpeed },
+			{ "max_health", Stats.MaxHealth },
+			{ "attack", Stats.Attack },
+			{ "accuracy", Stats.Accuracy },
+			{ "defense", Stats.Defense },
+			{ "evasion", Stats.Evasion },
+			{ "initiative", Stats.Initiative },
+			{ "attack_speed", Stats.AttackSpeedTicks },
 			{ "speed", Speed },
 			{ "is_alive", IsAlive },
 			{ "intention_state", IntentionStateName },
@@ -409,8 +399,18 @@ public partial class Adventurer : Node2D, ICombatant
 			return;
 		}
 
-		_healthBar.MaxValue = Mathf.Max(1, MaxHealth);
-		_healthBar.Value = Mathf.Clamp(Health, 0, MaxHealth);
+		_healthBar.MaxValue = Mathf.Max(1, Stats.MaxHealth);
+		_healthBar.Value = Mathf.Clamp(Health, 0, Stats.MaxHealth);
+	}
+
+	private void SetCurrentHealth(int health)
+	{
+		Stats = Stats with { CurrentHealth = Mathf.Clamp(health, 0, Stats.MaxHealth) };
+	}
+
+	private void RestoreStatsToFullHealth()
+	{
+		Stats = Stats with { CurrentHealth = Stats.MaxHealth };
 	}
 
 	private void EnsureSelectionOutline()

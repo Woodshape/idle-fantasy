@@ -135,8 +135,8 @@ public sealed class CombatTickResolver
 
 		return rolledActions
 			.OrderByDescending(action => action.InitiativeScore)
-			.ThenByDescending(action => action.QueuedAction.Actor.Initiative)
-			.ThenBy(action => action.QueuedAction.Actor.AttackSpeed)
+			.ThenByDescending(action => action.QueuedAction.Actor.Stats.Initiative)
+			.ThenBy(action => action.QueuedAction.Actor.Stats.AttackSpeedTicks)
 			.ThenBy(action => action.QueuedAction.Actor.CombatantId, StringComparer.Ordinal)
 			.ToArray();
 	}

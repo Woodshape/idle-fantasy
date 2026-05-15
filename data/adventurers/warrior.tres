@@ -1,16 +1,16 @@
 [gd_resource type="Resource" script_class="AdventurerDefinition" format=3 uid="uid://d10cahnm4y3to"]
 
-[ext_resource type="Script" path="res://scripts/AdventurerDefinition.cs" id="1_adventurer"]
-[ext_resource type="Resource" path="res://data/combat/loadouts/warrior_starting.tres" id="2_loadout"]
-[ext_resource type="Script" path="res://scripts/CombatStatsDefinition.cs" id="3_stats_script"]
+[ext_resource type="Script" uid="uid://cb6m1kowy5u30" path="res://scripts/AdventurerDefinition.cs" id="1_adventurer"]
+[ext_resource type="Resource" uid="uid://cjjmgmrwp6dyd" path="res://data/combat/loadouts/warrior_starting.tres" id="2_loadout"]
+[ext_resource type="Script" uid="uid://bv3qr7yw0gw25" path="res://scripts/CombatStatsDefinition.cs" id="3_stats_script"]
 
 [sub_resource type="Resource" id="Stats_warrior"]
 script = ExtResource("3_stats_script")
-MaxHealth = 36
+MaxHealth = 46
 Attack = 8
-Accuracy = 0.22
-Defense = 2
-Evasion = 0.12
+Accuracy = 0.24
+Defense = 3
+Evasion = 0.18
 Initiative = 3
 AttackSpeedTicks = 4
 
@@ -19,6 +19,7 @@ script = ExtResource("1_adventurer")
 DefinitionId = "warrior"
 DisplayName = "Warrior"
 ArchetypeId = "warrior"
+Role = 0
 Stats = SubResource("Stats_warrior")
 CombatLoadout = ExtResource("2_loadout")
 SpriteModulate = Color(0.25, 0.55, 1, 1)

@@ -12,6 +12,9 @@ public partial class MonsterDefinition : Resource
 	public string DisplayName { get; set; } = string.Empty;
 
 	[Export]
+	public CombatantRole Role { get; set; } = CombatantRole.DamageDealer;
+
+	[Export]
 	public int Level { get; set; } = 1;
 
 	[Export]

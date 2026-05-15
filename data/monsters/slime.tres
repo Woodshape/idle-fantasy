@@ -1,15 +1,16 @@
-[gd_resource type="Resource" format=3 uid="uid://daobxg1dsx6md"]
+[gd_resource type="Resource" script_class="MonsterDefinition" format=3 uid="uid://daobxg1dsx6md"]
 
-[ext_resource type="Script" path="res://scripts/MonsterDefinition.cs" id="1_monster"]
-[ext_resource type="Resource" path="res://data/combat/loadouts/slime_starting.tres" id="2_loadout"]
-[ext_resource type="Script" path="res://scripts/CombatStatsDefinition.cs" id="3_stats_script"]
+[ext_resource type="Script" uid="uid://dxyrq54yboh17" path="res://scripts/MonsterDefinition.cs" id="1_monster"]
+[ext_resource type="Resource" uid="uid://cdwc6vsjnmp72" path="res://data/combat/loadouts/slime_starting.tres" id="2_loadout"]
+[ext_resource type="Script" uid="uid://bv3qr7yw0gw25" path="res://scripts/CombatStatsDefinition.cs" id="3_stats_script"]
 
 [sub_resource type="Resource" id="Stats_slime"]
 script = ExtResource("3_stats_script")
-MaxHealth = 23
-Attack = 5
-Accuracy = 0.35
-Defense = 1
+MaxHealth = 45
+Attack = 7
+Accuracy = 0.32
+Defense = 2
+Evasion = 0.12
 Initiative = 1
 AttackSpeedTicks = 8
 
@@ -17,6 +18,7 @@ AttackSpeedTicks = 8
 script = ExtResource("1_monster")
 DefinitionId = "slime"
 DisplayName = "Slime"
+Role = 1
 Stats = SubResource("Stats_slime")
 CombatLoadout = ExtResource("2_loadout")
 GoldReward = 7

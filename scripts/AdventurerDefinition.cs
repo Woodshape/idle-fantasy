@@ -2,6 +2,13 @@
 
 using Godot;
 
+public enum CombatantRole
+{
+	Tank,
+	DamageDealer,
+	Support
+}
+
 [GlobalClass]
 public partial class AdventurerDefinition : Resource
 {
@@ -13,6 +20,9 @@ public partial class AdventurerDefinition : Resource
 
 	[Export]
 	public string ArchetypeId { get; set; } = string.Empty;
+
+	[Export]
+	public CombatantRole Role { get; set; } = CombatantRole.DamageDealer;
 
 	[Export]
 	public int Level { get; set; } = 1;
